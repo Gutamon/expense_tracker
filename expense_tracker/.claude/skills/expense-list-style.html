@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense List Demo</title>
+
+  <style>
+    :root {
+      --bg: #111214;
+      --surface: #1b1b20;
+      --border: #2a2a32;
+
+      --text: #f5f5f5;
+      --muted: #8b8b95;
+
+      --accent: #57d38c;
+      --accent-dim: rgba(87, 211, 140, 0.12);
+
+      --danger: #ff6b6b;
+      --danger-dim: rgba(255, 107, 107, 0.12);
+
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+
+      font-family:
+        "Noto Sans TC",
+        system-ui,
+        sans-serif;
+
+      padding: 40px;
+    }
+
+    .wrapper {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .title {
+      font-size: .9rem;
+      font-weight: 500;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    /* Expense Item */
+
+    .expense-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+
+      border-radius: var(--radius);
+
+      padding: 16px 20px;
+      margin-bottom: 12px;
+
+      display: flex;
+      align-items: center;
+      gap: 16px;
+
+      transition:
+        border-color .2s,
+        transform .12s;
+    }
+
+    .expense-item:hover {
+      border-color: #3a3a44;
+      transform: translateY(-1px);
+    }
+
+    /* Badge */
+
+    .cat-badge {
+      border-radius: 6px;
+
+      font-size: .72rem;
+      font-weight: 600;
+
+      padding: 4px 10px;
+
+      white-space: nowrap;
+      letter-spacing: .04em;
+    }
+
+    .cat-badge.expense {
+      background: var(--danger-dim);
+      color: var(--danger);
+    }
+
+    .cat-badge.income {
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    .cat-badge.transfer {
+      background: rgba(91, 192, 222, 0.12);
+      color: #5bc0de;
+    }
+
+    /* Info */
+
+    .item-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .item-title {
+      font-size: .94rem;
+      font-weight: 500;
+
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .item-date {
+      margin-top: 4px;
+
+      font-size: .75rem;
+      color: var(--muted);
+
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .account-tag {
+      font-size: .7rem;
+
+      background: var(--border);
+
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    /* Amount */
+
+    .item-amount {
+      font-family: monospace;
+      font-size: 1rem;
+      font-weight: 600;
+
+      white-space: nowrap;
+    }
+
+    .item-amount.expense {
+      color: var(--danger);
+    }
+
+    .item-amount.income {
+      color: var(--accent);
+    }
+
+    .item-amount.transfer {
+      color: var(--text);
+    }
+
+    /* Actions */
+
+    .item-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 30px;
+      height: 30px;
+
+      border-radius: 6px;
+
+      border: 1px solid var(--border);
+      background: transparent;
+
+      color: var(--muted);
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      cursor: pointer;
+
+      transition: all .2s;
+    }
+
+    .icon-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .icon-btn.del:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    /* Mobile */
+
+    @media (max-width: 768px) {
+      body {
+        padding: 18px;
+      }
+
+      .expense-item {
+        display: grid;
+        grid-template-columns: max-content 1fr max-content;
+        grid-template-rows: auto auto;
+        column-gap: 12px;
+        row-gap: 10px;
+        align-items: center;
+      }
+
+      .cat-badge {
+        grid-column: 1;
+        grid-row: 1;
+      }
+
+      .item-amount {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: start;
+      }
+
+      .item-info {
+        grid-column: 1 / 3;
+        grid-row: 2;
+      }
+
+      .item-actions {
+        grid-column: 3;
+        grid-row: 1 / 3;
+        justify-self: end;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="wrapper">
+
+    <div class="title">記帳明細</div>
+
+    <!-- Expense -->
+    <div class="expense-item">
+
+      <span class="cat-badge expense">
+        餐飲
+      </span>
+
+      <div class="item-info">
+        <div class="item-title">
+          午餐
+        </div>
+
+        <div class="item-date">
+          2026-05-10 · 麥當勞
+
+          <span class="account-tag">
+            💳 玉山信用卡
+          </span>
+        </div>
+      </div>
+
+      <div class="item-amount expense">
+        -NT$ 120
+      </div>
+
+      <div class="item-actions">
+        <button class="icon-btn">✎</button>
+        <button class="icon-btn del">✕</button>
+      </div>
+
+    </div>
+
+    <!-- Income -->
+    <div class="expense-item">
+
+      <span class="cat-badge income">
+        薪資
+      </span>
+
+      <div class="item-info">
+        <div class="item-title">
+          五月薪水
+        </div>
+
+        <div class="item-date">
+          2026-05-01
+
+          <span class="account-tag">
+            🏦 台新銀行
+          </span>
+        </div>
+      </div>
+
+      <div class="item-amount income">
+        +NT$ 52,000
+      </div>
+
+      <div class="item-actions">
+        <button class="icon-btn">✎</button>
+        <button class="icon-btn del">✕</button>
+      </div>
+
+    </div>
+
+    <!-- Transfer -->
+    <div class="expense-item">
+
+      <span class="cat-badge transfer">
+        轉帳
+      </span>
+
+      <div class="item-info">
+        <div class="item-title">
+          轉帳
+        </div>
+
+        <div class="item-date">
+          2026-05-08
+
+          <span class="account-tag">
+            💵 現金
+          </span>
+
+          ➔
+
+          <span class="account-tag">
+            🏦 台新銀行
+          </span>
+        </div>
+      </div>
+
+      <div class="item-amount transfer">
+        -NT$ 5,000
+      </div>
+
+      <div class="item-actions">
+        <button class="icon-btn">✎</button>
+        <button class="icon-btn del">✕</button>
+      </div>
+
+    </div>
+
+  </div>
+
+</body>
+
+</html>

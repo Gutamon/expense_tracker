@@ -1,341 +1,994 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>記帳本</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --bg: #0f0f11;
-      --surface: #18181c;
-      --border: #2a2a30;
-      --accent: #c8f04a;
-      --accent-dim: rgba(200,240,74,0.12);
-      --text: #e8e8ec;
-      --muted: #6b6b78;
-      --danger: #ff5f5f;
-      --radius: 12px;
+{% extends "base.html" %}
+
+{% block title %}記帳本{% endblock %}
+
+{% block head %}
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js'></script>
+<style>
+  .title {
+    font-size: .9rem;
+    font-weight: 500;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 15px;
+  }
+
+  /* ── Stats ── */
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+
+  .stat-card .label {
+    font-size: .75rem;
+    color: var(--muted);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .stat-card .value {
+    font-family: 'DM Mono', monospace;
+    font-size: 1.6rem;
+    font-weight: 500;
+  }
+
+  .stat-card .value.green {
+    color: var(--accent);
+  }
+
+  .stat-card .value.red {
+    color: var(--danger);
+  }
+
+  .progress-bar {
+    margin-top: 10px;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s;
+  }
+
+  .progress-fill.over {
+    background: var(--danger);
+  }
+
+  /* ── Two-column grid ── */
+  .grid {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* ── Form card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+  }
+
+  .card h2 {
+    font-size: .9rem;
+    font-weight: 500;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  .field {
+    margin-bottom: 16px;
+  }
+
+  .field label {
+    display: block;
+    font-size: .78rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+    letter-spacing: .05em;
+  }
+
+  .field input[type="text"],
+  .field input[type="number"],
+  .field input[type="date"],
+  .field select,
+  .field textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: .9rem;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color .2s;
+  }
+
+  .field input:focus,
+  .field select option,
+  optgroup {
+    background: #1e1e24;
+    color: var(--text);
+  }
+
+  .segmented-control {
+    display: flex;
+    background: #0f0f11;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 16px;
+  }
+
+  .segmented-control label {
+    flex: 1;
+    text-align: center;
+    padding: 8px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: .85rem;
+    font-weight: 500;
+    color: var(--muted);
+    transition: all .2s;
+  }
+
+  .segmented-control input[type="radio"] {
+    display: none;
+  }
+
+  .segmented-control input[type="radio"]:checked+label {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
+
+  .segmented-control input[type="radio"][value="income"]:checked+label {
+    color: var(--accent);
+  }
+
+  .segmented-control input[type="radio"][value="expense"]:checked+label {
+    color: var(--danger);
+  }
+
+  .segmented-control input[type="radio"][value="transfer"]:checked+label {
+    color: #5bc0de;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: .9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity .2s, transform .1s;
+  }
+
+  .btn:active {
+    transform: scale(.98);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #111;
+  }
+
+  .btn-primary:hover {
+    opacity: .88;
+  }
+
+  /* ── Expense list ── */
+  .list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .list-header h2 {
+    font-size: .9rem;
+    font-weight: 500;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 20px;
+  }
+
+  .expense-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: border-color .2s, transform .12s;
+  }
+
+  .expense-item:hover {
+    border-color: #3a3a44;
+    transform: translateY(-1px);
+  }
+
+  .cat-badge {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-radius: 6px;
+    font-size: .72rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    white-space: nowrap;
+    letter-spacing: .04em;
+  }
+
+  .cat-badge.expense {
+    background: var(--danger-dim);
+    color: var(--danger);
+  }
+
+  .cat-badge.transfer {
+    background: rgba(91, 192, 222, 0.12);
+    color: #5bc0de;
+  }
+
+  .item-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .item-title {
+    font-size: .94rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .item-date {
+    font-size: .75rem;
+    color: var(--muted);
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .account-tag {
+    font-size: .7rem;
+    background: var(--border);
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+
+  .item-amount {
+    font-family: 'DM Mono', monospace;
+    font-size: 1rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .item-amount.income {
+    color: var(--accent);
+  }
+
+  .item-amount.expense {
+    color: var(--danger);
+  }
+
+  .item-amount.transfer {
+    color: var(--text);
+  }
+
+  .item-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .icon-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-size: .8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .2s;
+  }
+
+  .icon-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .icon-btn.del:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  .empty {
+    text-align: center;
+    padding: 60px 0;
+    color: var(--muted);
+    font-size: .9rem;
+  }
+
+  /* ── Modal ── */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .7);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .overlay.open {
+    display: flex;
+  }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    width: 90%;
+    max-width: 450px;
+    animation: pop .25s ease;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  @media (min-width: 768px) {
+    .modal.wide {
+      max-width: 700px;
     }
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Noto Sans TC', sans-serif;
-      font-weight: 300;
-      min-height: 100vh;
-    }
-
-    /* ── Header ── */
-    header {
-      border-bottom: 1px solid var(--border);
-      padding: 20px 32px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .logo { font-size: 1.1rem; font-weight: 700; letter-spacing: .04em; }
-    .logo span { color: var(--accent); }
-    nav a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: .85rem;
-      margin-left: 24px;
-      transition: color .2s;
-    }
-    nav a:hover, nav a.active { color: var(--accent); }
-
-    /* ── Layout ── */
-    .shell {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 40px 24px;
-    }
-
-    /* ── Stats ── */
-    .stats {
+    .modal-form {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 40px;
+      grid-template-columns: 1fr 1fr;
+      gap: 0 20px;
     }
-    .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
+
+    .modal-form .full {
+      grid-column: span 2;
     }
-    .stat-card .label { font-size: .75rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
-    .stat-card .value { font-family: 'DM Mono', monospace; font-size: 1.6rem; font-weight: 500; }
-    .stat-card .value.green { color: var(--accent); }
+  }
 
-    /* ── Two-column grid ── */
-    .grid { display: grid; grid-template-columns: 340px 1fr; gap: 24px; align-items: start; }
-
-    /* ── Form card ── */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 28px;
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(.94)
     }
-    .card h2 { font-size: .9rem; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 24px; }
 
-    .field { margin-bottom: 16px; }
-    .field label { display: block; font-size: .78rem; color: var(--muted); margin-bottom: 6px; letter-spacing: .05em; }
-    .field input,
-    .field select,
-    .field textarea {
-      width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-family: inherit;
-      font-size: .9rem;
-      padding: 10px 14px;
-      outline: none;
-      transition: border-color .2s;
+    to {
+      opacity: 1;
+      transform: scale(1)
     }
-    .field input:focus,
-    .field select:focus,
-    .field textarea:focus { border-color: var(--accent); }
-    .field textarea { resize: vertical; min-height: 72px; }
-    .field select option { background: #1e1e24; }
+  }
 
-    .btn {
-      width: 100%;
-      padding: 12px;
-      border: none;
-      border-radius: 8px;
-      font-family: inherit;
-      font-size: .9rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: opacity .2s, transform .1s;
+  .modal h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 20px;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .btn-ghost {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text);
+    border-radius: 8px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--accent);
+  }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--accent);
+    color: #111;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: .85rem;
+    font-weight: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .3s;
+    z-index: 200;
+  }
+
+  #toast.show {
+    opacity: 1;
+  }
+
+  /* ── Calendar / View Toggle ── */
+  .view-toggle {
+    display: flex;
+    background: #0f0f11;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+  }
+
+  .view-toggle label {
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: .8rem;
+    font-weight: 500;
+    color: var(--muted);
+    transition: all .2s;
+  }
+
+  .view-toggle input[type="radio"] {
+    display: none;
+  }
+
+  .view-toggle input[type="radio"]:checked+label {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
+
+  #calendar-view {
+    display: none;
+    margin-top: 16px;
+  }
+
+  .fc {
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 0.85rem;
+  }
+
+  .fc-theme-standard td,
+  .fc-theme-standard th,
+  .fc-theme-standard .fc-scrollgrid {
+    border-color: var(--border);
+  }
+
+  .fc-col-header-cell-cushion,
+  .fc-daygrid-day-number {
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .fc .fc-toolbar-title {
+    font-size: 1.2rem;
+    font-weight: 500;
+  }
+
+  .fc .fc-button-primary {
+    background-color: var(--surface);
+    border-color: var(--border);
+    color: var(--text);
+  }
+
+  .fc .fc-button-primary:not(:disabled):active,
+  .fc .fc-button-primary:not(:disabled).fc-button-active {
+    background-color: var(--accent);
+    color: #000;
+  }
+
+  /* ── Account Filters ── */
+  .acc-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .btn-filter {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: .85rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .2s;
+  }
+
+  .btn-filter.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── FAB (mobile add button) ── */
+  .fab-add {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+
+    .stats {
+      grid-template-columns: 1fr;
     }
-    .btn:active { transform: scale(.98); }
-    .btn-primary { background: var(--accent); color: #111; }
-    .btn-primary:hover { opacity: .88; }
 
-    /* ── Expense list ── */
-    .list-header {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+
+    #add-form-card {
+      display: none;
+    }
+
+    .fab-add {
       display: flex;
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #111;
+      border: none;
+      font-size: 1.6rem;
+      font-weight: 300;
       align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      z-index: 50;
+      transition: transform .15s, opacity .15s;
     }
-    .list-header h2 { font-size: .9rem; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+    .fab-add:active {
+      transform: scale(.92);
+    }
+
+    .list-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
 
     .expense-item {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px 20px;
-      margin-bottom: 10px;
-      display: flex;
+      display: grid;
+      grid-template-columns: max-content 1fr max-content;
+      grid-template-rows: auto auto;
+      column-gap: 12px;
+      row-gap: 10px;
       align-items: center;
-      gap: 16px;
-      transition: border-color .2s;
     }
-    .expense-item:hover { border-color: #3a3a44; }
 
-    .cat-badge {
-      background: var(--accent-dim);
-      color: var(--accent);
-      border-radius: 6px;
-      font-size: .72rem;
-      font-weight: 500;
-      padding: 4px 10px;
-      white-space: nowrap;
-      letter-spacing: .04em;
+    .expense-item .cat-badge {
+      grid-column: 1;
+      grid-row: 1;
     }
-    .item-info { flex: 1; min-width: 0; }
-    .item-title { font-size: .92rem; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .item-date { font-size: .75rem; color: var(--muted); margin-top: 2px; }
-    .item-amount {
-      font-family: 'DM Mono', monospace;
-      font-size: 1rem;
-      font-weight: 500;
-      color: var(--accent);
-      white-space: nowrap;
-    }
-    .item-actions { display: flex; gap: 8px; }
-    .icon-btn {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      border-radius: 6px;
-      width: 30px;
-      height: 30px;
-      cursor: pointer;
-      font-size: .8rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all .2s;
-    }
-    .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .icon-btn.del:hover { border-color: var(--danger); color: var(--danger); }
 
-    .empty { text-align: center; padding: 60px 0; color: var(--muted); font-size: .9rem; }
-
-    /* ── Modal ── */
-    .overlay {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,.7);
-      backdrop-filter: blur(4px);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
+    .expense-item .item-amount {
+      grid-column: 2;
+      grid-row: 1;
+      justify-self: start;
     }
-    .overlay.open { display: flex; }
-    .modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 32px;
-      width: 100%;
-      max-width: 400px;
-      animation: pop .25s ease;
+
+    .expense-item .item-info {
+      grid-column: 1 / 3;
+      grid-row: 2;
     }
-    @keyframes pop { from { opacity:0; transform:scale(.94) } to { opacity:1; transform:scale(1) } }
-    .modal h3 { font-size: 1rem; font-weight: 500; margin-bottom: 20px; }
-    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
-    .btn-ghost {
-      flex: 1; padding: 10px; border: 1px solid var(--border); background: none;
-      color: var(--text); border-radius: 8px; font-family: inherit; cursor: pointer;
+
+    .expense-item .item-actions {
+      grid-column: 3;
+      grid-row: 1 / 3;
+      justify-self: end;
     }
-    .btn-ghost:hover { border-color: var(--accent); }
+  }
 
-    /* ── Toast ── */
-    #toast {
-      position: fixed; bottom: 24px; right: 24px;
-      background: var(--accent); color: #111;
-      border-radius: 8px; padding: 12px 20px;
-      font-size: .85rem; font-weight: 500;
-      opacity: 0; pointer-events: none;
-      transition: opacity .3s;
-      z-index: 200;
-    }
-    #toast.show { opacity: 1; }
-  </style>
-</head>
-<body>
+  /* ── Month Navigator ── */
+  .month-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    gap: 12px;
+  }
 
-<header>
-  <div class="logo">帳 <span>·</span> 本</div>
-  <nav>
-    <a href="/" class="active">支出列表</a>
-    <a href="/charts">圖表分析</a>
-    <a href="/categories">類別管理</a>
-    <span style="color:var(--muted); margin-left:24px;">|</span>
-    <span style="color:var(--text); margin-left:24px;">{{ username }}</span>
-    <a href="/logout">登出</a>
-  </nav>
-</header>
+  .month-nav-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
 
-<main class="shell">
+  .month-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .2s;
+    padding: 0;
+  }
 
-  <!-- Stats -->
-  <div class="stats">
-    <div class="stat-card">
-      <div class="label">總支出筆數</div>
-      <div class="value" id="stat-count">{{ expenses | length }}</div>
+  .month-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  #month-display {
+    font-size: .95rem;
+    font-weight: 500;
+    min-width: 82px;
+    text-align: center;
+  }
+
+  #date-range-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .range-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: .85rem;
+    padding: 6px 10px;
+    outline: none;
+  }
+
+  .btn-filter.filter-locked {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .budget-section {
+    margin-bottom: 12px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Account Filters -->
+<h2 class="title">持有帳戶篩選</h2>
+<div class="acc-filters" id="acc-filters">
+  <button class="btn-filter active" id="acc-filter-all" data-id="all" onclick="toggleAllFilter(this)">全部</button>
+  {% for a in all_accounts %}
+  {% if a.get('is_asset', 1) %}
+  <button class="btn-filter filter-locked" data-id="{{ a.id }}" data-bal="{{ account_balances.get(a.id, 0) }}"
+    onclick="toggleAccFilter(this)">
+    {{ a.icon }} {{ a.name }}
+  </button>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat-card">
+    <div class="label">所選資產總額</div>
+    <div class="value green" id="stat-total">NT$ {{ "%.0f" | format(total_balance) }}</div>
+  </div>
+</div>
+
+<div class="grid">
+
+  <!-- Add Form -->
+  <div class="card" id="add-form-card">
+    <h2>新增明細</h2>
+    <div class="segmented-control">
+      <input type="radio" name="f-type" id="f-type-exp" value="expense" checked onchange="onTypeChange('expense', 'f')">
+      <label for="f-type-exp">支出</label>
+      <input type="radio" name="f-type" id="f-type-inc" value="income" onchange="onTypeChange('income', 'f')">
+      <label for="f-type-inc">收入</label>
+      <input type="radio" name="f-type" id="f-type-tra" value="transfer" onchange="onTypeChange('transfer', 'f')">
+      <label for="f-type-tra">轉帳</label>
     </div>
-    <div class="stat-card">
-      <div class="label">總金額</div>
-      <div class="value green" id="stat-total">NT$ {{ "%.0f" | format(total) }}</div>
+    <div class="field" id="f-title-field">
+      <label>名稱</label>
+      <input type="text" id="f-title" placeholder="例：午餐" autocomplete="off" />
     </div>
-    <div class="stat-card">
-      <div class="label">平均每筆</div>
-      <div class="value" id="stat-avg">
-        NT$ {{ "%.0f" | format(total / expenses|length) if expenses else 0 }}
-      </div>
+    <div class="field">
+      <label>金額（NT$）</label>
+      <input type="number" id="f-amount" placeholder="0" min="0" step="1" autocomplete="off" />
+    </div>
+    <div class="field" id="f-category-field">
+      <label>類別</label>
+      <select id="f-category">
+        {% for group, cats in grouped_categories.items() %}
+        <optgroup label="{{ group }}">
+          {% for cat in cats %}
+          <option value="{{ cat.name }}" data-type="{{ cat.type }}">{{ cat.name }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label id="f-account-label">帳戶 <a href="/settings?tab=accounts"
+          style="font-size:0.625rem;float:right;cursor:pointer;color:var(--accent);text-decoration:none;">管理</a></label>
+      <select id="f-account">
+
+        {% for a in accounts %}
+        <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field" id="f-to-account-field" style="display:none">
+      <label>轉入帳戶</label>
+      <select id="f-to-account">
+
+        {% for a in accounts %}
+        <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>日期</label>
+      <input type="date" id="f-date" />
+    </div>
+    <div class="field">
+      <label>備註（選填）</label>
+      <input type="text" id="f-note" placeholder="..." autocomplete="off" />
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" style="flex:1" onclick="addExpense()">新增</button>
+      <button class="btn btn-primary"
+        style="flex:1;background:var(--surface);border:1px solid var(--accent);color:var(--accent)"
+        onclick="addExpenseAgain()">再記一筆</button>
     </div>
   </div>
 
-  <div class="grid">
 
-    <!-- Add Form -->
-    <div class="card">
-      <h2>新增支出</h2>
-      <div class="field">
+
+  <!-- List -->
+  <div style="min-width: 0;">
+    <div class="list-header">
+      <h2>記帳明細</h2>
+    </div>
+
+    <!-- Budget Section -->
+    <div class="budget-section">
+      <div id="budget-bars"></div>
+      <a href="/settings?tab=budget" style="font-size:.78rem;color:var(--accent);text-decoration:none;">預算設定</a>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+      <div class="view-toggle">
+        <input type="radio" name="view-mode" id="view-list" value="list" checked onchange="switchView('list')">
+        <label for="view-list">明細</label>
+        <input type="radio" name="view-mode" id="view-cal" value="cal" onchange="switchView('cal')">
+        <label for="view-cal">行事曆</label>
+      </div>
+    </div>
+
+    <!-- Month Navigator -->
+    <div class="month-nav" id="month-nav">
+      <div class="month-nav-controls">
+        <button class="month-btn" onclick="changeMonth(-1)">&#8249;</button>
+        <span id="month-display"></span>
+        <button class="month-btn" onclick="changeMonth(1)">&#8250;</button>
+      </div>
+      <button class="btn-filter" id="custom-range-btn" onclick="toggleDateRange()">自訂區間</button>
+    </div>
+    <div id="date-range-bar" style="display:none">
+      <input type="date" id="range-start" class="range-input">
+      <span style="color:var(--muted);font-size:.85rem">至</span>
+      <input type="date" id="range-end" class="range-input">
+      <button class="btn-filter active" onclick="applyDateRange()">套用</button>
+      <button class="btn-filter" onclick="clearDateRange()">清除</button>
+    </div>
+
+    <div id="expense-list">
+      {% if expenses %}
+      {% for e in expenses %}
+      <div class="expense-item" id="exp-{{ e.id }}" data-acc-id="{{ e.account_id }}" data-date="{{ e.date }}" {% if
+        e.type=='transfer' %}data-to-acc-id="{{ e.to_account_id or '' }}" {% endif %}>
+        <span class="cat-badge {% if e.type == 'expense' %}expense{% elif e.type == 'transfer' %}transfer{% endif %}">
+          {% if e.type == 'transfer' %}轉帳{% else %}{{ e.category }}{% endif %}
+        </span>
+        <div class="item-info">
+          <div class="item-title">{{ e.title }}</div>
+          <div class="item-date">
+            <span>{{ e.date }}{% if e.note %} · {{ e.note }}{% endif %}</span>
+            {% if e.account_id and account_map.get(e.account_id) %}
+            <span class="account-tag">{{ account_map[e.account_id].icon }} {{ account_map[e.account_id].name }}</span>
+            {% endif %}
+            {% if e.type == 'transfer' and e.to_account_id and account_map.get(e.to_account_id) %}
+            ➔
+            <span class="account-tag">{{ account_map[e.to_account_id].icon }} {{ account_map[e.to_account_id].name
+              }}</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="item-amount {{ e.type }}">
+          {% if e.type == 'income' %}+{% else %}-{% endif %}NT$ {{ "%.0f" | format(e.amount) }}
+        </div>
+        <div class="item-actions">
+          <button class="icon-btn" onclick="openEditById('{{ e.id }}')">✎</button>
+          <button class="icon-btn del" onclick="confirmDelete('{{ e.id }}')">✕</button>
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty">尚無明細，請從左側新增。</div>
+      {% endif %}
+    </div>
+
+    <div id="calendar-view"></div>
+
+
+  </div>
+
+</div>
+
+<!-- FAB (mobile only) -->
+<button class="fab-add" onclick="openMobileAdd()">＋</button>
+
+<!-- Mobile Add Modal -->
+<div class="overlay" id="mobile-add-overlay">
+  <div class="modal wide">
+    <h3>新增明細</h3>
+    <div class="modal-form">
+      <div class="field full">
+        <div class="segmented-control" style="margin-bottom:0">
+          <input type="radio" name="m-type" id="m-type-exp" value="expense" checked
+            onchange="onTypeChange('expense', 'm')">
+          <label for="m-type-exp">支出</label>
+          <input type="radio" name="m-type" id="m-type-inc" value="income" onchange="onTypeChange('income', 'm')">
+          <label for="m-type-inc">收入</label>
+          <input type="radio" name="m-type" id="m-type-tra" value="transfer" onchange="onTypeChange('transfer', 'm')">
+          <label for="m-type-tra">轉帳</label>
+        </div>
+      </div>
+      <div class="field full" id="m-title-field">
         <label>名稱</label>
-        <input type="text" id="f-title" placeholder="例：午餐" />
+        <input type="text" id="m-title" placeholder="例：午餐" autocomplete="off" />
       </div>
-      <div class="field">
+      <div class="field full">
         <label>金額（NT$）</label>
-        <input type="number" id="f-amount" placeholder="0" min="0" step="1" />
+        <input type="number" id="m-amount" placeholder="0" min="0" step="1" autocomplete="off" />
       </div>
-      <div class="field">
+      <div class="field full" id="m-category-field">
         <label>類別</label>
-        <select id="f-category">
-          {% for cat in categories %}
-          <option>{{ cat }}</option>
+        <select id="m-category">
+          {% for group, cats in grouped_categories.items() %}
+          <optgroup label="{{ group }}">
+            {% for cat in cats %}
+            <option value="{{ cat.name }}" data-type="{{ cat.type }}">{{ cat.name }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field full">
+        <label id="m-account-label">帳戶</label>
+        <select id="m-account">
+          {% for a in accounts %}
+          <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field full" id="m-to-account-field" style="display:none">
+        <label>轉入帳戶</label>
+        <select id="m-to-account">
+          {% for a in accounts %}
+          <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field full">
+        <label>日期</label>
+        <input type="date" id="m-date" />
+      </div>
+      <div class="field full">
+        <label>備註（選填）</label>
+        <input type="text" id="m-note" placeholder="..." autocomplete="off" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeMobileAdd()">取消</button>
+      <button class="btn btn-primary" style="flex:2" onclick="addExpenseFrom('m', true)">再記一筆</button>
+      <button class="btn btn-primary" style="flex:2" onclick="addExpenseFrom('m', false)">新增</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="overlay" id="edit-overlay">
+  <div class="modal wide">
+    <h3>編輯明細</h3>
+    <input type="hidden" id="e-id" />
+    <div class="modal-form">
+      <div class="field full">
+        <div class="segmented-control" style="margin-bottom:0">
+          <input type="radio" name="e-type" id="e-type-exp" value="expense" onchange="onTypeChange('expense', 'e')">
+          <label for="e-type-exp">支出</label>
+          <input type="radio" name="e-type" id="e-type-inc" value="income" onchange="onTypeChange('income', 'e')">
+          <label for="e-type-inc">收入</label>
+          <input type="radio" name="e-type" id="e-type-tra" value="transfer" onchange="onTypeChange('transfer', 'e')">
+          <label for="e-type-tra">轉帳</label>
+        </div>
+      </div>
+      <div class="field" id="e-title-field"><label>名稱</label><input type="text" id="e-title" autocomplete="off" /></div>
+      <div class="field"><label>金額</label><input type="number" id="e-amount" autocomplete="off" /></div>
+      <div class="field" id="e-category-field">
+        <label>類別</label>
+        <select id="e-category">
+          {% for group, cats in grouped_categories.items() %}
+          <optgroup label="{{ group }}">
+            {% for cat in cats %}
+            <option value="{{ cat.name }}" data-type="{{ cat.type }}">{{ cat.name }}</option>
+            {% endfor %}
+          </optgroup>
           {% endfor %}
         </select>
       </div>
       <div class="field">
-        <label>日期</label>
-        <input type="date" id="f-date" />
-      </div>
-      <div class="field">
-        <label>備註（選填）</label>
-        <textarea id="f-note" placeholder="..."></textarea>
-      </div>
-      <button class="btn btn-primary" onclick="addExpense()">新增</button>
-    </div>
+        <label id="e-account-label">帳戶</label>
+        <select id="e-account">
 
-    <!-- List -->
-    <div>
-      <div class="list-header">
-        <h2>支出紀錄</h2>
-      </div>
-      <div id="expense-list">
-        {% if expenses %}
-          {% for e in expenses %}
-          <div class="expense-item" data-id="{{ e.id }}">
-            <span class="cat-badge">{{ e.category }}</span>
-            <div class="item-info">
-              <div class="item-title">{{ e.title }}</div>
-              <div class="item-date">{{ e.date }}{% if e.note %} · {{ e.note }}{% endif %}</div>
-            </div>
-            <div class="item-amount">NT$ {{ "%.0f" | format(e.amount) }}</div>
-            <div class="item-actions">
-              <button class="icon-btn" onclick="openEdit('{{ e.id }}','{{ e.title }}','{{ e.amount }}','{{ e.category }}','{{ e.date }}','{{ e.note or '' }}')">✎</button>
-              <button class="icon-btn del" onclick="confirmDelete('{{ e.id }}')">✕</button>
-            </div>
-          </div>
+          {% for a in accounts %}
+          <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}</option>
           {% endfor %}
-        {% else %}
-          <div class="empty">尚無支出紀錄，請從左側新增。</div>
-        {% endif %}
+        </select>
       </div>
-    </div>
+      <div class="field" id="e-to-account-field" style="display:none">
+        <label>轉入帳戶</label>
+        <select id="e-to-account">
 
-  </div>
-</main>
-
-<!-- Edit Modal -->
-<div class="overlay" id="edit-overlay">
-  <div class="modal">
-    <h3>編輯支出</h3>
-    <input type="hidden" id="e-id" />
-    <div class="field"><label>名稱</label><input type="text" id="e-title" /></div>
-    <div class="field"><label>金額</label><input type="number" id="e-amount" /></div>
-    <div class="field">
-      <label>類別</label>
-      <select id="e-category">
-        {% for cat in categories %}<option>{{ cat }}</option>{% endfor %}
-      </select>
+          {% for a in accounts %}
+          <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field"><label>日期</label><input type="date" id="e-date" /></div>
+      <div class="field"><label>備註</label><input type="text" id="e-note" autocomplete="off" /></div>
     </div>
-    <div class="field"><label>日期</label><input type="date" id="e-date" /></div>
-    <div class="field"><label>備註</label><textarea id="e-note"></textarea></div>
     <div class="modal-actions">
       <button class="btn-ghost" onclick="closeEdit()">取消</button>
       <button class="btn btn-primary" style="flex:1" onclick="saveEdit()">儲存</button>
@@ -351,17 +1004,90 @@
     <input type="hidden" id="del-id" />
     <div class="modal-actions">
       <button class="btn-ghost" onclick="document.getElementById('del-overlay').classList.remove('open')">取消</button>
-      <button class="btn btn-primary" style="flex:1;background:var(--danger);color:#fff" onclick="doDelete()">刪除</button>
+      <button class="btn btn-primary" style="flex:1;background:var(--danger);color:#fff"
+        onclick="doDelete()">刪除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Day Detail Modal (calendar click) -->
+<div class="overlay" id="day-overlay">
+  <div class="modal">
+    <h3 id="day-modal-title"></h3>
+    <div id="day-modal-content" style="max-height:55vh;overflow-y:auto;margin-top:8px"></div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn-ghost" onclick="document.getElementById('day-overlay').classList.remove('open')">關閉</button>
     </div>
   </div>
 </div>
 
 <div id="toast"></div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-  // Set today as default date
-  document.getElementById("f-date").value = new Date().toISOString().split("T")[0];
+  const today = new Date().toISOString().split("T")[0];
+  document.getElementById("f-date").value = today;
+  document.getElementById("m-date").value = today;
 
+  const allExpenses = {{ expenses | tojson | safe }};
+  const accountMapData = {{ account_map | tojson | safe }};
+  const allCategories = {{ categories | tojson | safe }};
+
+  // ── Type change ──
+  function onTypeChange(type, prefix) {
+    if (type === 'transfer') {
+      document.getElementById(prefix + '-title-field').style.display = 'none';
+      document.getElementById(prefix + '-category-field').style.display = 'none';
+      document.getElementById(prefix + '-to-account-field').style.display = 'block';
+      document.getElementById(prefix + '-account-label').innerHTML = `轉出帳戶 <a href="/settings?tab=accounts" style="font-size:0.625rem;float:right;cursor:pointer;color:var(--accent);text-decoration:none;">管理</a>`;
+      document.getElementById(prefix + '-title').value = '轉帳';
+    } else {
+      document.getElementById(prefix + '-title-field').style.display = 'block';
+      document.getElementById(prefix + '-category-field').style.display = 'block';
+      document.getElementById(prefix + '-to-account-field').style.display = 'none';
+      document.getElementById(prefix + '-account-label').innerHTML = `帳戶 <a href="/settings?tab=accounts" style="font-size:0.625rem;float:right;cursor:pointer;color:var(--accent);text-decoration:none;">管理</a>`;
+      filterCategories(type, prefix + '-category');
+      if (document.getElementById(prefix + '-title').value === '轉帳') document.getElementById(prefix + '-title').value = '';
+    }
+  }
+
+  // ── Mobile add ──
+  function openMobileAdd() {
+    document.getElementById('mobile-add-overlay').classList.add('open');
+  }
+
+  let pendingReload = false;
+
+  function closeMobileAdd() {
+    document.getElementById('mobile-add-overlay').classList.remove('open');
+    if (pendingReload) { pendingReload = false; location.reload(); }
+  }
+
+  // ── Category filter ──
+  function filterCategories(type, selectId) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    let firstValid = null;
+    Array.from(select.options).forEach(opt => {
+      if (opt.dataset.type === type) {
+        opt.style.display = '';
+        if (!firstValid) firstValid = opt.value;
+      } else {
+        opt.style.display = 'none';
+      }
+    });
+    Array.from(select.querySelectorAll('optgroup')).forEach(grp => {
+      const hasVisible = Array.from(grp.querySelectorAll('option')).some(o => o.style.display !== 'none');
+      grp.style.display = hasVisible ? '' : 'none';
+    });
+    if (firstValid) select.value = firstValid;
+  }
+
+  onTypeChange('expense', 'f');
+  onTypeChange('expense', 'm');
+
+  // ── Toast ──
   function toast(msg) {
     const t = document.getElementById("toast");
     t.textContent = msg;
@@ -369,46 +1095,161 @@
     setTimeout(() => t.classList.remove("show"), 2500);
   }
 
-  async function addExpense() {
+  // ── Budget display ──
+  function buildBudgetBar(name, spent, budget, pct, over) {
+    return `<div style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">
+        <span style="font-size:.85rem;font-weight:500;">${name}</span>
+        <span style="font-family:'DM Mono',monospace;font-size:.75rem;color:var(--muted);">NT$ ${Math.round(spent).toLocaleString()} / ${Math.round(budget).toLocaleString()}</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill ${over ? 'over' : ''}" style="width:${pct}%;"></div></div>
+    </div>`;
+  }
+
+  // Budget display (fetches per-month data from API)
+  const _budgetCache = {};
+
+  async function updateBudgetDisplay() {
+    const catMap = {};
+    allCategories.forEach(c => { catMap[c.name] = c; });
+
+    const catSpent = {};
+    let totalSpent = 0;
+    allExpenses.forEach(e => {
+      if (e.type !== 'expense') return;
+      if (!dateMatchesFilter(e.date)) return;
+      const cat = catMap[e.category];
+      if (cat && cat.in_budget) totalSpent += e.amount;
+      catSpent[e.category] = (catSpent[e.category] || 0) + e.amount;
+    });
+
+    let totalBudget = 0;
+    let catBudgetMap = {};
+
+    if (!isCustomRange) {
+      const cacheKey = `${currentYear}-${currentMonth + 1}`;
+      if (!_budgetCache[cacheKey]) {
+        try {
+          const res = await fetch(`/api/budget?year=${currentYear}&month=${currentMonth + 1}`);
+          if (res.ok) _budgetCache[cacheKey] = await res.json();
+        } catch (e) {}
+      }
+      const bdata = _budgetCache[cacheKey];
+      if (bdata) {
+        totalBudget = bdata.total_budget || 0;
+        (bdata.categories || []).forEach(cb => { catBudgetMap[String(cb.id)] = cb.amount; });
+      }
+    }
+
+    let html = '';
+    if (totalBudget > 0) {
+      const pct = Math.min(100, Math.round(totalSpent / totalBudget * 100));
+      html += buildBudgetBar('總預算', totalSpent, totalBudget, pct, totalSpent > totalBudget);
+    }
+    allCategories.filter(c => c.type === 'expense').forEach(cat => {
+      const b = catBudgetMap[String(cat.id)] || 0;
+      if (b <= 0) return;
+      const spent = catSpent[cat.name] || 0;
+      const pct = Math.min(100, Math.round(spent / b * 100));
+      html += buildBudgetBar(cat.name, spent, b, pct, spent > b);
+    });
+
+    const container = document.getElementById('budget-bars');
+    if (!html) {
+      container.innerHTML = '<p style="color:var(--muted);font-size:.85rem;text-align:center;padding:20px 0;">尚未設定預算 · <a href="/settings?tab=budget" style="color:var(--accent);">前往設定</a></p>';
+    } else {
+      container.innerHTML = html;
+    }
+  }
+
+  // ── Add expense ──
+  async function addExpenseFrom(prefix, keepOpen = false) {
+    const type = document.querySelector(`input[name="${prefix}-type"]:checked`).value;
+    const titleValue = document.getElementById(`${prefix}-title`).value.trim();
     const body = {
-      title: document.getElementById("f-title").value.trim(),
-      amount: parseFloat(document.getElementById("f-amount").value),
-      category: document.getElementById("f-category").value,
-      date: document.getElementById("f-date").value,
-      note: document.getElementById("f-note").value.trim(),
+      type,
+      title: type === 'transfer' ? (titleValue || "轉帳") : titleValue,
+      amount: parseFloat(document.getElementById(`${prefix}-amount`).value),
+      category: document.getElementById(`${prefix}-category`).value,
+      date: document.getElementById(`${prefix}-date`).value,
+      note: document.getElementById(`${prefix}-note`).value.trim(),
+      account_id: parseInt(document.getElementById(`${prefix}-account`).value) || 0,
+      to_account_id: parseInt(document.getElementById(`${prefix}-to-account`).value) || 0,
     };
     if (!body.title || !body.amount || !body.date) { toast("請填寫必要欄位"); return; }
+    if (!body.account_id) { toast("請指定帳戶"); return; }
+    if (body.type === 'transfer' && !body.to_account_id) { toast("請指定轉入帳戶"); return; }
 
     const res = await fetch("/api/expenses", { method: "POST", body: JSON.stringify(body) });
-    if (res.ok) { toast("新增成功 ✓"); location.reload(); }
-    else { toast("新增失敗"); }
+    if (res.ok) {
+      if (keepOpen) {
+        document.getElementById(`${prefix}-title`).value = '';
+        document.getElementById(`${prefix}-amount`).value = '';
+        document.getElementById(`${prefix}-note`).value = '';
+        toast("新增成功 ✓ 可繼續輸入");
+        pendingReload = true;
+      } else {
+        toast("新增成功 ✓");
+        location.reload();
+      }
+    } else {
+      toast("新增失敗");
+    }
   }
 
-  function openEdit(id, title, amount, category, date, note) {
-    document.getElementById("e-id").value = id;
-    document.getElementById("e-title").value = title;
-    document.getElementById("e-amount").value = amount;
-    document.getElementById("e-category").value = category;
-    document.getElementById("e-date").value = date;
-    document.getElementById("e-note").value = note;
-    document.getElementById("edit-overlay").classList.add("open");
+  function addExpense() { addExpenseFrom('f', false); }
+  function addExpenseAgain() { addExpenseFrom('f', true); }
+
+  // ── Edit ──
+  async function openEditById(id) {
+    try {
+      const res = await fetch(`/api/expenses/${id}`);
+      if (!res.ok) { toast("載入失敗"); return; }
+      const d = await res.json();
+      document.getElementById("e-id").value = d.id;
+      const typeRadio = document.querySelector(`input[name="e-type"][value="${d.type}"]`);
+      if (typeRadio) { typeRadio.checked = true; onTypeChange(d.type, 'e'); }
+      document.getElementById("e-title").value = d.title || '';
+      document.getElementById("e-amount").value = d.amount || 0;
+      setTimeout(() => {
+        if (d.type !== 'transfer') document.getElementById("e-category").value = d.category;
+        document.getElementById("e-account").value = d.account_id || 0;
+        if (d.type === 'transfer') document.getElementById("e-to-account").value = d.to_account_id || 0;
+      }, 50);
+      document.getElementById("e-date").value = d.date || '';
+      document.getElementById("e-note").value = d.note || '';
+      document.getElementById("edit-overlay").classList.add("open");
+    } catch (err) {
+      console.error(err);
+      toast("發生錯誤，請查看主控台");
+    }
   }
+
   function closeEdit() { document.getElementById("edit-overlay").classList.remove("open"); }
 
   async function saveEdit() {
     const id = document.getElementById("e-id").value;
+    const type = document.querySelector('input[name="e-type"]:checked').value;
+    const titleValue = document.getElementById("e-title").value.trim();
     const body = {
-      title: document.getElementById("e-title").value.trim(),
+      type,
+      title: type === 'transfer' ? (titleValue || "轉帳") : titleValue,
       amount: parseFloat(document.getElementById("e-amount").value),
       category: document.getElementById("e-category").value,
       date: document.getElementById("e-date").value,
       note: document.getElementById("e-note").value.trim(),
+      account_id: parseInt(document.getElementById("e-account").value) || 0,
+      to_account_id: parseInt(document.getElementById("e-to-account").value) || 0,
     };
+    if (!body.title || !body.amount || !body.date) { toast("請填寫必要欄位"); return; }
+    if (!body.account_id) { toast("請指定帳戶"); return; }
+    if (body.type === 'transfer' && !body.to_account_id) { toast("請指定轉入帳戶"); return; }
     const res = await fetch(`/api/expenses/${id}`, { method: "PUT", body: JSON.stringify(body) });
     if (res.ok) { toast("更新成功 ✓"); location.reload(); }
     else { toast("更新失敗"); }
   }
 
+  // ── Delete ──
   function confirmDelete(id) {
     document.getElementById("del-id").value = id;
     document.getElementById("del-overlay").classList.add("open");
@@ -417,9 +1258,249 @@
   async function doDelete() {
     const id = document.getElementById("del-id").value;
     const res = await fetch(`/api/expenses/${id}`, { method: "DELETE" });
-    if (res.ok) { toast("已刪除"); location.reload(); }
-    else { toast("刪除失敗"); }
+    if (res.ok) location.reload();
+    else {
+      const err = await res.json();
+      toast(err.error || "刪除失敗");
+      document.getElementById('del-overlay').classList.remove('open');
+    }
   }
+
+  // ── Account filters ──
+  let filterTimer = null;
+
+  function isAllFilterActive() {
+    const b = document.getElementById('acc-filter-all');
+    return b ? b.classList.contains('active') : true;
+  }
+
+  function getActiveAccountIds() {
+    return new Set(Array.from(document.querySelectorAll('.btn-filter.active[data-id]:not([data-id="all"])')).map(b => b.dataset.id));
+  }
+
+  function toggleAllFilter(btn) {
+    const activating = !btn.classList.contains('active');
+    btn.classList.toggle('active');
+    const individual = document.querySelectorAll('.btn-filter[data-id]:not([data-id="all"])');
+    if (activating) {
+      individual.forEach(b => { b.classList.remove('active'); b.classList.add('filter-locked'); });
+    } else {
+      individual.forEach(b => { b.classList.add('active'); b.classList.remove('filter-locked'); });
+    }
+    if (filterTimer) clearTimeout(filterTimer);
+    applyFilters();
+  }
+
+  function toggleAccFilter(btn) {
+    if (btn.classList.contains('filter-locked')) return;
+    btn.classList.toggle('active');
+    if (filterTimer) clearTimeout(filterTimer);
+    filterTimer = setTimeout(() => { applyFilters(); }, 1000);
+  }
+
+  // ── Month navigation ──
+  let currentYear = new Date().getFullYear();
+  let currentMonth = new Date().getMonth();
+  let isCustomRange = false;
+  let rangeStart = null, rangeEnd = null;
+
+  function updateMonthDisplay() {
+    document.getElementById('month-display').textContent = `${currentYear}年${currentMonth + 1}月`;
+  }
+
+  function changeMonth(delta) {
+    isCustomRange = false;
+    rangeStart = null;
+    rangeEnd = null;
+    document.getElementById('date-range-bar').style.display = 'none';
+    document.getElementById('custom-range-btn').classList.remove('active');
+    currentMonth += delta;
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+    updateMonthDisplay();
+    applyFilters();
+    if (calendar) calendar.gotoDate(new Date(currentYear, currentMonth, 1));
+  }
+
+  function toggleDateRange() {
+    const bar = document.getElementById('date-range-bar');
+    const btn = document.getElementById('custom-range-btn');
+    if (bar.style.display === 'none' || bar.style.display === '') {
+      bar.style.display = 'flex';
+      btn.classList.add('active');
+    } else {
+      clearDateRange();
+    }
+  }
+
+  function applyDateRange() {
+    const s = document.getElementById('range-start').value;
+    const e = document.getElementById('range-end').value;
+    if (!s || !e) { toast("請選擇起始與結束日期"); return; }
+    if (s > e) { toast("起始日期不能晚於結束日期"); return; }
+    isCustomRange = true;
+    rangeStart = s;
+    rangeEnd = e;
+    document.getElementById('month-display').textContent = `${s} ~ ${e}`;
+    applyFilters();
+  }
+
+  function clearDateRange() {
+    isCustomRange = false;
+    rangeStart = null;
+    rangeEnd = null;
+    document.getElementById('date-range-bar').style.display = 'none';
+    document.getElementById('custom-range-btn').classList.remove('active');
+    document.getElementById('range-start').value = '';
+    document.getElementById('range-end').value = '';
+    updateMonthDisplay();
+    applyFilters();
+  }
+
+  function dateMatchesFilter(dateStr) {
+    if (!dateStr) return false;
+    if (isCustomRange && rangeStart && rangeEnd) return dateStr >= rangeStart && dateStr <= rangeEnd;
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+  }
+
+  // ── Apply all filters ──
+  function applyFilters() {
+    const allActive = isAllFilterActive();
+    const activeIds = allActive ? null : getActiveAccountIds();
+
+    let totalBal = 0;
+    document.querySelectorAll('.btn-filter[data-id]:not([data-id="all"])').forEach(b => {
+      if (allActive || b.classList.contains('active')) totalBal += parseFloat(b.dataset.bal || 0);
+    });
+    const valEl = document.getElementById("stat-total");
+    valEl.textContent = "NT$ " + totalBal.toFixed(0);
+    if (totalBal >= 0) { valEl.classList.remove('red'); valEl.classList.add('green'); }
+    else { valEl.classList.remove('green'); valEl.classList.add('red'); }
+
+    document.querySelectorAll('.expense-item').forEach(el => {
+      const s1 = el.getAttribute('data-acc-id');
+      const s2 = el.getAttribute('data-to-acc-id');
+      const accountOk = allActive || (activeIds && ((s1 && activeIds.has(s1)) || (s2 && activeIds.has(s2))));
+      const dateOk = dateMatchesFilter(el.getAttribute('data-date') || '');
+      el.style.display = (accountOk && dateOk) ? '' : 'none';
+    });
+
+    updateBudgetDisplay();
+
+    if (calendar && document.getElementById('calendar-view').style.display !== 'none') {
+      initCalendar(activeIds);
+    }
+  }
+
+  function updateDisplayedBalance() { applyFilters(); }
+
+  // ── View switch + Calendar ──
+  let calendar = null;
+
+  function switchView(mode) {
+    const monthNav = document.getElementById('month-nav');
+    const dateBar = document.getElementById('date-range-bar');
+    if (mode === 'list') {
+      document.getElementById('expense-list').style.display = 'block';
+      document.getElementById('calendar-view').style.display = 'none';
+      monthNav.style.display = 'flex';
+    } else {
+      document.getElementById('expense-list').style.display = 'none';
+      document.getElementById('calendar-view').style.display = 'block';
+      monthNav.style.display = 'none';
+      dateBar.style.display = 'none';
+      const ai = isAllFilterActive() ? null : getActiveAccountIds();
+      initCalendar(ai);
+    }
+  }
+
+  function initCalendar(activeIds) {
+    const calendarEl = document.getElementById('calendar-view');
+
+    const filteredData = activeIds
+      ? allExpenses.filter(e =>
+        activeIds.has(String(e.account_id)) || (e.type === 'transfer' && e.to_account_id && activeIds.has(String(e.to_account_id)))
+      )
+      : allExpenses;
+
+    const agg = {};
+    filteredData.forEach(e => {
+      if (!agg[e.date]) agg[e.date] = { income: 0, expense: 0 };
+      if (e.type === 'income') agg[e.date].income += e.amount;
+      else if (e.type === 'expense') agg[e.date].expense += e.amount;
+    });
+
+    const events = [];
+    for (const [date, data] of Object.entries(agg)) {
+      if (data.income > 0) events.push({ title: `+${Math.round(data.income)}`, start: date, color: 'transparent', textColor: 'var(--accent)' });
+      if (data.expense > 0) events.push({ title: `-${Math.round(data.expense)}`, start: date, color: 'transparent', textColor: 'var(--danger)' });
+    }
+
+    if (calendar) calendar.destroy();
+    calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      initialDate: new Date(currentYear, currentMonth, 1),
+      headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
+      events,
+      contentHeight: 'auto',
+      dayMaxEvents: true,
+      datesSet: function (info) {
+        currentYear = info.view.currentStart.getFullYear();
+        currentMonth = info.view.currentStart.getMonth();
+        if (!isCustomRange) updateMonthDisplay();
+        updateBudgetDisplay();
+      },
+      dateClick: function (info) { openDayModal(info.dateStr); },
+      eventClick: function (info) {
+        info.jsEvent.preventDefault();
+        openDayModal(info.event.startStr);
+      }
+    });
+    calendar.render();
+  }
+
+  // ── Day detail modal ──
+  function openDayModal(dateStr) {
+    const allActive = isAllFilterActive();
+    const activeIds = allActive ? null : getActiveAccountIds();
+    const dayItems = allExpenses.filter(e => {
+      if (e.date !== dateStr) return false;
+      if (allActive) return true;
+      return activeIds.has(String(e.account_id)) || (e.type === 'transfer' && e.to_account_id && activeIds.has(String(e.to_account_id)));
+    });
+
+    const d = new Date(dateStr + 'T00:00:00');
+    document.getElementById('day-modal-title').textContent = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+
+    const content = document.getElementById('day-modal-content');
+    if (dayItems.length === 0) {
+      content.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px 0">當日無記帳</p>';
+    } else {
+      content.innerHTML = dayItems.map(e => {
+        const sign = e.type === 'income' ? '+' : '-';
+        const badgeCls = e.type === 'expense' ? 'expense' : e.type === 'transfer' ? 'transfer' : '';
+        const badgeText = e.type === 'transfer' ? '轉帳' : e.category;
+        const acc = accountMapData[String(e.account_id)];
+        const accTag = acc ? `<span class="account-tag">${acc.icon || ''} ${acc.name}</span>` : '';
+        const toAcc = e.type === 'transfer' && e.to_account_id ? accountMapData[String(e.to_account_id)] : null;
+        const toAccTag = toAcc ? ` ➔ <span class="account-tag">${toAcc.icon || ''} ${toAcc.name}</span>` : '';
+        return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+          <span class="cat-badge ${badgeCls}">${badgeText}</span>
+          <div style="flex:1;min-width:0">
+            <div class="item-title">${e.title}</div>
+            <div class="item-date">${e.note ? e.note + ' ' : ''}${accTag}${toAccTag}</div>
+          </div>
+          <div class="item-amount ${e.type}">${sign}NT$ ${Math.round(e.amount)}</div>
+        </div>`;
+      }).join('');
+    }
+    document.getElementById('day-overlay').classList.add('open');
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    updateMonthDisplay();
+    applyFilters();
+  });
 </script>
-</body>
-</html>
+{% endblock %}

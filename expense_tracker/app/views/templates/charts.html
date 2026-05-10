@@ -1,96 +1,229 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>圖表分析 · 記帳本</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <style>
-    :root {
-      --bg: #0f0f11;
-      --surface: #18181c;
-      --border: #2a2a30;
-      --accent: #c8f04a;
-      --text: #e8e8ec;
-      --muted: #6b6b78;
-      --radius: 12px;
+{% extends "base.html" %}
+
+{% block title %}圖表分析 · 記帳本{% endblock %}
+
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  .page-title {
+    font-size: 1.4rem;
+    font-weight: 500;
+    margin-bottom: 24px;
+  }
+
+  .page-title span {
+    color: var(--muted);
+    font-size: .9rem;
+    font-weight: 300;
+    margin-left: 12px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+  }
+
+  .tab {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 8px;
+    transition: all .2s;
+  }
+
+  .tab.active {
+    color: #111;
+    background: var(--accent);
+    font-weight: 500;
+  }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  /* ── Stats ── */
+  .stats {
+    margin-bottom: 24px;
+  }
+
+  .bar {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    width: 100%;
+  }
+
+  .stat-card {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+
+  .stat-card .label {
+    font-size: .75rem;
+    color: var(--muted);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .stat-card .value {
+    font-family: 'DM Mono', monospace;
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
+  .stat-card .value.green {
+    color: var(--accent);
+  }
+
+  .stat-card .value.red {
+    color: var(--danger);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+  }
+
+  .card.full {
+    grid-column: 1 / -1;
+  }
+
+  .card h2 {
+    font-size: .8rem;
+    font-weight: 500;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  canvas {
+    max-height: 300px;
+  }
+
+  /* Category legend table */
+  #cat-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+  }
+
+  #cat-table th,
+  #cat-table td {
+    padding: 10px 12px;
+    text-align: left;
+    font-size: .83rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #cat-table th {
+    color: var(--muted);
+    font-weight: 400;
+    letter-spacing: .05em;
+  }
+
+  #cat-table .amount {
+    font-family: 'DM Mono', monospace;
+    color: var(--accent);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  @media (max-width: 768px) {
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
     }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: 'Noto Sans TC', sans-serif; font-weight: 300; min-height: 100vh; }
 
-    header { border-bottom: 1px solid var(--border); padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; }
-    .logo { font-size: 1.1rem; font-weight: 700; letter-spacing: .04em; }
-    .logo span { color: var(--accent); }
-    nav a { color: var(--muted); text-decoration: none; font-size: .85rem; margin-left: 24px; transition: color .2s; }
-    nav a:hover, nav a.active { color: var(--accent); }
+    nav span {
+      display: none;
+    }
+  }
+</style>
+{% endblock %}
 
-    .shell { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
-    .page-title { font-size: 1.4rem; font-weight: 500; margin-bottom: 32px; }
-    .page-title span { color: var(--muted); font-size: .9rem; font-weight: 300; margin-left: 12px; }
-
-    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; }
-    .card.full { grid-column: 1 / -1; }
-    .card h2 { font-size: .8rem; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 24px; }
-
-    canvas { max-height: 300px; }
-
-    /* Category legend table */
-    #cat-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-    #cat-table th, #cat-table td { padding: 10px 12px; text-align: left; font-size: .83rem; border-bottom: 1px solid var(--border); }
-    #cat-table th { color: var(--muted); font-weight: 400; letter-spacing: .05em; }
-    #cat-table .amount { font-family: 'DM Mono', monospace; color: var(--accent); }
-    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; vertical-align: middle; }
-  </style>
-</head>
-<body>
-
-<header>
-  <div class="logo">帳 <span>·</span> 本</div>
-  <nav>
-    <a href="/">支出列表</a>
-    <a href="/charts" class="active">圖表分析</a>
-    <a href="/categories">類別管理</a>
-    <span style="color:var(--muted); margin-left:24px;">|</span>
-    <span style="color:var(--text); margin-left:24px;">{{ username }}</span>
-    <a href="/logout">登出</a>
-  </nav>
-</header>
-
-<main class="shell">
-  <div class="page-title">圖表分析 <span>視覺化你的消費習慣</span></div>
-
-  <div class="charts-grid">
-
-    <!-- Monthly Bar Chart -->
-    <div class="card full">
-      <h2>每月支出趨勢</h2>
-      <canvas id="monthly-chart"></canvas>
+{% block content %}
+<div class="stats">
+  <div class="bar">
+    <div class="stat-card">
+      <div class="label">現金</div>
+      <div class="value {% if cash >= 0 %}green{% else %}red{% endif %}">{{ "%.0f" | format(cash) }}</div>
     </div>
-
-    <!-- Category Pie Chart -->
-    <div class="card">
-      <h2>類別佔比</h2>
-      <canvas id="category-chart"></canvas>
+    <div class="stat-card">
+      <div class="label">負債</div>
+      <div class="value {% if liabilities < 0 %}red{% else %}green{% endif %}">{{ "%.0f" | format(liabilities) }}
+      </div>
     </div>
-
-    <!-- Category Table -->
-    <div class="card">
-      <h2>類別明細</h2>
-      <table id="cat-table">
-        <thead>
-          <tr><th>類別</th><th>金額</th><th>佔比</th></tr>
-        </thead>
-        <tbody id="cat-tbody"></tbody>
-      </table>
+    <div class="stat-card">
+      <div class="label">股票現值</div>
+      <div class="value green">{{ "%.2f" | format(stock_value) }}</div>
     </div>
-
   </div>
-</main>
+</div>
 
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('balance')">收支</button>
+  <button class="tab" onclick="switchTab('expense')">支出</button>
+  <button class="tab" onclick="switchTab('income')">收入</button>
+</div>
+
+<div class="charts-grid">
+
+  <!-- Monthly Bar Chart -->
+  <div class="card full">
+    <h2 id="chart-title-monthly">每月趨勢</h2>
+    <canvas id="monthly-chart"></canvas>
+  </div>
+
+  <!-- Category Pie Chart -->
+  <div class="card" id="card-category">
+    <h2 id="chart-title-category">類別佔比</h2>
+    <canvas id="category-chart"></canvas>
+  </div>
+
+  <!-- Category Table -->
+  <div class="card" id="card-table">
+    <h2>類別明細</h2>
+    <table id="cat-table">
+      <thead>
+        <tr>
+          <th>類別</th>
+          <th>金額</th>
+          <th>佔比</th>
+        </tr>
+      </thead>
+      <tbody id="cat-tbody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
 <script src="{{ url_for('static', filename='js/chart_logic.js') }}"></script>
-</body>
-</html>
+{% endblock %}

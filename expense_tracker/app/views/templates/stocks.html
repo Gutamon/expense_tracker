@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+
+{% block title %}股票專區 · 記帳本{% endblock %}
+
+{% block head %}
+
+<style>
+.summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
+    .summary-stats { display: flex; gap: 32px; }
+    .s-item { display: flex; flex-direction: column; gap: 6px; }
+    .s-label { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .s-value { font-size: 1.5rem; font-weight: 700; font-family: 'DM Mono', monospace; }
+    .profit { color: var(--accent); }
+    .loss { color: var(--danger); }
+    
+    .stock-list { display: grid; gap: 20px; }
+    .stock-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 16px; transition: opacity .2s; }
+    .stock-card.empty { opacity: 0.5; filter: grayscale(100%); }
+    .stock-card.empty:hover { opacity: 0.8; filter: grayscale(50%); }
+    .stock-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .stock-info { display: flex; flex-direction: column; gap: 4px; }
+    .stock-symbol { font-size: 1.3rem; font-weight: 700; font-family: 'DM Mono', monospace; color: var(--accent); }
+    .stock-name { font-size: .85rem; color: var(--muted); }
+    .stock-stats { display: flex; gap: 24px; text-align: right; }
+    .stat-item { display: flex; flex-direction: column; gap: 4px; }
+    .stat-label { font-size: .7rem; color: var(--muted); }
+    .stat-value { font-family: 'DM Mono', monospace; font-size: 1rem; }
+    
+    .stock-actions { display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--border); padding-top: 16px; }
+    .btn-action { background: rgba(255,255,255,0.05); border: 1px solid transparent; color: var(--text); padding: 6px 12px; border-radius: 6px; font-size: .8rem; cursor: pointer; transition: all .2s; }
+    .btn-action:hover { background: rgba(255,255,255,0.1); border-color: var(--border); }
+    
+    .tx-toggle { margin-left: auto; font-size: .8rem; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 4px; background: none; border: none; }
+    .tx-toggle:hover { color: var(--accent); }
+    .tx-container { display: none; margin-top: 16px; border-top: 1px dashed var(--border); padding-top: 16px; }
+    .tx-container.open { display: block; }
+    .tx-item { display: flex; justify-content: space-between; padding: 8px 0; font-size: .85rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .tx-item:last-child { border-bottom: none; }
+    .badge { padding: 2px 6px; border-radius: 4px; font-size: .7rem; font-weight: 500; }
+    .badge.buy { background: rgba(200, 240, 74, 0.12); color: var(--accent); }
+    .badge.sell { background: rgba(255, 95, 95, 0.12); color: var(--danger); }
+    .badge.dividend { background: rgba(74, 138, 240, 0.12); color: #4a8af0; }
+    .badge.split { background: rgba(240, 74, 200, 0.12); color: #f04ac8; }
+    
+    .btn { padding: 10px 16px; border: none; border-radius: 8px; font-family: inherit; font-size: .9rem; font-weight: 500; cursor: pointer; background: var(--accent); color: #111; }
+    .btn:hover { opacity: .9; }
+    .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+    
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity .2s; }
+    .modal-overlay.open { opacity: 1; pointer-events: auto; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); width: 400px; padding: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+    .modal h3 { font-size: 1.1rem; margin-bottom: 24px; font-weight: 500; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
+    .field input, .field select { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 10px 14px; outline: none; font-family: inherit; }
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .modal-actions { display: flex; gap: 12px; margin-top: 24px; }
+    .modal-actions button { flex: 1; }
+    
+    #toast { position: fixed; bottom: 24px; right: 24px; background: var(--accent); color: #111; border-radius: 8px; padding: 12px 20px; font-size: .85rem; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 200; }
+    #toast.show { opacity: 1; }
+
+    @media (max-width: 768px) {
+      
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      
+      nav span {
+        display: none;
+      }
+      
+      .summary-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 20px;
+      }
+      .summary-stats {
+        flex-direction: column;
+        gap: 16px;
+      }
+      .stock-
+      .stock-stats {
+        flex-direction: column;
+        text-align: left;
+        gap: 12px;
+      }
+      .stock-actions {
+        flex-wrap: wrap;
+      }
+      .modal {
+        width: 90%;
+        padding: 24px;
+      }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="summary-card">
+      <div class="summary-stats">
+        <div class="s-item">
+          <span class="s-label">總投入成本</span>
+          <span class="s-value">${{ "%.0f" | format(total_cost) }}</span>
+        </div>
+        <div class="s-item">
+          <span class="s-label">總市值</span>
+          <span class="s-value">${{ "%.0f" | format(total_value) }}</span>
+        </div>
+        <div class="s-item">
+          <span class="s-label">總未實現損益</span>
+          {% set total_pct = (total_pl / total_cost * 100) if total_cost > 0 else 0 %}
+          <span class="s-value {% if total_pl >= 0 %}profit{% else %}loss{% endif %}">
+            {% if total_pl >= 0 %}+{% endif %}${{ "%.0f" | format(total_pl) }} <span style="font-size:1rem;">({{ "%.1f" | format(total_pct) }}%)</span>
+          </span>
+        </div>
+      </div>
+      <div>
+        <button class="btn btn-ghost" style="margin-right:8px;" onclick="updatePrices()">更新現價</button>
+        <button class="btn" onclick="openPosModal()">新增倉位</button>
+      </div>
+    </div>
+
+    <div class="stock-list">
+      {% if stocks %}
+        {% for s in stocks %}
+        {% set scost = s.shares * s.avg_price %}
+        {% set svalue = s.shares * s.current_price %}
+        {% set spl = svalue - scost %}
+        {% set spct = (spl / scost * 100) if scost > 0 else 0 %}
+        <div class="stock-card {% if s.shares == 0 %}empty{% endif %}">
+          <div class="stock-header">
+            <div class="stock-info">
+              <div class="stock-symbol">{{ s.symbol }}</div>
+              <div class="stock-name" style="display:flex; align-items:center; gap:6px;">
+                <span id="s-name-{{ s.id }}">{{ s.name }}</span>
+                <button class="btn-ghost" style="border:none; padding:2px; cursor:pointer;" onclick="editStockName({{ s.id }}, '{{ s.name | replace('\'', '\\\'') }}')" title="編輯名稱">✏️</button>
+              </div>
+            </div>
+            <div class="stock-stats">
+              <div class="stat-item">
+                <span class="stat-label">持有股數</span>
+                <span class="stat-value">{{ "%.0f" | format(s.shares) }}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">均價 / 現價</span>
+                <span class="stat-value">${{ "%.2f" | format(s.avg_price) }} / ${{ "%.2f" | format(s.current_price) }}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">損益</span>
+                <span class="stat-value {% if spl >= 0 %}profit{% else %}loss{% endif %}">
+                  {% if spl >= 0 %}+{% endif %}${{ "%.0f" | format(spl) }} ({{ "%.1f" | format(spct) }}%)
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="stock-actions">
+            <button class="btn-action" onclick="openTxModal({{ s.id }}, 'buy')">買入</button>
+            {% if s.shares > 0 %}
+            <button class="btn-action" onclick="openTxModal({{ s.id }}, 'sell')">賣出</button>
+            <button class="btn-action" onclick="openTxModal({{ s.id }}, 'dividend')">股利</button>
+            <button class="btn-action" onclick="openTxModal({{ s.id }}, 'split')">分割</button>
+            {% endif %}
+            
+            {% set stock_txs = transactions | selectattr("stock_id", "equalto", s.id) | list %}
+            <button class="tx-toggle" onclick="toggleTx('tx-{{ s.id }}')">
+              交易紀錄 ({{ stock_txs | length }}) ▾
+            </button>
+          </div>
+          
+          <div class="tx-container" id="tx-{{ s.id }}">
+            {% if stock_txs %}
+              {% for t in stock_txs %}
+              <div class="tx-item" style="position:relative;">
+                <div>
+                  <span class="badge {{ t.type }}">{{ t.type | upper }}</span>
+                  <span style="color:var(--muted); margin-left:8px;">{{ t.date }}</span>
+                  {% if t.note %}<span style="color:var(--muted)">· {{ t.note }}</span>{% endif %}
+                </div>
+                <div style="font-family:'DM Mono',monospace; text-align:right;">
+                  {% if t.type == 'buy' or t.type == 'sell' %}
+                    {{ "%.0f" | format(t.shares) }} 股 @ ${{ "%.2f" | format(t.price) }} <br>
+                    <span style="font-size:0.7rem;color:var(--muted)">手續費: ${{ t.fee }}</span>
+                  {% elif t.type == 'dividend' %}
+                    <span style="color:#4a8af0">+ ${{ "%.2f" | format(t.price) }}</span>
+                  {% elif t.type == 'split' %}
+                    <span style="color:#f04ac8">比例: {{ t.price }}</span>
+                  {% endif %}
+                </div>
+                <!-- 編輯與刪除按鈕 -->
+                <div style="position:absolute; bottom:8px; left:8px; display:flex; gap:6px;">
+                  <button class="btn-ghost" style="padding:2px 6px; font-size:0.7rem; border:none; color:var(--muted);" onclick="editTx({{ t.id }}, '{{ t.type }}', '{{ t.date }}', {{ t.shares }}, {{ t.price }}, {{ t.fee }}, '{{ t.note }}')">編輯</button>
+                  <button class="btn-ghost" style="padding:2px 6px; font-size:0.7rem; border:none; color:var(--danger);" onclick="deleteTx({{ t.id }})">刪除</button>
+                </div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <div style="text-align:center;color:var(--muted);font-size:.8rem;">尚無交易紀錄</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="text-align:center;color:var(--muted);padding:60px 0;background:var(--surface);border-radius:var(--radius);">
+          尚未建立任何倉位，請點擊「新增倉位」開始記錄。
+        </div>
+      {% endif %}
+    </div>
+<!-- Position Modal -->
+  <div class="modal-overlay" id="pos-modal">
+    <div class="modal">
+      <h3>新增股票倉位</h3>
+      <div class="field">
+        <label>股票代號 (僅限大寫英數字)</label>
+        <input type="text" id="pos-symbol" placeholder="例: AAPL, 2330" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>股票名稱</label>
+        <input type="text" id="pos-name" placeholder="例: 台積電" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>交割帳號 (資金進出帳戶)</label>
+        <select id="pos-account">
+          <option value="" disabled selected>請選擇交割帳號</option>
+          {% for a in accounts %}
+          <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closePosModal()">取消</button>
+        <button class="btn" onclick="submitPosition()">建立</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transaction Modal -->
+  <div class="modal-overlay" id="tx-modal">
+    <div class="modal">
+      <h3 id="tx-title">新增交易</h3>
+      <input type="hidden" id="tx-id-edit">
+      <input type="hidden" id="tx-stock-id">
+      <input type="hidden" id="tx-type">
+      
+      <div class="field">
+        <label>日期</label>
+        <input type="date" id="tx-date" autocomplete="off">
+      </div>
+      <div class="field" id="wrap-shares">
+        <label>股數 (整數)</label>
+        <input type="number" id="tx-shares" step="1" min="1" placeholder="0" autocomplete="off" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+      </div>
+      <div class="field" id="wrap-price">
+        <label id="lbl-price">成交單價</label>
+        <input type="number" id="tx-price" step="0.01" min="0" placeholder="0" autocomplete="off">
+      </div>
+      <div class="field" id="wrap-fee">
+        <label>手續費</label>
+        <input type="number" id="tx-fee" step="0.01" min="0" placeholder="0" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>備註 (選填)</label>
+        <input type="text" id="tx-note" placeholder="..." autocomplete="off">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeTxModal()">取消</button>
+        <button class="btn" onclick="submitTransaction()">送出</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+
+    function toast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 2500);
+    }
+
+    // Toggle transactions
+    function toggleTx(id) {
+      document.getElementById(id).classList.toggle('open');
+    }
+
+    // Position Modal
+    function openPosModal() { document.getElementById('pos-modal').classList.add('open'); }
+    function closePosModal() { document.getElementById('pos-modal').classList.remove('open'); }
+
+    async function editStockName(id, currentName) {
+      const newName = prompt("請輸入新的股票名稱：", currentName);
+      if (newName !== null && newName.trim() !== "" && newName.trim() !== currentName) {
+        const res = await fetch(`/api/stocks/${id}/name`, {
+          method: "PUT",
+          body: JSON.stringify({ name: newName.trim() })
+        });
+        if (res.ok) {
+          document.getElementById(`s-name-${id}`).textContent = newName.trim();
+          toast("名稱已更新");
+        } else {
+          toast("名稱更新失敗");
+        }
+      }
+    }
+
+    document.getElementById('pos-symbol').addEventListener('input', function(e) {
+      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    });
+
+    async function submitPosition() {
+      const symbol = document.getElementById('pos-symbol').value;
+      const name = document.getElementById('pos-name').value;
+      const account_id = document.getElementById('pos-account').value;
+      
+      if (!symbol || !name || !account_id) return toast("請填寫完整資訊");
+      
+      const res = await fetch("/api/stocks", { 
+        method: "POST", 
+        body: JSON.stringify({ symbol, name, account_id }) 
+      });
+      if (res.ok) { toast("倉位建立成功"); setTimeout(() => location.reload(), 500); }
+      else { const err = await res.json(); toast(err.error || "建立失敗"); }
+    }
+
+    // Transaction Modal
+    function openTxModal(stockId, type) {
+      document.getElementById('tx-id-edit').value = '';
+      document.getElementById('tx-stock-id').value = stockId;
+      document.getElementById('tx-type').value = type;
+      document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+      document.getElementById('tx-shares').value = '';
+      document.getElementById('tx-price').value = '';
+      document.getElementById('tx-fee').value = '';
+      document.getElementById('tx-note').value = '';
+      
+      const titles = { 'buy': '買入', 'sell': '賣出', 'dividend': '現金股利', 'split': '股票分割' };
+      document.getElementById('tx-title').textContent = titles[type];
+      
+      const wShares = document.getElementById('wrap-shares');
+      const wPrice = document.getElementById('wrap-price');
+      const wFee = document.getElementById('wrap-fee');
+      const lPrice = document.getElementById('lbl-price');
+      
+      wShares.style.display = 'block'; wPrice.style.display = 'block'; wFee.style.display = 'block';
+      
+      if (type === 'buy' || type === 'sell') {
+        lPrice.textContent = '成交單價';
+      } else if (type === 'dividend') {
+        wShares.style.display = 'none'; wFee.style.display = 'none';
+        lPrice.textContent = '股利總額';
+      } else if (type === 'split') {
+        wShares.style.display = 'none'; wFee.style.display = 'none';
+        lPrice.textContent = '分割比例 (例: 1變2 輸入 2)';
+      }
+      
+      document.getElementById('tx-modal').classList.add('open');
+    }
+    
+    function closeTxModal() { document.getElementById('tx-modal').classList.remove('open'); }
+
+    async function submitTransaction() {
+      const type = document.getElementById('tx-type').value;
+      const body = {
+        stock_id: document.getElementById('tx-stock-id').value,
+        type: type,
+        date: document.getElementById('tx-date').value,
+        shares: parseInt(document.getElementById('tx-shares').value || 0, 10),
+        price: parseFloat(document.getElementById('tx-price').value || 0),
+        fee: parseFloat(document.getElementById('tx-fee').value || 0),
+        note: document.getElementById('tx-note').value.trim(),
+      };
+
+      if (!body.date || (!body.price && type !== 'split')) {
+        toast("請填寫必要欄位"); return;
+      }
+
+      const res = await fetch("/api/stocks/transactions", { method: "POST", body: JSON.stringify(body) });
+      if (res.ok) { toast("交易已記錄"); setTimeout(() => location.reload(), 500); }
+      else { const err = await res.json(); toast("錯誤: " + (err.error || "新增失敗")); }
+    }
+
+    async function updatePrices() {
+      toast("正在獲取最新收盤價...");
+      const res = await fetch("/api/stocks/update_prices", { method: "POST" });
+      if (res.ok) { toast("更新成功"); setTimeout(() => location.reload(), 1000); }
+      else toast("更新失敗");
+    }
+  </script>
+{% endblock %}

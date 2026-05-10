@@ -1,0 +1,30 @@
+:root {
+  --bg: #0f0f11;
+  --surface: #18181c;
+  --border: #2a2a30;
+  --accent: #c8f04a;
+  --accent-dim: rgba(200, 240, 74, 0.12);
+  --text: #e8e8ec;
+  --muted: #6b6b78;
+  --danger: #ff5f5f;
+  --danger-dim: rgba(255, 95, 95, 0.12);
+  --radius: 12px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 1rem;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans TC', sans-serif;
+  font-weight: 300;
+  min-height: 100vh;
+}

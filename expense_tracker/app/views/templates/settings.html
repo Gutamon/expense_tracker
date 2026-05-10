@@ -1,0 +1,1230 @@
+{% extends "base.html" %}
+
+{% block title %}設定管理 · 記帳本{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<style>
+  .page-title {
+    font-size: 1.4rem;
+    font-weight: 500;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .main-tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+  }
+
+  .main-tab {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 8px 14px;
+    border-radius: 8px;
+    transition: all .2s;
+  }
+
+  .main-tab.active {
+    color: #111;
+    background: var(--accent);
+    font-weight: 500;
+  }
+
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+  }
+
+  h2 {
+    font-size: 1.1rem;
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-weight: 500;
+  }
+
+  .field {
+    margin-bottom: 16px;
+  }
+
+  .field label {
+    display: block;
+    font-size: .78rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .field input[type="text"],
+  .field input[type="number"],
+  .field select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    outline: none;
+    box-sizing: border-box;
+    font-family: inherit;
+  }
+
+  .field input:focus,
+  .field select:focus {
+    border-color: var(--accent);
+  }
+
+  .checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: .9rem;
+    cursor: pointer;
+    color: var(--text);
+  }
+
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+
+  .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #2a2a30;
+    transition: .3s;
+    border-radius: 24px;
+  }
+
+  .toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--muted);
+    transition: .3s;
+    border-radius: 50%;
+  }
+
+  .toggle-switch input:checked+.toggle-slider {
+    background-color: var(--accent);
+    opacity: 0.8;
+  }
+
+  .toggle-switch input:checked+.toggle-slider:before {
+    transform: translateX(20px);
+    background-color: #000;
+  }
+
+  .segmented-control {
+    display: flex;
+    background: #0f0f11;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 16px;
+  }
+
+  .segmented-control label {
+    flex: 1;
+    text-align: center;
+    padding: 8px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: .85rem;
+    font-weight: 500;
+    color: var(--muted);
+    transition: all .2s;
+  }
+
+  .segmented-control input[type="radio"] {
+    display: none;
+  }
+
+  .segmented-control input[type="radio"]:checked+label {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
+
+  .btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    width: 100%;
+    font-family: inherit;
+  }
+
+  .btn:hover {
+    opacity: .9;
+  }
+
+  .list-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    background: var(--bg);
+    align-items: center;
+    cursor: default;
+  }
+
+  .drag-handle {
+    cursor: grab;
+    color: var(--muted);
+    padding: 0 12px 0 0;
+    font-size: 1.1rem;
+    user-select: none;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    line-height: 1;
+  }
+
+  .drag-handle:active {
+    cursor: grabbing;
+  }
+
+  .budget-nav-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .2s;
+    padding: 0;
+  }
+
+  .budget-nav-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .item-name {
+    font-weight: 500;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .item-meta {
+    font-size: .75rem;
+    color: var(--muted);
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .item-meta span {
+    display: inline-block;
+    background: #2a2a30;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .item-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-action {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: .8rem;
+  }
+
+  .btn-action:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-action.del:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .7);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .overlay.open {
+    display: flex;
+  }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .btn-ghost {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--accent);
+  }
+
+  .scroll-container {
+    max-height: 500px;
+    overflow-y: auto;
+    padding-right: 8px;
+  }
+
+  .scroll-container::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scroll-container::-webkit-scrollbar-thumb {
+    background: #2a2a30;
+    border-radius: 4px;
+  }
+
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .filter-bar select {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    outline: none;
+  }
+
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--accent);
+    color: #111;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: .85rem;
+    font-weight: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .3s;
+    z-index: 200;
+  }
+
+  #toast.show {
+    opacity: 1;
+  }
+
+  /* ── Mobile add button ── */
+  .btn-add-mobile {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+    header {
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 16px;
+      gap: 16px;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    nav a {
+      margin-left: 0;
+    }
+
+    nav span {
+      display: none;
+    }
+
+    .shell {
+      margin: 20px auto;
+      padding: 0 16px;
+    }
+
+    .settings-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .settings-add-card {
+      display: none;
+    }
+
+    .btn-add-mobile {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #111;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-family: inherit;
+      font-size: .9rem;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="main-tabs">
+  <button id="main-tab-categories" class="main-tab active" onclick="switchMainTab('categories')">類別</button>
+  <button id="main-tab-groups" class="main-tab" onclick="switchMainTab('groups')">群組</button>
+  <button id="main-tab-accounts" class="main-tab" onclick="switchMainTab('accounts')">帳戶</button>
+  <button id="main-tab-budget" class="main-tab" onclick="switchMainTab('budget')">月預算</button>
+</div>
+
+<!-- Category Section -->
+<div id="section-categories" class="settings-grid">
+  <div class="card settings-add-card">
+    <h2>新增類別</h2>
+    <div class="field">
+      <label>類別名稱</label>
+      <input type="text" id="cat-new-name" placeholder="例：午餐" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>所屬群組</label>
+      <select id="cat-new-group">
+        {% for g in groups %}
+        {% if g.name and g.name.strip() and g.name != '未分類' %}
+        <option value="{{ g.name }}" data-type="{{ g.get('type', 'expense') }}">{{ g.name }}</option>
+        {% endif %}
+        {% endfor %}
+        <option value="未分類" data-type="">未分類</option>
+      </select>
+    </div>
+    <div class="segmented-control">
+      <input type="radio" name="cat-new-type" id="cat-new-type-exp" value="expense" checked onchange="filterCatGroupSelect('cat-new-group','expense')">
+      <label for="cat-new-type-exp">支出類別</label>
+      <input type="radio" name="cat-new-type" id="cat-new-type-inc" value="income" onchange="filterCatGroupSelect('cat-new-group','income')">
+      <label for="cat-new-type-inc">收入類別</label>
+    </div>
+    <div class="checkbox-group">
+      <label><span class="toggle-switch"><input type="checkbox" id="cat-new-in_budget" checked><span
+            class="toggle-slider"></span></span>列入預算計算</label>
+    </div>
+    <button class="btn" onclick="addCat()">新增類別</button>
+  </div>
+  <div class="card">
+    <button class="btn-add-mobile" onclick="document.getElementById('mobile-cat-overlay').classList.add('open')">＋ 新增類別</button>
+    <div class="segmented-control" style="margin-bottom:24px;">
+      <input type="radio" name="cat-list-filter" id="cat-list-exp" value="expense" checked
+        onchange="switchCatListTab('expense')">
+      <label for="cat-list-exp">支出類別</label>
+      <input type="radio" name="cat-list-filter" id="cat-list-inc" value="income" onchange="switchCatListTab('income')">
+      <label for="cat-list-inc">收入類別</label>
+    </div>
+    <div class="filter-bar">
+      <select id="cat-group-filter" onchange="filterCatGroups()">
+        <option value="all">所有群組</option>
+      </select>
+    </div>
+    <div class="scroll-container" id="cat-list">
+      {% for c in categories %}
+      <div class="list-item cat-item" data-id="{{ c.id }}" data-type="{{ c.type }}" data-group="{{ c.group_name }}">
+        <span class="drag-handle">⠿</span>
+        <div class="item-info">
+          <div class="item-name" {% if c.type=='income' %}style="color:var(--accent);" {% endif %}>{{ c.name }}
+          </div>
+          <div class="item-meta">
+            <span style="color:#fff;">{{ c.group_name }}</span>
+            {% if c.is_asset %}<span>計資產</span>{% endif %}
+            {% if c.type == 'expense' and c.in_budget %}<span>計預算</span>{% endif %}
+          </div>
+        </div>
+        <div class="item-actions">
+          <button class="btn-action"
+            onclick="openCatEdit({{ c.id }}, '{{ c.name }}', '{{ c.group_name }}', '{{ c.type }}', {{ c.is_asset }}, {{ c.in_budget }})">編輯</button>
+          <button class="btn-action del" onclick="openCatDelete({{ c.id }}, '{{ c.name }}')">刪除</button>
+        </div>
+      </div>
+      {% endfor %}
+      <div id="cat-empty-msg" style="display:none; text-align:center; padding: 40px 0; color: var(--muted);">此群組尚無類別
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Groups Section -->
+<div id="section-groups" class="settings-grid" style="display:none;">
+  <div class="card settings-add-card">
+    <h2>新增群組</h2>
+    <div class="field">
+      <label>群組名稱</label>
+      <input type="text" id="grp-new-name" placeholder="例：生活" autocomplete="off">
+    </div>
+    <div class="segmented-control">
+      <input type="radio" name="grp-new-type" id="grp-new-type-exp" value="expense" checked>
+      <label for="grp-new-type-exp">支出群組</label>
+      <input type="radio" name="grp-new-type" id="grp-new-type-inc" value="income">
+      <label for="grp-new-type-inc">收入群組</label>
+    </div>
+    <button class="btn" onclick="addGroup()">新增群組</button>
+  </div>
+  <div class="card">
+    <button class="btn-add-mobile" onclick="document.getElementById('mobile-grp-overlay').classList.add('open')">＋ 新增群組</button>
+    <div class="segmented-control" style="margin-bottom:24px;">
+      <input type="radio" name="grp-list-filter" id="grp-list-exp" value="expense" checked onchange="switchGrpListTab('expense')">
+      <label for="grp-list-exp">支出群組</label>
+      <input type="radio" name="grp-list-filter" id="grp-list-inc" value="income" onchange="switchGrpListTab('income')">
+      <label for="grp-list-inc">收入群組</label>
+    </div>
+    <div class="scroll-container" id="grp-list">
+      {% for g in groups %}
+      <div class="list-item grp-item" data-id="{{ g.id }}" data-type="{{ g.get('type', 'expense') }}">
+        <span class="drag-handle">⠿</span>
+        <div class="item-info">
+          <div class="item-name">{{ g.name }}</div>
+        </div>
+        <div class="item-actions">
+          <button class="btn-action" onclick="openGroupEdit({{ g.id }}, '{{ g.name }}', '{{ g.get('type', 'expense') }}')">編輯</button>
+          <button class="btn-action del" onclick="openGroupDelete({{ g.id }}, '{{ g.name }}')">刪除</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Account Section -->
+<div id="section-accounts" class="settings-grid" style="display:none;">
+  <div class="card settings-add-card">
+    <h2>新增帳戶</h2>
+    <div class="field">
+      <label>帳戶名稱</label>
+      <input type="text" id="acc-new-name" placeholder="例：中國信託" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>帳戶類型</label>
+      <select id="acc-new-type">
+        <optgroup label="現金">
+          <option value="現金">現金</option>
+          <option value="銀行">銀行</option>
+          <option value="儲值支付">儲值支付</option>
+          <option value="其他">其他</option>
+        </optgroup>
+        <optgroup label="負債">
+          <option value="信用卡">信用卡</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="checkbox-group" style="margin-bottom:16px;">
+      <label><span class="toggle-switch"><input type="checkbox" id="acc-new-is_asset" checked><span
+            class="toggle-slider"></span></span>列入總資產</label>
+    </div>
+    <button class="btn" onclick="addAccount()">新增帳戶</button>
+  </div>
+  <div class="card">
+    <button class="btn-add-mobile" onclick="document.getElementById('mobile-acc-overlay').classList.add('open')">＋ 新增帳戶</button>
+    <h2>帳戶列表</h2>
+    <div class="scroll-container" id="acc-list">
+      {% for a in accounts %}
+      <div class="list-item acc-item" data-id="{{ a.id }}">
+        <span class="drag-handle">⠿</span>
+        <div class="item-info">
+          <div class="item-name">{{ a.icon }} {{ a.name }}</div>
+          <div class="item-meta">
+            {% if a.type == 'liability' %}
+            <span style="color:var(--danger);">負債</span>
+            {% else %}
+            <span style="color:var(--accent);">現金</span>
+            {% endif %}
+            {% if a.is_asset %}
+            <span style="margin-left:8px; color:var(--muted); font-size:0.75rem;">(列入資產)</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="item-actions">
+          <button class="btn-action"
+            onclick="openAccEdit({{ a.id }}, '{{ a.name }}', '{{ a.icon }}', '{{ a.type }}', {{ a.get('is_asset', 1) }})">編輯</button>
+          <button class="btn-action del" onclick="openAccDelete({{ a.id }}, '{{ a.name }}')">刪除</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Mobile Add Modals -->
+<div class="overlay" id="mobile-cat-overlay">
+  <div class="modal">
+    <h3>新增類別</h3>
+    <div class="field">
+      <label>類別名稱</label>
+      <input type="text" id="mcat-new-name" placeholder="例：午餐" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>所屬群組</label>
+      <select id="mcat-new-group">
+        {% for g in groups %}
+        {% if g.name and g.name.strip() and g.name != '未分類' %}
+        <option value="{{ g.name }}" data-type="{{ g.get('type', 'expense') }}">{{ g.name }}</option>
+        {% endif %}
+        {% endfor %}
+        <option value="未分類" data-type="">未分類</option>
+      </select>
+    </div>
+    <div class="segmented-control">
+      <input type="radio" name="mcat-new-type" id="mcat-new-type-exp" value="expense" checked onchange="filterCatGroupSelect('mcat-new-group','expense')">
+      <label for="mcat-new-type-exp">支出類別</label>
+      <input type="radio" name="mcat-new-type" id="mcat-new-type-inc" value="income" onchange="filterCatGroupSelect('mcat-new-group','income')">
+      <label for="mcat-new-type-inc">收入類別</label>
+    </div>
+    <div class="checkbox-group">
+      <label><span class="toggle-switch"><input type="checkbox" id="mcat-new-in_budget" checked><span
+            class="toggle-slider"></span></span>列入預算計算</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="document.getElementById('mobile-cat-overlay').classList.remove('open')">取消</button>
+      <button class="btn" style="flex:1" onclick="addCatMobile()">新增類別</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="mobile-grp-overlay">
+  <div class="modal">
+    <h3>新增群組</h3>
+    <div class="field">
+      <label>群組名稱</label>
+      <input type="text" id="mgrp-new-name" placeholder="例：生活" autocomplete="off">
+    </div>
+    <div class="segmented-control">
+      <input type="radio" name="mgrp-new-type" id="mgrp-new-type-exp" value="expense" checked>
+      <label for="mgrp-new-type-exp">支出群組</label>
+      <input type="radio" name="mgrp-new-type" id="mgrp-new-type-inc" value="income">
+      <label for="mgrp-new-type-inc">收入群組</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="document.getElementById('mobile-grp-overlay').classList.remove('open')">取消</button>
+      <button class="btn" style="flex:1" onclick="addGroupMobile()">新增群組</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="mobile-acc-overlay">
+  <div class="modal">
+    <h3>新增帳戶</h3>
+    <div class="field">
+      <label>帳戶名稱</label>
+      <input type="text" id="macc-new-name" placeholder="例：中國信託" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>帳戶類型</label>
+      <select id="macc-new-type">
+        <optgroup label="現金">
+          <option value="現金">現金</option>
+          <option value="銀行">銀行</option>
+          <option value="儲值支付">儲值支付</option>
+          <option value="其他">其他</option>
+        </optgroup>
+        <optgroup label="負債">
+          <option value="信用卡">信用卡</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="checkbox-group" style="margin-bottom:16px;">
+      <label><span class="toggle-switch"><input type="checkbox" id="macc-new-is_asset" checked><span
+            class="toggle-slider"></span></span>列入總資產</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="document.getElementById('mobile-acc-overlay').classList.remove('open')">取消</button>
+      <button class="btn" style="flex:1" onclick="addAccountMobile()">新增帳戶</button>
+    </div>
+  </div>
+</div>
+
+<!-- Budget Section -->
+<div id="section-budget" style="display:none;">
+  <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:24px;">
+    <button class="budget-nav-btn" onclick="budgetChangeMonth(-1)">&#8249;</button>
+    <span id="budget-month-display" style="font-size:.95rem;font-weight:500;min-width:90px;text-align:center;"></span>
+    <button class="budget-nav-btn" onclick="budgetChangeMonth(1)">&#8250;</button>
+  </div>
+  <div class="settings-grid">
+    <div class="card settings-add-card">
+      <h2>總月預算</h2>
+      <div class="field">
+        <label>每月總預算 (NT$)</label>
+        <input type="number" id="total-budget-input" placeholder="0" min="0" autocomplete="off">
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h2 style="margin:0">類別預算</h2>
+        <button class="btn" style="width:auto;padding:8px 20px;" onclick="saveAllBudgets()">存檔</button>
+      </div>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:20px;">設定 0 代表此類別不追蹤預算</p>
+      <div class="scroll-container" id="cat-budget-list">
+        {% for c in categories %}
+        {% if c.type == 'expense' %}
+        <div class="list-item" style="cursor:default;">
+          <div class="item-info">
+            <div class="item-name">{{ c.name }}</div>
+            <div class="item-meta"><span>{{ c.group_name or '未分類' }}</span></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="number" class="cat-budget-input" data-id="{{ c.id }}"
+              value="0" placeholder="0" min="0"
+              style="width:100px;background:var(--bg);border:1px solid var(--border);color:#fff;padding:6px 10px;border-radius:6px;outline:none;font-family:inherit;font-size:.85rem;">
+          </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modals (Category) -->
+<div class="overlay" id="cat-edit-overlay">
+  <div class="modal">
+    <h3>編輯類別</h3>
+    <input type="hidden" id="cat-e-id" />
+    <div class="field"><label>名稱</label><input type="text" id="cat-e-name" autocomplete="off" /></div>
+    <div class="field"><label>群組</label>
+      <select id="cat-e-group">
+        {% for g in groups %}
+        {% if g.name and g.name.strip() and g.name != '未分類' %}
+        <option value="{{ g.name }}" data-type="{{ g.get('type', 'expense') }}">{{ g.name }}</option>
+        {% endif %}
+        {% endfor %}
+        <option value="未分類" data-type="">未分類</option>
+      </select>
+    </div>
+    <div class="segmented-control">
+      <input type="radio" name="cat-e-type" id="cat-e-type-exp" value="expense" onchange="filterCatGroupSelect('cat-e-group','expense')">
+      <label for="cat-e-type-exp">支出類別</label>
+      <input type="radio" name="cat-e-type" id="cat-e-type-inc" value="income" onchange="filterCatGroupSelect('cat-e-group','income')">
+      <label for="cat-e-type-inc">收入類別</label>
+    </div>
+    <div class="checkbox-group">
+      <label><span class="toggle-switch"><input type="checkbox" id="cat-e-in_budget"><span
+            class="toggle-slider"></span></span>列入預算計算</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost"
+        onclick="document.getElementById('cat-edit-overlay').classList.remove('open')">取消</button>
+      <button class="btn" style="flex:1" onclick="saveCatEdit()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="cat-del-overlay">
+  <div class="modal">
+    <h3>刪除類別：<span id="cat-del-name" style="color:var(--danger)"></span></h3>
+    <p style="font-size:0.9rem; color:var(--muted); margin-bottom:16px;">請選擇接手類別：</p>
+    <input type="hidden" id="cat-del-id" />
+    <div class="field"><select id="cat-del-replace"></select></div>
+    <div class="modal-actions">
+      <button class="btn-ghost"
+        onclick="document.getElementById('cat-del-overlay').classList.remove('open')">取消</button>
+      <button class="btn" style="flex:1; background:var(--danger); color:#fff;" onclick="confirmCatDelete()">刪除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modals (Groups) -->
+<div class="overlay" id="grp-edit-overlay">
+  <div class="modal">
+    <h3>編輯群組</h3>
+    <input type="hidden" id="grp-e-id" />
+    <div class="field"><label>名稱</label><input type="text" id="grp-e-name" autocomplete="off" /></div>
+    <div class="segmented-control">
+      <input type="radio" name="grp-e-type" id="grp-e-type-exp" value="expense">
+      <label for="grp-e-type-exp">支出群組</label>
+      <input type="radio" name="grp-e-type" id="grp-e-type-inc" value="income">
+      <label for="grp-e-type-inc">收入群組</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost"
+        onclick="document.getElementById('grp-edit-overlay').classList.remove('open')">取消</button>
+      <button class="btn" style="flex:1" onclick="saveGroupEdit()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="grp-del-overlay">
+  <div class="modal">
+    <h3>刪除群組：<span id="grp-del-name" style="color:var(--danger)"></span></h3>
+    <p style="font-size:0.9rem; color:var(--muted); margin-bottom:16px;">確定刪除？旗下類別將被標記為「未分類」。</p>
+    <input type="hidden" id="grp-del-id" />
+    <div class="modal-actions">
+      <button class="btn-ghost"
+        onclick="document.getElementById('grp-del-overlay').classList.remove('open')">取消</button>
+      <button class="btn" style="flex:1; background:var(--danger); color:#fff;"
+        onclick="confirmGroupDelete()">刪除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modals (Account) -->
+<div class="overlay" id="acc-edit-overlay">
+  <div class="modal">
+    <h3>編輯帳戶</h3>
+    <input type="hidden" id="acc-e-id" />
+    <div class="field"><label>名稱</label><input type="text" id="acc-e-name" autocomplete="off" /></div>
+    <div class="field">
+      <label>帳戶類型</label>
+      <select id="acc-e-type">
+        <optgroup label="現金">
+          <option value="現金">現金</option>
+          <option value="銀行">銀行</option>
+          <option value="儲值支付">儲值支付</option>
+          <option value="其他">其他</option>
+        </optgroup>
+        <optgroup label="負債">
+          <option value="信用卡">信用卡</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="checkbox-group" style="margin-bottom:16px;">
+      <label><span class="toggle-switch"><input type="checkbox" id="acc-e-is_asset"><span
+            class="toggle-slider"></span></span>列入總資產</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost"
+        onclick="document.getElementById('acc-edit-overlay').classList.remove('open')">取消</button>
+      <button class="btn" style="flex:1" onclick="saveAccEdit()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="acc-del-overlay">
+  <div class="modal">
+    <h3>刪除帳戶：<span id="acc-del-name" style="color:var(--danger)"></span></h3>
+    <p style="font-size:0.9rem; color:var(--muted); margin-bottom:16px;">請選擇接手帳戶：</p>
+    <input type="hidden" id="acc-del-id" />
+    <div class="field"><select id="acc-del-replace"></select></div>
+    <div class="modal-actions">
+      <button class="btn-ghost"
+        onclick="document.getElementById('acc-del-overlay').classList.remove('open')">取消</button>
+      <button class="btn" style="flex:1; background:var(--danger); color:#fff;" onclick="confirmAccDelete()">刪除</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script>
+  function toast(msg) {
+    const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2500);
+  }
+  function reloadPage() {
+    let tab = 'categories';
+    if (document.getElementById('main-tab-groups').classList.contains('active')) tab = 'groups';
+    if (document.getElementById('main-tab-accounts').classList.contains('active')) tab = 'accounts';
+    if (document.getElementById('main-tab-budget').classList.contains('active')) tab = 'budget';
+    window.location.href = '?tab=' + tab;
+  }
+
+  // Tabs
+  function switchMainTab(tab) {
+    document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('main-tab-' + tab).classList.add('active');
+    document.getElementById('section-categories').style.display = tab === 'categories' ? 'grid' : 'none';
+    document.getElementById('section-groups').style.display = tab === 'groups' ? 'grid' : 'none';
+    document.getElementById('section-accounts').style.display = tab === 'accounts' ? 'grid' : 'none';
+    document.getElementById('section-budget').style.display = tab === 'budget' ? 'block' : 'none';
+    if (tab === 'categories') switchCatListTab(currentCatTab);
+    if (tab === 'groups') switchGrpListTab(currentGrpTab);
+    if (tab === 'budget') onBudgetTabActivated();
+  }
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('tab')) switchMainTab(urlParams.get('tab'));
+
+  // Init SortableJS — handle only
+  new Sortable(document.getElementById('cat-list'), {
+    handle: '.drag-handle', animation: 150, onEnd: async () => {
+      const order = Array.from(document.querySelectorAll('#cat-list .cat-item')).map(el => el.dataset.id);
+      await fetch('/api/categories/sort', { method: 'POST', body: JSON.stringify({ order }) });
+    }
+  });
+  new Sortable(document.getElementById('grp-list'), {
+    handle: '.drag-handle', animation: 150, onEnd: async () => {
+      const order = Array.from(document.querySelectorAll('#grp-list .grp-item')).map(el => el.dataset.id);
+      await fetch('/api/groups/sort', { method: 'POST', body: JSON.stringify({ order }) });
+    }
+  });
+  new Sortable(document.getElementById('acc-list'), {
+    handle: '.drag-handle', animation: 150, onEnd: async () => {
+      const order = Array.from(document.querySelectorAll('#acc-list .acc-item')).map(el => el.dataset.id);
+      await fetch('/api/accounts/sort', { method: 'POST', body: JSON.stringify({ order }) });
+    }
+  });
+
+  // Categories
+  let currentCatTab = 'expense';
+  function switchCatListTab(tab) {
+    currentCatTab = tab; updateCatGroupSelect(); filterCatGroups();
+  }
+  function updateCatGroupSelect() {
+    const groups = new Set();
+    document.querySelectorAll('.cat-item').forEach(el => {
+      if (el.dataset.type === currentCatTab && el.dataset.group && el.dataset.group.trim() !== '') {
+        groups.add(el.dataset.group);
+      }
+    });
+    const select = document.getElementById('cat-group-filter');
+    const val = select.value;
+    select.innerHTML = '<option value="all">所有群組</option>';
+
+    const sortedGroups = Array.from(groups).sort();
+    const uncatIndex = sortedGroups.indexOf('未分類');
+    if (uncatIndex !== -1) {
+      sortedGroups.splice(uncatIndex, 1);
+      sortedGroups.push('未分類');
+    }
+
+    sortedGroups.forEach(g => { select.innerHTML += `<option value="${g}">${g}</option>`; });
+    select.value = groups.has(val) ? val : 'all';
+  }
+  function filterCatGroups() {
+    const group = document.getElementById('cat-group-filter').value;
+    let count = 0;
+    document.querySelectorAll('.cat-item').forEach(el => {
+      if (el.dataset.type === currentCatTab && (group === 'all' || el.dataset.group === group)) {
+        el.style.display = 'flex'; count++;
+      } else { el.style.display = 'none'; }
+    });
+    document.getElementById('cat-empty-msg').style.display = count === 0 ? 'block' : 'none';
+  }
+
+  async function addCat() {
+    const body = {
+      name: document.getElementById('cat-new-name').value.trim(),
+      group_name: document.getElementById('cat-new-group').value.trim() || '未分類',
+      type: document.querySelector('input[name="cat-new-type"]:checked').value,
+      in_budget: document.getElementById('cat-new-in_budget').checked ? 1 : 0
+    };
+    if (!body.name) return toast('請輸入類別名稱');
+    const res = await fetch('/api/categories', { method: 'POST', body: JSON.stringify(body) });
+    if (res.ok) reloadPage();
+  }
+
+  function openCatEdit(id, name, group_name, type, is_asset, in_budget) {
+    document.getElementById('cat-e-id').value = id; document.getElementById('cat-e-name').value = name;
+    document.querySelector(`input[name="cat-e-type"][value="${type}"]`).checked = true;
+    filterCatGroupSelect('cat-e-group', type);
+    setTimeout(() => { document.getElementById('cat-e-group').value = group_name; }, 0);
+    document.getElementById('cat-e-in_budget').checked = !!in_budget;
+    document.getElementById('cat-edit-overlay').classList.add('open');
+  }
+  async function saveCatEdit() {
+    const id = document.getElementById('cat-e-id').value;
+    const body = {
+      name: document.getElementById('cat-e-name').value.trim(),
+      group_name: document.getElementById('cat-e-group').value.trim() || '未分類',
+      type: document.querySelector('input[name="cat-e-type"]:checked').value,
+      in_budget: document.getElementById('cat-e-in_budget').checked ? 1 : 0
+    };
+    const res = await fetch(`/api/categories/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+    if (res.ok) reloadPage();
+  }
+
+  function openCatDelete(id, name) {
+    document.getElementById('cat-del-id').value = id; document.getElementById('cat-del-name').textContent = name;
+    const select = document.getElementById('cat-del-replace'); select.innerHTML = ''; let count = 0;
+    document.querySelectorAll('.cat-item').forEach(el => {
+      const catId = el.dataset.id;
+      if (catId != id) {
+        const catName = el.querySelector('.item-name').textContent.trim();
+        select.innerHTML += `<option value="${catId}">${catName}</option>`; count++;
+      }
+    });
+    if (count === 0) return toast("請至少保留一個類別");
+    document.getElementById('cat-del-overlay').classList.add('open');
+  }
+  async function confirmCatDelete() {
+    const id = document.getElementById('cat-del-id').value; const repId = document.getElementById('cat-del-replace').value;
+    const res = await fetch(`/api/categories/${id}?replace_with=${repId}`, { method: 'DELETE' });
+    if (res.ok) reloadPage();
+  }
+
+  // Groups
+  let currentGrpTab = 'expense';
+  function switchGrpListTab(tab) {
+    currentGrpTab = tab;
+    document.querySelectorAll('.grp-item').forEach(el => {
+      el.style.display = (el.dataset.type === tab) ? 'flex' : 'none';
+    });
+  }
+  function filterCatGroupSelect(selectId, type) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    let firstValid = null; let currentIsValid = false; const cur = select.value;
+    Array.from(select.options).forEach(opt => {
+      const ot = opt.dataset.type || '';
+      const show = ot === type || ot === '';
+      opt.style.display = show ? '' : 'none';
+      if (show && !firstValid) firstValid = opt.value;
+      if (show && opt.value === cur) currentIsValid = true;
+    });
+    if (!currentIsValid && firstValid) select.value = firstValid;
+  }
+  async function addGroup() {
+    const name = document.getElementById('grp-new-name').value.trim();
+    const type = document.querySelector('input[name="grp-new-type"]:checked').value;
+    if (!name) return toast("請輸入名稱");
+    const res = await fetch('/api/groups', { method: 'POST', body: JSON.stringify({ name, type }) });
+    if (res.ok) reloadPage();
+  }
+  function openGroupEdit(id, name, type) {
+    document.getElementById('grp-e-id').value = id; document.getElementById('grp-e-name').value = name;
+    const radio = document.querySelector(`input[name="grp-e-type"][value="${type || 'expense'}"]`);
+    if (radio) radio.checked = true;
+    document.getElementById('grp-edit-overlay').classList.add('open');
+  }
+  async function saveGroupEdit() {
+    const id = document.getElementById('grp-e-id').value; const name = document.getElementById('grp-e-name').value.trim();
+    const type = document.querySelector('input[name="grp-e-type"]:checked').value;
+    const res = await fetch(`/api/groups/${id}`, { method: 'PUT', body: JSON.stringify({ name, type }) });
+    if (res.ok) reloadPage();
+  }
+  function openGroupDelete(id, name) {
+    document.getElementById('grp-del-id').value = id; document.getElementById('grp-del-name').textContent = name;
+    document.getElementById('grp-del-overlay').classList.add('open');
+  }
+  async function confirmGroupDelete() {
+    const id = document.getElementById('grp-del-id').value;
+    const res = await fetch(`/api/groups/${id}`, { method: 'DELETE' });
+    if (res.ok) reloadPage();
+  }
+
+  // Accounts
+  const ICON_MAP = { "現金": "💵", "銀行": "🏦", "儲值支付": "🪙", "信用卡": "💳", "其他": "👝" };
+  const REV_ICON_MAP = { "💵": "現金", "🏦": "銀行", "🪙": "儲值支付", "💳": "信用卡", "👝": "其他" };
+
+  async function addAccount() {
+    const name = document.getElementById("acc-new-name").value.trim();
+    const subType = document.getElementById("acc-new-type").value;
+    const icon = ICON_MAP[subType] || '👝'; const type = subType === "信用卡" ? "liability" : "asset";
+    const is_asset = document.getElementById("acc-new-is_asset").checked ? 1 : 0;
+    if (!name) return toast("請輸入帳戶名稱");
+    const res = await fetch("/api/accounts", { method: "POST", body: JSON.stringify({ name, icon, type, is_asset }) });
+    if (res.ok) reloadPage();
+  }
+
+  function openAccEdit(id, name, icon, type, is_asset) {
+    document.getElementById('acc-e-id').value = id; document.getElementById('acc-e-name').value = name;
+    let subType = REV_ICON_MAP[icon] || (type === 'liability' ? '信用卡' : '其他');
+    document.getElementById('acc-e-type').value = subType;
+    document.getElementById('acc-e-is_asset').checked = !!is_asset;
+    document.getElementById('acc-edit-overlay').classList.add('open');
+  }
+
+  async function saveAccEdit() {
+    const id = document.getElementById('acc-e-id').value; const subType = document.getElementById('acc-e-type').value;
+    const newType = subType === "信用卡" ? "liability" : "asset";
+    const is_asset = document.getElementById("acc-e-is_asset").checked ? 1 : 0;
+    const body = { name: document.getElementById('acc-e-name').value.trim(), icon: ICON_MAP[subType] || '👝', type: newType, is_asset };
+    const res = await fetch(`/api/accounts/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+    if (res.ok) reloadPage();
+  }
+
+  function openAccDelete(id, name) {
+    document.getElementById('acc-del-id').value = id; document.getElementById('acc-del-name').textContent = name;
+    const select = document.getElementById('acc-del-replace'); select.innerHTML = ''; let count = 0;
+    document.querySelectorAll('#section-accounts .list-item').forEach(el => {
+      const accId = el.dataset.id;
+      if (accId != id) {
+        const accName = el.querySelector('.item-name').textContent.trim();
+        select.innerHTML += `<option value="${accId}">${accName}</option>`; count++;
+      }
+    });
+    if (count === 0) return toast("請至少保留一個帳戶");
+    document.getElementById('acc-del-overlay').classList.add('open');
+  }
+  async function confirmAccDelete() {
+    const id = document.getElementById('acc-del-id').value; const replaceId = document.getElementById('acc-del-replace').value;
+    const res = await fetch(`/api/accounts/${id}?replace_with=${replaceId}`, { method: "DELETE" });
+    if (res.ok) reloadPage();
+  }
+
+  // Budget (per-month)
+  let budgetYear = new Date().getFullYear();
+  let budgetMonth = new Date().getMonth() + 1;
+
+  function updateBudgetMonthDisplay() {
+    const el = document.getElementById('budget-month-display');
+    if (el) el.textContent = `${budgetYear}年${budgetMonth}月`;
+  }
+
+  async function budgetChangeMonth(delta) {
+    budgetMonth += delta;
+    if (budgetMonth < 1) { budgetMonth = 12; budgetYear--; }
+    if (budgetMonth > 12) { budgetMonth = 1; budgetYear++; }
+    updateBudgetMonthDisplay();
+    await loadBudgetForMonth();
+  }
+
+  async function loadBudgetForMonth() {
+    const res = await fetch(`/api/budget?year=${budgetYear}&month=${budgetMonth}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('total-budget-input').value = data.total_budget || 0;
+    const catMap = {};
+    (data.categories || []).forEach(cb => { catMap[String(cb.id)] = cb.amount; });
+    document.querySelectorAll('.cat-budget-input').forEach(input => {
+      input.value = catMap[input.dataset.id] || 0;
+    });
+  }
+
+  async function saveAllBudgets() {
+    const total = parseFloat(document.getElementById('total-budget-input').value || 0);
+    const categories = [];
+    document.querySelectorAll('.cat-budget-input').forEach(input => {
+      categories.push({ id: parseInt(input.dataset.id), amount: parseFloat(input.value || 0) });
+    });
+    const res = await fetch('/api/budget', {
+      method: 'POST',
+      body: JSON.stringify({ year: budgetYear, month: budgetMonth, total_budget: total, categories })
+    });
+    if (res.ok) toast("儲存成功");
+    else toast("儲存失敗");
+  }
+
+  function onBudgetTabActivated() {
+    updateBudgetMonthDisplay();
+    loadBudgetForMonth();
+  }
+
+  switchCatListTab('expense');
+  switchGrpListTab('expense');
+  filterCatGroupSelect('cat-new-group', 'expense');
+  filterCatGroupSelect('mcat-new-group', 'expense');
+
+  // Mobile modal add functions
+  async function addCatMobile() {
+    const body = {
+      name: document.getElementById('mcat-new-name').value.trim(),
+      group_name: document.getElementById('mcat-new-group').value.trim() || '未分類',
+      type: document.querySelector('input[name="mcat-new-type"]:checked').value,
+      in_budget: document.getElementById('mcat-new-in_budget').checked ? 1 : 0
+    };
+    if (!body.name) return toast('請輸入類別名稱');
+    const res = await fetch('/api/categories', { method: 'POST', body: JSON.stringify(body) });
+    if (res.ok) reloadPage();
+  }
+
+  async function addGroupMobile() {
+    const name = document.getElementById('mgrp-new-name').value.trim();
+    const type = document.querySelector('input[name="mgrp-new-type"]:checked').value;
+    if (!name) return toast("請輸入名稱");
+    const res = await fetch('/api/groups', { method: 'POST', body: JSON.stringify({ name, type }) });
+    if (res.ok) reloadPage();
+  }
+
+  async function addAccountMobile() {
+    const name = document.getElementById("macc-new-name").value.trim();
+    const subType = document.getElementById("macc-new-type").value;
+    const icon = ICON_MAP[subType] || '👝';
+    const type = subType === "信用卡" ? "liability" : "asset";
+    const is_asset = document.getElementById("macc-new-is_asset").checked ? 1 : 0;
+    if (!name) return toast("請輸入帳戶名稱");
+    const res = await fetch("/api/accounts", { method: "POST", body: JSON.stringify({ name, icon, type, is_asset }) });
+    if (res.ok) reloadPage();
+  }
+</script>
+{% endblock %}
