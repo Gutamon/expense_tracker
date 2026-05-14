@@ -13,19 +13,36 @@
 <body>
   <div class="auth-card">
     <h2>登入帳號</h2>
+    <div id="error-msg" class="error-msg" style="display:none"></div>
     <div class="field"><label>帳號</label><input type="text" id="username" /></div>
     <div class="field"><label>密碼</label><input type="password" id="password" /></div>
     <button class="btn" onclick="doLogin()">登入</button>
     <a href="/register" class="link">還沒有帳號？前往註冊</a>
   </div>
+  <style>
+    .error-msg {
+      background: rgba(255, 95, 95, 0.12);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 1.4rem;
+      margin-bottom: 16px;
+    }
+  </style>
   <script>
     async function doLogin() {
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
       const res = await fetch('/login', { method: 'POST', body: JSON.stringify({ username, password }) });
       const data = await res.json();
-      if (res.ok) location.href = '/';
-      else alert(data.error);
+      if (res.ok) {
+        location.href = '/';
+      } else {
+        const el = document.getElementById('error-msg');
+        el.textContent = data.error;
+        el.style.display = 'block';
+      }
     }
   </script>
 </body>

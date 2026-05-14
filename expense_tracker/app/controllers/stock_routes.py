@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 import yfinance as yf
 from flask import Blueprint, render_template, request, jsonify, session, abort, redirect
 from app.models.stock import StockModel
@@ -58,6 +59,10 @@ def api_create_position():
     new_id = stock_model.create_position(session['user_id'], symbol, name, int(account_id))
     if not new_id:
         abort(400, "該股票倉位已存在")
+
+    with get_db() as conn:
+        conn.execute("UPDATE stocks SET current_price = ?, updated_at = ? WHERE id = ?",
+                     (float(price), datetime.now().strftime("%Y-%m-%d %H:%M:%S"), new_id))
 
     return jsonify({"success": True, "id": new_id}), 201
 
@@ -137,6 +142,20 @@ def api_update_stock_transaction(tx_id):
         return jsonify({"success": True})
     except ValueError as e:
         abort(400, str(e))
+
+@stock_bp.route("/api/stocks/<int:stock_id>", methods=["DELETE"])
+def api_delete_position(stock_id):
+    user_id = session['user_id']
+    with get_db() as conn:
+        cursor = conn.cursor()
+        stock = cursor.execute("SELECT id FROM stocks WHERE id = ? AND user_id = ?", (stock_id, user_id)).fetchone()
+        if not stock:
+            abort(404, "找不到此倉位")
+        tx_count = cursor.execute("SELECT COUNT(*) as c FROM stock_transactions WHERE stock_id = ? AND user_id = ?", (stock_id, user_id)).fetchone()['c']
+        if tx_count > 0:
+            abort(400, "此倉位有交易紀錄，無法直接刪除")
+        cursor.execute("DELETE FROM stocks WHERE id = ? AND user_id = ?", (stock_id, user_id))
+    return jsonify({"success": True})
 
 @stock_bp.route("/api/stocks/transactions/<int:tx_id>", methods=["DELETE"])
 def api_delete_stock_transaction(tx_id):

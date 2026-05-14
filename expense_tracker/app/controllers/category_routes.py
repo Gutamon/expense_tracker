@@ -123,7 +123,8 @@ def api_accounts_create():
         name=data["name"].strip(),
         icon=data.get("icon", "💰"),
         type=data.get("type", "asset"),
-        is_asset=int(data.get("is_asset", 1))
+        is_asset=int(data.get("is_asset", 1)),
+        billing_start_day=int(data.get("billing_start_day", 1))
     )
     return jsonify({"success": True, "id": new_id}), 201
 

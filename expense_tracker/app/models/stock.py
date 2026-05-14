@@ -57,66 +57,48 @@ class StockModel:
         conn.execute("UPDATE stocks SET shares = ?, avg_price = ? WHERE id = ?", (shares, avg_price, stock_id))
 
     def add_transaction(self, user_id: int, stock_id: int, t_type: str, date: str, shares: float, price: float, fee: float, note: str):
-        shares = int(shares) # 確保輸入時也是整數
+        shares = int(shares)
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         with get_db() as conn:
             cursor = conn.cursor()
-            
-            # 取得該股票的交割帳號與名稱
+
             stock_info = cursor.execute("SELECT account_id, symbol FROM stocks WHERE id = ?", (stock_id,)).fetchone()
             settlement_acc_id = stock_info["account_id"]
             symbol = stock_info["symbol"]
-            
-            # 取得或建立「股票交易」帳戶
-            stock_acc = cursor.execute("SELECT id FROM accounts WHERE user_id = ? AND name = '股票交易'", (user_id,)).fetchone()
-            if stock_acc:
-                inventory_acc_id = stock_acc["id"]
-            else:
-                cursor.execute("INSERT INTO accounts (user_id, name, icon, type, sort_order, is_asset) VALUES (?, '股票交易', '📈', 'asset', 99, 1)", (user_id,))
-                inventory_acc_id = cursor.lastrowid
-                
+
             cursor.execute('''
                 INSERT INTO stock_transactions (user_id, stock_id, type, date, shares, price, fee, note, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (user_id, stock_id, t_type, date, shares, price, fee, note, created_at))
-            
-            # 建立關聯的轉帳紀錄 (買入：交割 -> 庫存；賣出/股利：庫存 -> 交割)
-            # 買入的總花費 (扣除交割帳戶)
-            # 賣出的總得款 (存入交割帳戶)
-            # 股利的總得款 (存入交割帳戶)
-            # 買入時轉帳：從 settlement_acc_id 到 inventory_acc_id
-            # 賣出時轉帳：從 inventory_acc_id 到 settlement_acc_id
-            
+            tx_id = cursor.lastrowid
+
+            # 買入＝交割帳戶支出；賣出/股利＝交割帳戶收入；分割不產生現金流
             amount = 0
-            from_acc = None
-            to_acc = None
+            exp_type = None
             title = ""
-            
+
             if t_type == "buy":
                 amount = shares * price + fee
-                from_acc = settlement_acc_id
-                to_acc = inventory_acc_id
+                exp_type = "expense"
                 title = f"買入 {symbol}"
             elif t_type == "sell":
                 amount = shares * price - fee
-                from_acc = inventory_acc_id
-                to_acc = settlement_acc_id
+                exp_type = "income"
                 title = f"賣出 {symbol}"
             elif t_type == "dividend":
-                amount = price # 這裡的 price 是股利總額
-                from_acc = inventory_acc_id
-                to_acc = settlement_acc_id
+                amount = price
+                exp_type = "income"
                 title = f"{symbol} 股利"
-                
-            if amount > 0 and t_type != "split":
+
+            if amount > 0 and exp_type:
                 cursor.execute('''
-                    INSERT INTO expenses (user_id, title, amount, date, category, account_id, to_account_id, type, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'transfer', ?)
-                ''', (user_id, title, amount, date, "股票交易", from_acc, to_acc, created_at))
-            
+                    INSERT INTO expenses (user_id, title, amount, date, category, account_id, to_account_id, type, created_at, stock_transaction_id)
+                    VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+                ''', (user_id, title, amount, date, "股票交易", settlement_acc_id, exp_type, created_at, tx_id))
+
             self._update_stock_avg(conn, stock_id)
-            return cursor.lastrowid
+            return tx_id
 
     def delete_transaction(self, user_id: int, tx_id: int) -> bool:
         with get_db() as conn:
@@ -125,15 +107,16 @@ class StockModel:
             if not tx: return False
             stock_id = tx['stock_id']
             created_at = tx['created_at']
-            
-            # Check if it is the latest transaction for this stock
+
             latest = cursor.execute("SELECT id FROM stock_transactions WHERE stock_id = ? AND user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1", (stock_id, user_id)).fetchone()
             if latest and latest['id'] != tx_id:
                 raise ValueError("只能刪除最上層（最新）的交易紀錄")
-                
+
             cursor.execute("DELETE FROM stock_transactions WHERE id = ?", (tx_id,))
-            cursor.execute("DELETE FROM expenses WHERE user_id = ? AND category = '股票交易' AND created_at = ?", (user_id, created_at))
-            
+            # Delete by stock_transaction_id (new records) or legacy created_at match
+            cursor.execute("DELETE FROM expenses WHERE user_id = ? AND stock_transaction_id = ?", (user_id, tx_id))
+            cursor.execute("DELETE FROM expenses WHERE user_id = ? AND category = '股票交易' AND created_at = ? AND stock_transaction_id IS NULL", (user_id, created_at))
+
             self._update_stock_avg(conn, stock_id)
             return True
 
@@ -146,30 +129,35 @@ class StockModel:
             stock_id = tx['stock_id']
             t_type = tx['type']
             created_at = tx['created_at']
-            
-            # Check if it is the latest
+
             latest = cursor.execute("SELECT id FROM stock_transactions WHERE stock_id = ? AND user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1", (stock_id, user_id)).fetchone()
             if latest and latest['id'] != tx_id:
                 raise ValueError("只能修改最上層（最新）的交易紀錄")
-                
+
             cursor.execute('''
-                UPDATE stock_transactions 
+                UPDATE stock_transactions
                 SET date = ?, shares = ?, price = ?, fee = ?, note = ?
                 WHERE id = ?
             ''', (date, shares, price, fee, note, tx_id))
-            
+
             amount = 0
             if t_type == "buy": amount = shares * price + fee
             elif t_type == "sell": amount = shares * price - fee
             elif t_type == "dividend": amount = price
-            
+
             if amount > 0 and t_type != "split":
-                cursor.execute('''
-                    UPDATE expenses
-                    SET amount = ?, date = ?
-                    WHERE user_id = ? AND category = '股票交易' AND created_at = ?
-                ''', (amount, date, user_id, created_at))
-                
+                # Update by stock_transaction_id (new records)
+                updated = cursor.execute('''
+                    UPDATE expenses SET amount = ?, date = ?
+                    WHERE user_id = ? AND stock_transaction_id = ?
+                ''', (amount, date, user_id, tx_id)).rowcount
+                # Fallback for legacy records linked by created_at
+                if not updated:
+                    cursor.execute('''
+                        UPDATE expenses SET amount = ?, date = ?
+                        WHERE user_id = ? AND category = '股票交易' AND created_at = ? AND stock_transaction_id IS NULL
+                    ''', (amount, date, user_id, created_at))
+
             self._update_stock_avg(conn, stock_id)
             return True
 

@@ -349,6 +349,17 @@
     border-color: var(--accent);
   }
 
+  .acc-section-label {
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 4px 0 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+  }
+
   .scroll-container {
     max-height: 500px;
     overflow-y: auto;
@@ -466,14 +477,14 @@
 
 {% block content %}
 <div class="main-tabs">
-  <button id="main-tab-categories" class="main-tab active" onclick="switchMainTab('categories')">類別</button>
-  <button id="main-tab-groups" class="main-tab" onclick="switchMainTab('groups')">群組</button>
-  <button id="main-tab-accounts" class="main-tab" onclick="switchMainTab('accounts')">帳戶</button>
+  <button id="main-tab-accounts" class="main-tab active" onclick="switchMainTab('accounts')">帳戶</button>
   <button id="main-tab-budget" class="main-tab" onclick="switchMainTab('budget')">月預算</button>
+  <button id="main-tab-groups" class="main-tab" onclick="switchMainTab('groups')">群組</button>
+  <button id="main-tab-categories" class="main-tab" onclick="switchMainTab('categories')">類別</button>
 </div>
 
 <!-- Category Section -->
-<div id="section-categories" class="settings-grid">
+<div id="section-categories" class="settings-grid" style="display:none;">
   <div class="card settings-add-card">
     <h2>新增類別</h2>
     <div class="field">
@@ -492,9 +503,11 @@
       </select>
     </div>
     <div class="segmented-control">
-      <input type="radio" name="cat-new-type" id="cat-new-type-exp" value="expense" checked onchange="filterCatGroupSelect('cat-new-group','expense')">
+      <input type="radio" name="cat-new-type" id="cat-new-type-exp" value="expense" checked
+        onchange="filterCatGroupSelect('cat-new-group','expense')">
       <label for="cat-new-type-exp">支出類別</label>
-      <input type="radio" name="cat-new-type" id="cat-new-type-inc" value="income" onchange="filterCatGroupSelect('cat-new-group','income')">
+      <input type="radio" name="cat-new-type" id="cat-new-type-inc" value="income"
+        onchange="filterCatGroupSelect('cat-new-group','income')">
       <label for="cat-new-type-inc">收入類別</label>
     </div>
     <div class="checkbox-group">
@@ -504,7 +517,8 @@
     <button class="btn" onclick="addCat()">新增類別</button>
   </div>
   <div class="card">
-    <button class="btn-add-mobile" onclick="document.getElementById('mobile-cat-overlay').classList.add('open')">＋ 新增類別</button>
+    <button class="btn-add-mobile" onclick="document.getElementById('mobile-cat-overlay').classList.add('open')">＋
+      新增類別</button>
     <div class="segmented-control" style="margin-bottom:24px;">
       <input type="radio" name="cat-list-filter" id="cat-list-exp" value="expense" checked
         onchange="switchCatListTab('expense')">
@@ -560,9 +574,11 @@
     <button class="btn" onclick="addGroup()">新增群組</button>
   </div>
   <div class="card">
-    <button class="btn-add-mobile" onclick="document.getElementById('mobile-grp-overlay').classList.add('open')">＋ 新增群組</button>
+    <button class="btn-add-mobile" onclick="document.getElementById('mobile-grp-overlay').classList.add('open')">＋
+      新增群組</button>
     <div class="segmented-control" style="margin-bottom:24px;">
-      <input type="radio" name="grp-list-filter" id="grp-list-exp" value="expense" checked onchange="switchGrpListTab('expense')">
+      <input type="radio" name="grp-list-filter" id="grp-list-exp" value="expense" checked
+        onchange="switchGrpListTab('expense')">
       <label for="grp-list-exp">支出群組</label>
       <input type="radio" name="grp-list-filter" id="grp-list-inc" value="income" onchange="switchGrpListTab('income')">
       <label for="grp-list-inc">收入群組</label>
@@ -575,7 +591,8 @@
           <div class="item-name">{{ g.name }}</div>
         </div>
         <div class="item-actions">
-          <button class="btn-action" onclick="openGroupEdit({{ g.id }}, '{{ g.name }}', '{{ g.get('type', 'expense') }}')">編輯</button>
+          <button class="btn-action"
+            onclick="openGroupEdit({{ g.id }}, '{{ g.name }}', '{{ g.get('type', 'expense') }}')">編輯</button>
           <button class="btn-action del" onclick="openGroupDelete({{ g.id }}, '{{ g.name }}')">刪除</button>
         </div>
       </div>
@@ -585,7 +602,7 @@
 </div>
 
 <!-- Account Section -->
-<div id="section-accounts" class="settings-grid" style="display:none;">
+<div id="section-accounts" class="settings-grid">
   <div class="card settings-add-card">
     <h2>新增帳戶</h2>
     <div class="field">
@@ -594,17 +611,26 @@
     </div>
     <div class="field">
       <label>帳戶類型</label>
-      <select id="acc-new-type">
-        <optgroup label="現金">
+      <select id="acc-new-type" onchange="toggleAccBillingField('acc-new-billing-field', this.value)">
+        <optgroup label="現金類">
           <option value="現金">現金</option>
           <option value="銀行">銀行</option>
           <option value="儲值支付">儲值支付</option>
           <option value="其他">其他</option>
         </optgroup>
-        <optgroup label="負債">
+        <optgroup label="負債類">
           <option value="信用卡">信用卡</option>
         </optgroup>
       </select>
+    </div>
+    <div class="field" id="acc-new-billing-field" style="display:none;">
+      <label>帳單起算日</label>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="number" id="acc-new-billing-start" min="1" max="28" value="1"
+          style="width:80px;background:var(--bg);border:1px solid var(--border);color:#fff;padding:10px;border-radius:8px;outline:none;font-family:inherit;">
+        <span style="color:var(--muted);font-size:.85rem;">號</span>
+      </div>
+      <p style="font-size:.75rem;color:var(--muted);margin:6px 0 0;">帳單週期為每月該日起至下月前一日止</p>
     </div>
     <div class="checkbox-group" style="margin-bottom:16px;">
       <label><span class="toggle-switch"><input type="checkbox" id="acc-new-is_asset" checked><span
@@ -613,31 +639,53 @@
     <button class="btn" onclick="addAccount()">新增帳戶</button>
   </div>
   <div class="card">
-    <button class="btn-add-mobile" onclick="document.getElementById('mobile-acc-overlay').classList.add('open')">＋ 新增帳戶</button>
+    <button class="btn-add-mobile" onclick="document.getElementById('mobile-acc-overlay').classList.add('open')">＋
+      新增帳戶</button>
     <h2>帳戶列表</h2>
     <div class="scroll-container" id="acc-list">
-      {% for a in accounts %}
+      {% set icon_sub = {'💵': '現金', '🏦': '銀行', '🪙': '儲值支付', '💳': '信用卡', '👝': '其他'} %}
+      <div class="acc-section-label">現金類帳戶</div>
+      {% for a in accounts if a.type != 'liability' %}
       <div class="list-item acc-item" data-id="{{ a.id }}">
         <span class="drag-handle">⠿</span>
         <div class="item-info">
           <div class="item-name">{{ a.icon }} {{ a.name }}</div>
           <div class="item-meta">
-            {% if a.type == 'liability' %}
-            <span style="color:var(--danger);">負債</span>
-            {% else %}
-            <span style="color:var(--accent);">現金</span>
-            {% endif %}
-            {% if a.is_asset %}
-            <span style="margin-left:8px; color:var(--muted); font-size:0.75rem;">(列入資產)</span>
-            {% endif %}
+            <span style="color:var(--accent);">{{ icon_sub.get(a.icon, '其他') }}</span>
+            {% if a.is_asset %}<span>(列入資產)</span>{% endif %}
           </div>
         </div>
         <div class="item-actions">
           <button class="btn-action"
-            onclick="openAccEdit({{ a.id }}, '{{ a.name }}', '{{ a.icon }}', '{{ a.type }}', {{ a.get('is_asset', 1) }})">編輯</button>
+            onclick="openAccEdit({{ a.id }}, '{{ a.name }}', '{{ a.icon }}', '{{ a.type }}', {{ a.get('is_asset', 1) }}, {{ a.get('billing_start_day', 1) }})">編輯</button>
           <button class="btn-action del" onclick="openAccDelete({{ a.id }}, '{{ a.name }}')">刪除</button>
         </div>
       </div>
+      {% else %}
+      <div style="text-align:center;padding:20px 0;color:var(--muted);font-size:.85rem;">尚無現金類帳戶</div>
+      {% endfor %}
+
+      <div class="acc-section-label" style="margin-top:20px;">負債類帳戶</div>
+      {% for a in accounts if a.type == 'liability' %}
+      <div class="list-item acc-item" data-id="{{ a.id }}">
+        <span class="drag-handle">⠿</span>
+        <div class="item-info">
+          <div class="item-name">{{ a.icon }} {{ a.name }}</div>
+          <div class="item-meta">
+            <span style="color:var(--danger);">{{ icon_sub.get(a.icon, '信用卡') }}</span>
+            {% if a.is_asset %}<span>(列入資產)</span>{% endif %}
+            {% set bsd = a.get('billing_start_day', 1) %}
+            <span>每月 {{ bsd }} 號後消費計入下月帳單</span>
+          </div>
+        </div>
+        <div class="item-actions">
+          <button class="btn-action"
+            onclick="openAccEdit({{ a.id }}, '{{ a.name }}', '{{ a.icon }}', '{{ a.type }}', {{ a.get('is_asset', 1) }}, {{ a.get('billing_start_day', 1) }})">編輯</button>
+          <button class="btn-action del" onclick="openAccDelete({{ a.id }}, '{{ a.name }}')">刪除</button>
+        </div>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:20px 0;color:var(--muted);font-size:.85rem;">尚無負債類帳戶</div>
       {% endfor %}
     </div>
   </div>
@@ -663,9 +711,11 @@
       </select>
     </div>
     <div class="segmented-control">
-      <input type="radio" name="mcat-new-type" id="mcat-new-type-exp" value="expense" checked onchange="filterCatGroupSelect('mcat-new-group','expense')">
+      <input type="radio" name="mcat-new-type" id="mcat-new-type-exp" value="expense" checked
+        onchange="filterCatGroupSelect('mcat-new-group','expense')">
       <label for="mcat-new-type-exp">支出類別</label>
-      <input type="radio" name="mcat-new-type" id="mcat-new-type-inc" value="income" onchange="filterCatGroupSelect('mcat-new-group','income')">
+      <input type="radio" name="mcat-new-type" id="mcat-new-type-inc" value="income"
+        onchange="filterCatGroupSelect('mcat-new-group','income')">
       <label for="mcat-new-type-inc">收入類別</label>
     </div>
     <div class="checkbox-group">
@@ -673,7 +723,8 @@
             class="toggle-slider"></span></span>列入預算計算</label>
     </div>
     <div class="modal-actions">
-      <button class="btn-ghost" onclick="document.getElementById('mobile-cat-overlay').classList.remove('open')">取消</button>
+      <button class="btn-ghost"
+        onclick="document.getElementById('mobile-cat-overlay').classList.remove('open')">取消</button>
       <button class="btn" style="flex:1" onclick="addCatMobile()">新增類別</button>
     </div>
   </div>
@@ -693,7 +744,8 @@
       <label for="mgrp-new-type-inc">收入群組</label>
     </div>
     <div class="modal-actions">
-      <button class="btn-ghost" onclick="document.getElementById('mobile-grp-overlay').classList.remove('open')">取消</button>
+      <button class="btn-ghost"
+        onclick="document.getElementById('mobile-grp-overlay').classList.remove('open')">取消</button>
       <button class="btn" style="flex:1" onclick="addGroupMobile()">新增群組</button>
     </div>
   </div>
@@ -708,24 +760,33 @@
     </div>
     <div class="field">
       <label>帳戶類型</label>
-      <select id="macc-new-type">
-        <optgroup label="現金">
+      <select id="macc-new-type" onchange="toggleAccBillingField('macc-new-billing-field', this.value)">
+        <optgroup label="現金類">
           <option value="現金">現金</option>
           <option value="銀行">銀行</option>
           <option value="儲值支付">儲值支付</option>
           <option value="其他">其他</option>
         </optgroup>
-        <optgroup label="負債">
+        <optgroup label="負債類">
           <option value="信用卡">信用卡</option>
         </optgroup>
       </select>
+    </div>
+    <div class="field" id="macc-new-billing-field" style="display:none;">
+      <label>帳單起算日</label>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="number" id="macc-new-billing-start" min="1" max="28" value="1"
+          style="width:80px;background:var(--bg);border:1px solid var(--border);color:#fff;padding:10px;border-radius:8px;outline:none;font-family:inherit;">
+        <span style="color:var(--muted);font-size:.85rem;">號</span>
+      </div>
     </div>
     <div class="checkbox-group" style="margin-bottom:16px;">
       <label><span class="toggle-switch"><input type="checkbox" id="macc-new-is_asset" checked><span
             class="toggle-slider"></span></span>列入總資產</label>
     </div>
     <div class="modal-actions">
-      <button class="btn-ghost" onclick="document.getElementById('mobile-acc-overlay').classList.remove('open')">取消</button>
+      <button class="btn-ghost"
+        onclick="document.getElementById('mobile-acc-overlay').classList.remove('open')">取消</button>
       <button class="btn" style="flex:1" onclick="addAccountMobile()">新增帳戶</button>
     </div>
   </div>
@@ -761,8 +822,7 @@
             <div class="item-meta"><span>{{ c.group_name or '未分類' }}</span></div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
-            <input type="number" class="cat-budget-input" data-id="{{ c.id }}"
-              value="0" placeholder="0" min="0"
+            <input type="number" class="cat-budget-input" data-id="{{ c.id }}" value="0" placeholder="0" min="0"
               style="width:100px;background:var(--bg);border:1px solid var(--border);color:#fff;padding:6px 10px;border-radius:6px;outline:none;font-family:inherit;font-size:.85rem;">
           </div>
         </div>
@@ -790,9 +850,11 @@
       </select>
     </div>
     <div class="segmented-control">
-      <input type="radio" name="cat-e-type" id="cat-e-type-exp" value="expense" onchange="filterCatGroupSelect('cat-e-group','expense')">
+      <input type="radio" name="cat-e-type" id="cat-e-type-exp" value="expense"
+        onchange="filterCatGroupSelect('cat-e-group','expense')">
       <label for="cat-e-type-exp">支出類別</label>
-      <input type="radio" name="cat-e-type" id="cat-e-type-inc" value="income" onchange="filterCatGroupSelect('cat-e-group','income')">
+      <input type="radio" name="cat-e-type" id="cat-e-type-inc" value="income"
+        onchange="filterCatGroupSelect('cat-e-group','income')">
       <label for="cat-e-type-inc">收入類別</label>
     </div>
     <div class="checkbox-group">
@@ -863,17 +925,26 @@
     <div class="field"><label>名稱</label><input type="text" id="acc-e-name" autocomplete="off" /></div>
     <div class="field">
       <label>帳戶類型</label>
-      <select id="acc-e-type">
-        <optgroup label="現金">
+      <select id="acc-e-type" onchange="toggleAccBillingField('acc-e-billing-field', this.value)">
+        <optgroup label="現金類">
           <option value="現金">現金</option>
           <option value="銀行">銀行</option>
           <option value="儲值支付">儲值支付</option>
           <option value="其他">其他</option>
         </optgroup>
-        <optgroup label="負債">
+        <optgroup label="負債類">
           <option value="信用卡">信用卡</option>
         </optgroup>
       </select>
+    </div>
+    <div class="field" id="acc-e-billing-field" style="display:none;">
+      <label>帳單起算日</label>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="number" id="acc-e-billing-start" min="1" max="28" value="1"
+          style="width:80px;background:var(--bg);border:1px solid var(--border);color:#fff;padding:10px;border-radius:8px;outline:none;font-family:inherit;">
+        <span style="color:var(--muted);font-size:.85rem;">號</span>
+      </div>
+      <p style="font-size:.75rem;color:var(--muted);margin:6px 0 0;">帳單週期為每月該日起至下月前一日止</p>
     </div>
     <div class="checkbox-group" style="margin-bottom:16px;">
       <label><span class="toggle-switch"><input type="checkbox" id="acc-e-is_asset"><span
@@ -912,10 +983,10 @@
     setTimeout(() => t.classList.remove("show"), 2500);
   }
   function reloadPage() {
-    let tab = 'categories';
-    if (document.getElementById('main-tab-groups').classList.contains('active')) tab = 'groups';
-    if (document.getElementById('main-tab-accounts').classList.contains('active')) tab = 'accounts';
+    let tab = 'accounts';
     if (document.getElementById('main-tab-budget').classList.contains('active')) tab = 'budget';
+    if (document.getElementById('main-tab-groups').classList.contains('active')) tab = 'groups';
+    if (document.getElementById('main-tab-categories').classList.contains('active')) tab = 'categories';
     window.location.href = '?tab=' + tab;
   }
 
@@ -932,7 +1003,7 @@
     if (tab === 'budget') onBudgetTabActivated();
   }
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('tab')) switchMainTab(urlParams.get('tab'));
+  switchMainTab(urlParams.get('tab') || 'accounts');
 
   // Init SortableJS — handle only
   new Sortable(document.getElementById('cat-list'), {
@@ -948,7 +1019,7 @@
     }
   });
   new Sortable(document.getElementById('acc-list'), {
-    handle: '.drag-handle', animation: 150, onEnd: async () => {
+    handle: '.drag-handle', filter: '.acc-section-label', animation: 150, onEnd: async () => {
       const order = Array.from(document.querySelectorAll('#acc-list .acc-item')).map(el => el.dataset.id);
       await fetch('/api/accounts/sort', { method: 'POST', body: JSON.stringify({ order }) });
     }
@@ -1096,48 +1167,66 @@
   const ICON_MAP = { "現金": "💵", "銀行": "🏦", "儲值支付": "🪙", "信用卡": "💳", "其他": "👝" };
   const REV_ICON_MAP = { "💵": "現金", "🏦": "銀行", "🪙": "儲值支付", "💳": "信用卡", "👝": "其他" };
 
+  function toggleAccBillingField(fieldId, subType) {
+    const el = document.getElementById(fieldId);
+    if (el) el.style.display = subType === '信用卡' ? 'block' : 'none';
+  }
+
   async function addAccount() {
     const name = document.getElementById("acc-new-name").value.trim();
     const subType = document.getElementById("acc-new-type").value;
-    const icon = ICON_MAP[subType] || '👝'; const type = subType === "信用卡" ? "liability" : "asset";
+    const icon = ICON_MAP[subType] || '👝';
+    const type = subType === "信用卡" ? "liability" : "asset";
     const is_asset = document.getElementById("acc-new-is_asset").checked ? 1 : 0;
     if (!name) return toast("請輸入帳戶名稱");
-    const res = await fetch("/api/accounts", { method: "POST", body: JSON.stringify({ name, icon, type, is_asset }) });
+    const body = { name, icon, type, is_asset };
+    if (type === 'liability') body.billing_start_day = parseInt(document.getElementById("acc-new-billing-start").value) || 1;
+    const res = await fetch("/api/accounts", { method: "POST", body: JSON.stringify(body) });
     if (res.ok) reloadPage();
   }
 
-  function openAccEdit(id, name, icon, type, is_asset) {
-    document.getElementById('acc-e-id').value = id; document.getElementById('acc-e-name').value = name;
+  function openAccEdit(id, name, icon, type, is_asset, billing_start_day) {
+    document.getElementById('acc-e-id').value = id;
+    document.getElementById('acc-e-name').value = name;
     let subType = REV_ICON_MAP[icon] || (type === 'liability' ? '信用卡' : '其他');
     document.getElementById('acc-e-type').value = subType;
     document.getElementById('acc-e-is_asset').checked = !!is_asset;
+    document.getElementById('acc-e-billing-start').value = billing_start_day || 1;
+    toggleAccBillingField('acc-e-billing-field', subType);
     document.getElementById('acc-edit-overlay').classList.add('open');
   }
 
   async function saveAccEdit() {
-    const id = document.getElementById('acc-e-id').value; const subType = document.getElementById('acc-e-type').value;
+    const id = document.getElementById('acc-e-id').value;
+    const subType = document.getElementById('acc-e-type').value;
     const newType = subType === "信用卡" ? "liability" : "asset";
     const is_asset = document.getElementById("acc-e-is_asset").checked ? 1 : 0;
     const body = { name: document.getElementById('acc-e-name').value.trim(), icon: ICON_MAP[subType] || '👝', type: newType, is_asset };
+    if (newType === 'liability') body.billing_start_day = parseInt(document.getElementById("acc-e-billing-start").value) || 1;
     const res = await fetch(`/api/accounts/${id}`, { method: 'PUT', body: JSON.stringify(body) });
     if (res.ok) reloadPage();
   }
 
   function openAccDelete(id, name) {
-    document.getElementById('acc-del-id').value = id; document.getElementById('acc-del-name').textContent = name;
-    const select = document.getElementById('acc-del-replace'); select.innerHTML = ''; let count = 0;
-    document.querySelectorAll('#section-accounts .list-item').forEach(el => {
+    document.getElementById('acc-del-id').value = id;
+    document.getElementById('acc-del-name').textContent = name;
+    const select = document.getElementById('acc-del-replace');
+    select.innerHTML = '';
+    let count = 0;
+    document.querySelectorAll('#acc-list .acc-item').forEach(el => {
       const accId = el.dataset.id;
       if (accId != id) {
         const accName = el.querySelector('.item-name').textContent.trim();
-        select.innerHTML += `<option value="${accId}">${accName}</option>`; count++;
+        select.innerHTML += `<option value="${accId}">${accName}</option>`;
+        count++;
       }
     });
     if (count === 0) return toast("請至少保留一個帳戶");
     document.getElementById('acc-del-overlay').classList.add('open');
   }
   async function confirmAccDelete() {
-    const id = document.getElementById('acc-del-id').value; const replaceId = document.getElementById('acc-del-replace').value;
+    const id = document.getElementById('acc-del-id').value;
+    const replaceId = document.getElementById('acc-del-replace').value;
     const res = await fetch(`/api/accounts/${id}?replace_with=${replaceId}`, { method: "DELETE" });
     if (res.ok) reloadPage();
   }
@@ -1190,8 +1279,6 @@
     loadBudgetForMonth();
   }
 
-  switchCatListTab('expense');
-  switchGrpListTab('expense');
   filterCatGroupSelect('cat-new-group', 'expense');
   filterCatGroupSelect('mcat-new-group', 'expense');
 
@@ -1223,7 +1310,9 @@
     const type = subType === "信用卡" ? "liability" : "asset";
     const is_asset = document.getElementById("macc-new-is_asset").checked ? 1 : 0;
     if (!name) return toast("請輸入帳戶名稱");
-    const res = await fetch("/api/accounts", { method: "POST", body: JSON.stringify({ name, icon, type, is_asset }) });
+    const body = { name, icon, type, is_asset };
+    if (type === 'liability') body.billing_start_day = parseInt(document.getElementById("macc-new-billing-start").value) || 1;
+    const res = await fetch("/api/accounts", { method: "POST", body: JSON.stringify(body) });
     if (res.ok) reloadPage();
   }
 </script>

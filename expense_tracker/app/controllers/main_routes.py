@@ -10,8 +10,6 @@ expense_model = ExpenseModel()
 category_model = CategoryModel()
 account_model = AccountModel()
 
-STOCK_CATEGORY = "股票交易"
-
 @main_bp.before_request
 def require_login():
     if 'user_id' not in session:
@@ -40,7 +38,8 @@ def index():
     for e in expenses:
         cat_info = cat_dict.get(e["category"], {})
         is_asset = cat_info.get("is_asset", 1)
-        in_budget = cat_info.get("in_budget", 1)
+        # Unknown categories (e.g. stock-generated) are excluded from budget by default
+        in_budget = cat_info.get("in_budget", 0) if cat_info else 0
         
         if is_asset:
             if e["type"] == "income":
@@ -80,20 +79,13 @@ def index():
     # Build account lookup for template
     account_map = {a['id']: a for a in accounts}
     
-    # 供手動選擇的帳戶與類別 (排除股票專用)
-    selectable_accounts = [a for a in accounts if a['name'] != STOCK_CATEGORY]
-    
     filtered_grouped_categories = {}
     for g, cats in grouped_categories.items():
         if g == "未分類": continue
-        filtered_cats = [c for c in cats if c['name'] != STOCK_CATEGORY]
-        if filtered_cats:
-            filtered_grouped_categories[g] = filtered_cats
-            
-    if "未分類" in grouped_categories:
-        filtered_cats = [c for c in grouped_categories["未分類"] if c['name'] != STOCK_CATEGORY]
-        if filtered_cats:
-            filtered_grouped_categories["未分類"] = filtered_cats
+        if cats:
+            filtered_grouped_categories[g] = cats
+    if "未分類" in grouped_categories and grouped_categories["未分類"]:
+        filtered_grouped_categories["未分類"] = grouped_categories["未分類"]
     
     return render_template(
         "index.html", 
@@ -103,7 +95,7 @@ def index():
         total_balance=total_balance, 
         budget_used=budget_used,
         monthly_budget=monthly_budget,
-        accounts=selectable_accounts,
+        accounts=accounts,
         all_accounts=accounts,
         account_map=account_map,
         account_balances=account_balances,
@@ -142,20 +134,7 @@ def charts():
             liabilities += balance
         else:
             cash += balance
-            
-    # 如果有建立股票交易帳戶，其餘額會計入 cash，但為了避免重複計算總資產，我們在前端應該注意
-    # 或者乾脆在這裡扣除「股票交易」的餘額？
-    # 如果「股票交易」是資產，會被加進 cash 中，那麼 charts 中的 cash 就會包含股票的成本。
-    # 所以我們要從 cash 扣除「股票交易」帳戶的餘額
-    stock_account_id = None
-    for acc in accounts:
-        if acc["name"] == "股票交易":
-            stock_account_id = acc["id"]
-            break
-            
-    if stock_account_id and stock_account_id in account_balances:
-        cash -= account_balances[stock_account_id]
-    
+
     stock_value = 0
     with get_db() as conn:
         rows = conn.execute("SELECT shares, current_price FROM stocks WHERE user_id = ?", (user_id,)).fetchall()
@@ -206,8 +185,9 @@ def api_get(expense_id):
 def api_update(expense_id):
     doc = expense_model.get_by_id(expense_id, session['user_id'])
     if not doc: abort(404, "找不到此筆明細")
-    if doc.get("category") == "股票交易": abort(403, "股票交易產生的明細請至股票專區操作")
-    
+    if doc.get("stock_transaction_id") or doc.get("category") == "股票交易":
+        abort(403, "股票交易產生的明細請至股票專區操作")
+
     data = request.get_json(force=True)
     req_type = data.get("type", doc.get("type"))
     if req_type != "transfer":
@@ -221,8 +201,9 @@ def api_update(expense_id):
 def api_delete(expense_id):
     doc = expense_model.get_by_id(expense_id, session['user_id'])
     if not doc: abort(404, "找不到此筆明細")
-    if doc.get("category") == "股票交易": abort(403, "股票交易產生的明細請至股票專區操作")
-    
+    if doc.get("stock_transaction_id") or doc.get("category") == "股票交易":
+        abort(403, "股票交易產生的明細請至股票專區操作")
+
     if not expense_model.delete(expense_id, session['user_id']):
         abort(404, description="找不到此筆明細")
     return jsonify({"success": True})

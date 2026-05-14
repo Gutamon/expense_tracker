@@ -149,7 +149,35 @@ def init_db():
         except sqlite3.OperationalError: pass
         try: conn.execute("ALTER TABLE accounts ADD COLUMN is_asset BOOLEAN DEFAULT 1")
         except sqlite3.OperationalError: pass
+        try: conn.execute("ALTER TABLE accounts ADD COLUMN billing_start_day INTEGER DEFAULT 1")
+        except sqlite3.OperationalError: pass
         try: conn.execute("ALTER TABLE expenses ADD COLUMN account_id INTEGER DEFAULT 0")
         except sqlite3.OperationalError: pass
         try: conn.execute("ALTER TABLE expenses ADD COLUMN to_account_id INTEGER DEFAULT 0")
         except sqlite3.OperationalError: pass
+        try: conn.execute("ALTER TABLE expenses ADD COLUMN stock_transaction_id INTEGER DEFAULT NULL")
+        except sqlite3.OperationalError: pass
+
+        # Migrate old "股票交易" virtual accounts: convert their transfer records to expense/income
+        try:
+            stock_accs = conn.execute("SELECT id FROM accounts WHERE name = '股票交易'").fetchall()
+            for sa_row in stock_accs:
+                sa_id = sa_row['id']
+                # Buy: from=settlement, to=股票交易 → expense from settlement
+                conn.execute("""
+                    UPDATE expenses SET type = 'expense', to_account_id = 0
+                    WHERE category = '股票交易' AND type = 'transfer' AND to_account_id = ?
+                """, (sa_id,))
+                # Sell/dividend: from=股票交易, to=settlement → income from settlement
+                sells = conn.execute("""
+                    SELECT id, to_account_id FROM expenses
+                    WHERE category = '股票交易' AND type = 'transfer' AND account_id = ?
+                """, (sa_id,)).fetchall()
+                for s in sells:
+                    conn.execute("""
+                        UPDATE expenses SET type = 'income', account_id = ?, to_account_id = 0
+                        WHERE id = ?
+                    """, (s['to_account_id'], s['id']))
+                conn.execute("DELETE FROM accounts WHERE id = ?", (sa_id,))
+        except Exception as mig_e:
+            print(f"Migration note: {mig_e}")

@@ -846,7 +846,7 @@
           </div>
         </div>
         <div class="item-amount {{ e.type }}">
-          {% if e.type == 'income' %}+{% else %}-{% endif %}NT$ {{ "%.0f" | format(e.amount) }}
+          {% if e.type == 'income' %}+{% elif e.type == 'expense' %}-{% endif %}NT$ {{ "%.0f" | format(e.amount) }}
         </div>
         <div class="item-actions">
           <button class="icon-btn" onclick="openEditById('{{ e.id }}')">✎</button>
@@ -1478,7 +1478,7 @@
       content.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px 0">當日無記帳</p>';
     } else {
       content.innerHTML = dayItems.map(e => {
-        const sign = e.type === 'income' ? '+' : '-';
+        const sign = e.type === 'income' ? '+' : e.type === 'expense' ? '-' : '';
         const badgeCls = e.type === 'expense' ? 'expense' : e.type === 'transfer' ? 'transfer' : '';
         const badgeText = e.type === 'transfer' ? '轉帳' : e.category;
         const acc = accountMapData[String(e.account_id)];

@@ -22,15 +22,15 @@ class AccountModel:
             rows = conn.execute("SELECT * FROM accounts WHERE user_id = ? ORDER BY sort_order, id", (user_id,)).fetchall()
             return [dict(r) for r in rows]
 
-    def create(self, user_id: int, name: str, icon: str = "💰", type: str = "asset", is_asset: int = 1) -> str:
+    def create(self, user_id: int, name: str, icon: str = "💰", type: str = "asset", is_asset: int = 1, billing_start_day: int = 1) -> str:
         with get_db() as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO accounts (user_id, name, icon, type, sort_order, is_asset) VALUES (?, ?, ?, ?, 0, ?)", (user_id, name, icon, type, is_asset))
+            cursor.execute("INSERT INTO accounts (user_id, name, icon, type, sort_order, is_asset, billing_start_day) VALUES (?, ?, ?, ?, 0, ?, ?)", (user_id, name, icon, type, is_asset, billing_start_day))
             return str(cursor.lastrowid)
 
     def update(self, account_id: str, user_id: int, data: dict) -> bool:
         fields, values = [], []
-        for key in ["name", "icon", "type", "is_asset"]:
+        for key in ["name", "icon", "type", "is_asset", "billing_start_day"]:
             if key in data:
                 fields.append(f"{key} = ?")
                 values.append(data[key])
