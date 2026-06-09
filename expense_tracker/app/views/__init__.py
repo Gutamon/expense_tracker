@@ -32,10 +32,12 @@ def create_app():
     from app.controllers.auth_routes import auth_bp
     from app.controllers.category_routes import settings_bp
     from app.controllers.stock_routes import stock_bp
-    
+    from app.controllers.debt_routes import debt_bp
+
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(stock_bp)
+    app.register_blueprint(debt_bp)
 
     return app

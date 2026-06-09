@@ -701,7 +701,7 @@
   {% if a.get('is_asset', 1) %}
   <button class="btn-filter filter-locked" data-id="{{ a.id }}" data-bal="{{ account_balances.get(a.id, 0) }}"
     onclick="toggleAccFilter(this)">
-    {{ a.icon }} {{ a.name }}
+    {{ a.icon }} {{ a.name }}{% if a.get('currency', 'TWD') != 'TWD' %} · {{ a.currency }}{% endif %}
   </button>
   {% endif %}
   {% endfor %}
@@ -733,8 +733,12 @@
       <input type="text" id="f-title" placeholder="例：午餐" autocomplete="off" />
     </div>
     <div class="field">
-      <label>金額（NT$）</label>
-      <input type="number" id="f-amount" placeholder="0" min="0" step="1" autocomplete="off" />
+      <label id="f-amount-label">金額（NT$）</label>
+      <input type="number" id="f-amount" placeholder="0" min="0" step="any" autocomplete="off" />
+    </div>
+    <div class="field" id="f-to-amount-field" style="display:none">
+      <label id="f-to-amount-label">轉入金額</label>
+      <input type="number" id="f-to-amount" placeholder="0" min="0" step="any" autocomplete="off" />
     </div>
     <div class="field" id="f-category-field">
       <label>類別</label>
@@ -846,7 +850,15 @@
           </div>
         </div>
         <div class="item-amount {{ e.type }}">
-          {% if e.type == 'income' %}+{% elif e.type == 'expense' %}-{% endif %}NT$ {{ "%.0f" | format(e.amount) }}
+          {% if e.type == 'transfer' and e.to_amount %}
+            {% set from_acc = account_map.get(e.account_id) %}
+            {% set to_acc = account_map.get(e.to_account_id) %}
+            {{ "%.0f" | format(e.amount) }} {{ from_acc.get('currency', 'TWD') if from_acc else 'TWD' }} → {{ "%.0f" | format(e.to_amount) }} {{ to_acc.get('currency', 'TWD') if to_acc else 'TWD' }}
+          {% else %}
+            {% set acc = account_map.get(e.account_id) %}
+            {% set cur = acc.get('currency', 'TWD') if acc else 'TWD' %}
+            {% if e.type == 'income' %}+{% elif e.type == 'expense' %}-{% endif %}{% if cur == 'TWD' %}NT$ {% else %}{{ cur }} {% endif %}{{ "%.0f" | format(e.amount) }}
+          {% endif %}
         </div>
         <div class="item-actions">
           <button class="icon-btn" onclick="openEditById('{{ e.id }}')">✎</button>
@@ -890,8 +902,12 @@
         <input type="text" id="m-title" placeholder="例：午餐" autocomplete="off" />
       </div>
       <div class="field full">
-        <label>金額（NT$）</label>
-        <input type="number" id="m-amount" placeholder="0" min="0" step="1" autocomplete="off" />
+        <label id="m-amount-label">金額（NT$）</label>
+        <input type="number" id="m-amount" placeholder="0" min="0" step="any" autocomplete="off" />
+      </div>
+      <div class="field full" id="m-to-amount-field" style="display:none">
+        <label id="m-to-amount-label">轉入金額</label>
+        <input type="number" id="m-to-amount" placeholder="0" min="0" step="any" autocomplete="off" />
       </div>
       <div class="field full" id="m-category-field">
         <label>類別</label>
@@ -955,7 +971,11 @@
         </div>
       </div>
       <div class="field" id="e-title-field"><label>名稱</label><input type="text" id="e-title" autocomplete="off" /></div>
-      <div class="field"><label>金額</label><input type="number" id="e-amount" autocomplete="off" /></div>
+      <div class="field"><label id="e-amount-label">金額</label><input type="number" id="e-amount" step="any" autocomplete="off" /></div>
+      <div class="field" id="e-to-amount-field" style="display:none">
+        <label id="e-to-amount-label">轉入金額</label>
+        <input type="number" id="e-to-amount" step="any" autocomplete="off" />
+      </div>
       <div class="field" id="e-category-field">
         <label>類別</label>
         <select id="e-category">
@@ -1034,6 +1054,43 @@
   const accountMapData = {{ account_map | tojson | safe }};
   const allCategories = {{ categories | tojson | safe }};
 
+  // Build currency lookup from account data
+  const accCurrencyMap = {};
+  Object.entries(accountMapData).forEach(([id, a]) => { accCurrencyMap[id] = a.currency || 'TWD'; });
+
+  const DEFAULT_AMOUNT_LABELS = { 'f': '金額（NT$）', 'm': '金額（NT$）', 'e': '金額' };
+
+  function updateAmountLabel(prefix) {
+    const typeEl = document.querySelector(`input[name="${prefix}-type"]:checked`);
+    if (!typeEl || typeEl.value === 'transfer') return;
+    const accId = document.getElementById(`${prefix}-account`).value;
+    const cur = accCurrencyMap[String(accId)] || 'TWD';
+    const labelEl = document.getElementById(`${prefix}-amount-label`);
+    if (!labelEl) return;
+    labelEl.textContent = cur === 'TWD' ? (DEFAULT_AMOUNT_LABELS[prefix] || '金額') : `金額（${cur}）`;
+  }
+
+  function updateTransferAmountFields(prefix) {
+    const fromId = document.getElementById(`${prefix}-account`).value;
+    const toId = document.getElementById(`${prefix}-to-account`).value;
+    const fromCur = accCurrencyMap[String(fromId)] || 'TWD';
+    const toCur = accCurrencyMap[String(toId)] || 'TWD';
+    const crossCurrency = fromId && toId && fromCur !== toCur;
+
+    const amountLabelEl = document.getElementById(`${prefix}-amount-label`);
+    const toAmountFieldEl = document.getElementById(`${prefix}-to-amount-field`);
+    const toAmountLabelEl = document.getElementById(`${prefix}-to-amount-label`);
+
+    if (crossCurrency) {
+      if (amountLabelEl) amountLabelEl.textContent = `轉出金額（${fromCur}）`;
+      if (toAmountLabelEl) toAmountLabelEl.textContent = `轉入金額（${toCur}）`;
+      if (toAmountFieldEl) toAmountFieldEl.style.display = 'block';
+    } else {
+      if (amountLabelEl) amountLabelEl.textContent = DEFAULT_AMOUNT_LABELS[prefix] || '金額';
+      if (toAmountFieldEl) toAmountFieldEl.style.display = 'none';
+    }
+  }
+
   // ── Type change ──
   function onTypeChange(type, prefix) {
     if (type === 'transfer') {
@@ -1042,13 +1099,20 @@
       document.getElementById(prefix + '-to-account-field').style.display = 'block';
       document.getElementById(prefix + '-account-label').innerHTML = `轉出帳戶 <a href="/settings?tab=accounts" style="font-size:0.625rem;float:right;cursor:pointer;color:var(--accent);text-decoration:none;">管理</a>`;
       document.getElementById(prefix + '-title').value = '轉帳';
+      document.getElementById(`${prefix}-account`).onchange = () => updateTransferAmountFields(prefix);
+      document.getElementById(`${prefix}-to-account`).onchange = () => updateTransferAmountFields(prefix);
+      updateTransferAmountFields(prefix);
     } else {
       document.getElementById(prefix + '-title-field').style.display = 'block';
       document.getElementById(prefix + '-category-field').style.display = 'block';
       document.getElementById(prefix + '-to-account-field').style.display = 'none';
+      document.getElementById(`${prefix}-to-amount-field`).style.display = 'none';
       document.getElementById(prefix + '-account-label').innerHTML = `帳戶 <a href="/settings?tab=accounts" style="font-size:0.625rem;float:right;cursor:pointer;color:var(--accent);text-decoration:none;">管理</a>`;
+      document.getElementById(`${prefix}-account`).onchange = () => updateAmountLabel(prefix);
+      document.getElementById(`${prefix}-to-account`).onchange = null;
       filterCategories(type, prefix + '-category');
       if (document.getElementById(prefix + '-title').value === '轉帳') document.getElementById(prefix + '-title').value = '';
+      updateAmountLabel(prefix);
     }
   }
 
@@ -1176,6 +1240,14 @@
       account_id: parseInt(document.getElementById(`${prefix}-account`).value) || 0,
       to_account_id: parseInt(document.getElementById(`${prefix}-to-account`).value) || 0,
     };
+    if (type === 'transfer') {
+      const toAmountField = document.getElementById(`${prefix}-to-amount-field`);
+      if (toAmountField && toAmountField.style.display !== 'none') {
+        const toAmt = parseFloat(document.getElementById(`${prefix}-to-amount`).value);
+        if (!toAmt) { toast("請填寫轉入金額"); return; }
+        body.to_amount = toAmt;
+      }
+    }
     if (!body.title || !body.amount || !body.date) { toast("請填寫必要欄位"); return; }
     if (!body.account_id) { toast("請指定帳戶"); return; }
     if (body.type === 'transfer' && !body.to_account_id) { toast("請指定轉入帳戶"); return; }
@@ -1186,6 +1258,7 @@
         document.getElementById(`${prefix}-title`).value = '';
         document.getElementById(`${prefix}-amount`).value = '';
         document.getElementById(`${prefix}-note`).value = '';
+        if (document.getElementById(`${prefix}-to-amount`)) document.getElementById(`${prefix}-to-amount`).value = '';
         toast("新增成功 ✓ 可繼續輸入");
         pendingReload = true;
       } else {
@@ -1193,7 +1266,8 @@
         location.reload();
       }
     } else {
-      toast("新增失敗");
+      const errData = await res.json().catch(() => ({}));
+      toast(errData.error || "新增失敗");
     }
   }
 
@@ -1214,7 +1288,11 @@
       setTimeout(() => {
         if (d.type !== 'transfer') document.getElementById("e-category").value = d.category;
         document.getElementById("e-account").value = d.account_id || 0;
-        if (d.type === 'transfer') document.getElementById("e-to-account").value = d.to_account_id || 0;
+        if (d.type === 'transfer') {
+          document.getElementById("e-to-account").value = d.to_account_id || 0;
+          updateTransferAmountFields('e');
+          if (d.to_amount) document.getElementById("e-to-amount").value = d.to_amount;
+        }
       }, 50);
       document.getElementById("e-date").value = d.date || '';
       document.getElementById("e-note").value = d.note || '';
@@ -1241,12 +1319,23 @@
       account_id: parseInt(document.getElementById("e-account").value) || 0,
       to_account_id: parseInt(document.getElementById("e-to-account").value) || 0,
     };
+    if (type === 'transfer') {
+      const toAmountField = document.getElementById('e-to-amount-field');
+      if (toAmountField && toAmountField.style.display !== 'none') {
+        const toAmt = parseFloat(document.getElementById('e-to-amount').value);
+        if (!toAmt) { toast("請填寫轉入金額"); return; }
+        body.to_amount = toAmt;
+      }
+    }
     if (!body.title || !body.amount || !body.date) { toast("請填寫必要欄位"); return; }
     if (!body.account_id) { toast("請指定帳戶"); return; }
     if (body.type === 'transfer' && !body.to_account_id) { toast("請指定轉入帳戶"); return; }
     const res = await fetch(`/api/expenses/${id}`, { method: "PUT", body: JSON.stringify(body) });
     if (res.ok) { toast("更新成功 ✓"); location.reload(); }
-    else { toast("更新失敗"); }
+    else {
+      const errData = await res.json().catch(() => ({}));
+      toast(errData.error || "更新失敗");
+    }
   }
 
   // ── Delete ──
@@ -1485,13 +1574,23 @@
         const accTag = acc ? `<span class="account-tag">${acc.icon || ''} ${acc.name}</span>` : '';
         const toAcc = e.type === 'transfer' && e.to_account_id ? accountMapData[String(e.to_account_id)] : null;
         const toAccTag = toAcc ? ` ➔ <span class="account-tag">${toAcc.icon || ''} ${toAcc.name}</span>` : '';
+        let amountStr;
+        if (e.type === 'transfer' && e.to_amount) {
+          const fromCur = acc ? (acc.currency || 'TWD') : 'TWD';
+          const toCur = toAcc ? (toAcc.currency || 'TWD') : 'TWD';
+          amountStr = `${Math.round(e.amount)} ${fromCur} → ${Math.round(e.to_amount)} ${toCur}`;
+        } else {
+          const cur = acc ? (acc.currency || 'TWD') : 'TWD';
+          const curPrefix = cur === 'TWD' ? 'NT$' : cur;
+          amountStr = `${sign}${curPrefix} ${Math.round(e.amount)}`;
+        }
         return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
           <span class="cat-badge ${badgeCls}">${badgeText}</span>
           <div style="flex:1;min-width:0">
             <div class="item-title">${e.title}</div>
             <div class="item-date">${e.note ? e.note + ' ' : ''}${accTag}${toAccTag}</div>
           </div>
-          <div class="item-amount ${e.type}">${sign}NT$ ${Math.round(e.amount)}</div>
+          <div class="item-amount ${e.type}">${amountStr}</div>
         </div>`;
       }).join('');
     }

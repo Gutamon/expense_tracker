@@ -27,4 +27,12 @@ body {
   font-family: 'Noto Sans TC', sans-serif;
   font-weight: 300;
   min-height: 100vh;
+  overflow-x: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input, textarea, select {
+  user-select: text;
+  -webkit-user-select: text;
 }

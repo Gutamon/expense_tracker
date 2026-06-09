@@ -255,6 +255,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    flex: 1;
   }
 
   .item-name {
@@ -285,22 +286,29 @@
     gap: 8px;
   }
 
-  .btn-action {
-    background: transparent;
+  .icon-btn {
+    background: none;
     border: 1px solid var(--border);
-    color: var(--text);
-    padding: 6px 12px;
+    color: var(--muted);
     border-radius: 6px;
+    width: 30px;
+    height: 30px;
     cursor: pointer;
-    font-size: .8rem;
+    font-size: .85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .2s;
+    font-family: inherit;
+    flex-shrink: 0;
   }
 
-  .btn-action:hover {
+  .icon-btn:hover {
     border-color: var(--accent);
     color: var(--accent);
   }
 
-  .btn-action.del:hover {
+  .icon-btn.del:hover {
     border-color: var(--danger);
     color: var(--danger);
   }
@@ -545,9 +553,9 @@
           </div>
         </div>
         <div class="item-actions">
-          <button class="btn-action"
-            onclick="openCatEdit({{ c.id }}, '{{ c.name }}', '{{ c.group_name }}', '{{ c.type }}', {{ c.is_asset }}, {{ c.in_budget }})">編輯</button>
-          <button class="btn-action del" onclick="openCatDelete({{ c.id }}, '{{ c.name }}')">刪除</button>
+          <button class="icon-btn"
+            onclick="openCatEdit({{ c.id }}, '{{ c.name }}', '{{ c.group_name }}', '{{ c.type }}', {{ c.is_asset }}, {{ c.in_budget }})">✎</button>
+          <button class="icon-btn del" onclick="openCatDelete({{ c.id }}, '{{ c.name }}')">✕</button>
         </div>
       </div>
       {% endfor %}
@@ -591,9 +599,9 @@
           <div class="item-name">{{ g.name }}</div>
         </div>
         <div class="item-actions">
-          <button class="btn-action"
-            onclick="openGroupEdit({{ g.id }}, '{{ g.name }}', '{{ g.get('type', 'expense') }}')">編輯</button>
-          <button class="btn-action del" onclick="openGroupDelete({{ g.id }}, '{{ g.name }}')">刪除</button>
+          <button class="icon-btn"
+            onclick="openGroupEdit({{ g.id }}, '{{ g.name }}', '{{ g.get('type', 'expense') }}')">✎</button>
+          <button class="icon-btn del" onclick="openGroupDelete({{ g.id }}, '{{ g.name }}')">✕</button>
         </div>
       </div>
       {% endfor %}
@@ -611,7 +619,7 @@
     </div>
     <div class="field">
       <label>帳戶類型</label>
-      <select id="acc-new-type" onchange="toggleAccBillingField('acc-new-billing-field', this.value)">
+      <select id="acc-new-type" onchange="toggleAccBillingField('acc-new-billing-field', 'acc-new-credit-limit-field', this.value)">
         <optgroup label="現金類">
           <option value="現金">現金</option>
           <option value="銀行">銀行</option>
@@ -631,6 +639,22 @@
         <span style="color:var(--muted);font-size:.85rem;">號</span>
       </div>
       <p style="font-size:.75rem;color:var(--muted);margin:6px 0 0;">帳單週期為每月該日起至下月前一日止</p>
+    </div>
+    <div class="field" id="acc-new-credit-limit-field" style="display:none;">
+      <label>信用額度 (NT$)</label>
+      <input type="number" id="acc-new-credit-limit" min="0" value="0" placeholder="0" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>幣別</label>
+      <select id="acc-new-currency">
+        <option value="TWD">TWD（台幣）</option>
+        <option value="USD">USD（美元）</option>
+        <option value="JPY">JPY（日幣）</option>
+        <option value="KRW">KRW（韓元）</option>
+        <option value="CNY">CNY（人民幣）</option>
+        <option value="EUR">EUR（歐元）</option>
+        <option value="GBP">GBP（英鎊）</option>
+      </select>
     </div>
     <div class="checkbox-group" style="margin-bottom:16px;">
       <label><span class="toggle-switch"><input type="checkbox" id="acc-new-is_asset" checked><span
@@ -652,13 +676,14 @@
           <div class="item-name">{{ a.icon }} {{ a.name }}</div>
           <div class="item-meta">
             <span style="color:var(--accent);">{{ icon_sub.get(a.icon, '其他') }}</span>
+            {% if a.get('currency', 'TWD') != 'TWD' %}<span style="color:#5bc0de;">{{ a.currency }}</span>{% endif %}
             {% if a.is_asset %}<span>(列入資產)</span>{% endif %}
           </div>
         </div>
         <div class="item-actions">
-          <button class="btn-action"
-            onclick="openAccEdit({{ a.id }}, '{{ a.name }}', '{{ a.icon }}', '{{ a.type }}', {{ a.get('is_asset', 1) }}, {{ a.get('billing_start_day', 1) }})">編輯</button>
-          <button class="btn-action del" onclick="openAccDelete({{ a.id }}, '{{ a.name }}')">刪除</button>
+          <button class="icon-btn"
+            onclick="openAccEdit({{ a.id }}, '{{ a.name }}', '{{ a.icon }}', '{{ a.type }}', {{ a.get('is_asset', 1) }}, {{ a.get('billing_start_day', 1) }}, '{{ a.get('currency', 'TWD') }}')">✎</button>
+          <button class="icon-btn del" onclick="openAccDelete({{ a.id }}, '{{ a.name }}')">✕</button>
         </div>
       </div>
       {% else %}
@@ -673,15 +698,17 @@
           <div class="item-name">{{ a.icon }} {{ a.name }}</div>
           <div class="item-meta">
             <span style="color:var(--danger);">{{ icon_sub.get(a.icon, '信用卡') }}</span>
+            {% if a.get('currency', 'TWD') != 'TWD' %}<span style="color:#5bc0de;">{{ a.currency }}</span>{% endif %}
             {% if a.is_asset %}<span>(列入資產)</span>{% endif %}
             {% set bsd = a.get('billing_start_day', 1) %}
             <span>每月 {{ bsd }} 號後消費計入下月帳單</span>
+            {% if a.get('credit_limit', 0) > 0 %}<span>額度 ${{ "%.0f"|format(a.credit_limit) }}</span>{% endif %}
           </div>
         </div>
         <div class="item-actions">
-          <button class="btn-action"
-            onclick="openAccEdit({{ a.id }}, '{{ a.name }}', '{{ a.icon }}', '{{ a.type }}', {{ a.get('is_asset', 1) }}, {{ a.get('billing_start_day', 1) }})">編輯</button>
-          <button class="btn-action del" onclick="openAccDelete({{ a.id }}, '{{ a.name }}')">刪除</button>
+          <button class="icon-btn"
+            onclick="openAccEdit({{ a.id }}, '{{ a.name }}', '{{ a.icon }}', '{{ a.type }}', {{ a.get('is_asset', 1) }}, {{ a.get('billing_start_day', 1) }}, '{{ a.get('currency', 'TWD') }}', {{ a.get('credit_limit', 0)|float }})">✎</button>
+          <button class="icon-btn del" onclick="openAccDelete({{ a.id }}, '{{ a.name }}')">✕</button>
         </div>
       </div>
       {% else %}
@@ -760,7 +787,7 @@
     </div>
     <div class="field">
       <label>帳戶類型</label>
-      <select id="macc-new-type" onchange="toggleAccBillingField('macc-new-billing-field', this.value)">
+      <select id="macc-new-type" onchange="toggleAccBillingField('macc-new-billing-field', 'macc-new-credit-limit-field', this.value)">
         <optgroup label="現金類">
           <option value="現金">現金</option>
           <option value="銀行">銀行</option>
@@ -779,6 +806,23 @@
           style="width:80px;background:var(--bg);border:1px solid var(--border);color:#fff;padding:10px;border-radius:8px;outline:none;font-family:inherit;">
         <span style="color:var(--muted);font-size:.85rem;">號</span>
       </div>
+    </div>
+    <div class="field" id="macc-new-credit-limit-field" style="display:none;">
+      <label>信用額度 (NT$)</label>
+      <input type="number" id="macc-new-credit-limit" min="0" value="0" placeholder="0" autocomplete="off"
+        style="width:100%;background:var(--bg);border:1px solid var(--border);color:#fff;padding:10px;border-radius:8px;outline:none;font-family:inherit;box-sizing:border-box;">
+    </div>
+    <div class="field">
+      <label>幣別</label>
+      <select id="macc-new-currency">
+        <option value="TWD">TWD（台幣）</option>
+        <option value="USD">USD（美元）</option>
+        <option value="JPY">JPY（日幣）</option>
+        <option value="KRW">KRW（韓元）</option>
+        <option value="CNY">CNY（人民幣）</option>
+        <option value="EUR">EUR（歐元）</option>
+        <option value="GBP">GBP（英鎊）</option>
+      </select>
     </div>
     <div class="checkbox-group" style="margin-bottom:16px;">
       <label><span class="toggle-switch"><input type="checkbox" id="macc-new-is_asset" checked><span
@@ -925,7 +969,7 @@
     <div class="field"><label>名稱</label><input type="text" id="acc-e-name" autocomplete="off" /></div>
     <div class="field">
       <label>帳戶類型</label>
-      <select id="acc-e-type" onchange="toggleAccBillingField('acc-e-billing-field', this.value)">
+      <select id="acc-e-type" onchange="toggleAccBillingField('acc-e-billing-field', 'acc-e-credit-limit-field', this.value)">
         <optgroup label="現金類">
           <option value="現金">現金</option>
           <option value="銀行">銀行</option>
@@ -945,6 +989,22 @@
         <span style="color:var(--muted);font-size:.85rem;">號</span>
       </div>
       <p style="font-size:.75rem;color:var(--muted);margin:6px 0 0;">帳單週期為每月該日起至下月前一日止</p>
+    </div>
+    <div class="field" id="acc-e-credit-limit-field" style="display:none;">
+      <label>信用額度 (NT$)</label>
+      <input type="number" id="acc-e-credit-limit" min="0" value="0" placeholder="0" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>幣別</label>
+      <select id="acc-e-currency">
+        <option value="TWD">TWD（台幣）</option>
+        <option value="USD">USD（美元）</option>
+        <option value="JPY">JPY（日幣）</option>
+        <option value="KRW">KRW（韓元）</option>
+        <option value="CNY">CNY（人民幣）</option>
+        <option value="EUR">EUR（歐元）</option>
+        <option value="GBP">GBP（英鎊）</option>
+      </select>
     </div>
     <div class="checkbox-group" style="margin-bottom:16px;">
       <label><span class="toggle-switch"><input type="checkbox" id="acc-e-is_asset"><span
@@ -990,6 +1050,12 @@
     window.location.href = '?tab=' + tab;
   }
 
+  // State — must be declared before switchMainTab is called inline
+  let currentCatTab = 'expense';
+  let currentGrpTab = 'expense';
+  let budgetYear = new Date().getFullYear();
+  let budgetMonth = new Date().getMonth() + 1;
+
   // Tabs
   function switchMainTab(tab) {
     document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
@@ -1026,7 +1092,6 @@
   });
 
   // Categories
-  let currentCatTab = 'expense';
   function switchCatListTab(tab) {
     currentCatTab = tab; updateCatGroupSelect(); filterCatGroups();
   }
@@ -1114,7 +1179,6 @@
   }
 
   // Groups
-  let currentGrpTab = 'expense';
   function switchGrpListTab(tab) {
     currentGrpTab = tab;
     document.querySelectorAll('.grp-item').forEach(el => {
@@ -1167,9 +1231,12 @@
   const ICON_MAP = { "現金": "💵", "銀行": "🏦", "儲值支付": "🪙", "信用卡": "💳", "其他": "👝" };
   const REV_ICON_MAP = { "💵": "現金", "🏦": "銀行", "🪙": "儲值支付", "💳": "信用卡", "👝": "其他" };
 
-  function toggleAccBillingField(fieldId, subType) {
-    const el = document.getElementById(fieldId);
-    if (el) el.style.display = subType === '信用卡' ? 'block' : 'none';
+  function toggleAccBillingField(billingFieldId, creditLimitFieldId, subType) {
+    const isCc = subType === '信用卡';
+    const bf = document.getElementById(billingFieldId);
+    const cf = document.getElementById(creditLimitFieldId);
+    if (bf) bf.style.display = isCc ? 'block' : 'none';
+    if (cf) cf.style.display = isCc ? 'block' : 'none';
   }
 
   async function addAccount() {
@@ -1178,21 +1245,27 @@
     const icon = ICON_MAP[subType] || '👝';
     const type = subType === "信用卡" ? "liability" : "asset";
     const is_asset = document.getElementById("acc-new-is_asset").checked ? 1 : 0;
+    const currency = document.getElementById("acc-new-currency").value;
     if (!name) return toast("請輸入帳戶名稱");
-    const body = { name, icon, type, is_asset };
-    if (type === 'liability') body.billing_start_day = parseInt(document.getElementById("acc-new-billing-start").value) || 1;
+    const body = { name, icon, type, is_asset, currency };
+    if (type === 'liability') {
+      body.billing_start_day = parseInt(document.getElementById("acc-new-billing-start").value) || 1;
+      body.credit_limit = parseFloat(document.getElementById("acc-new-credit-limit").value) || 0;
+    }
     const res = await fetch("/api/accounts", { method: "POST", body: JSON.stringify(body) });
     if (res.ok) reloadPage();
   }
 
-  function openAccEdit(id, name, icon, type, is_asset, billing_start_day) {
+  function openAccEdit(id, name, icon, type, is_asset, billing_start_day, currency, credit_limit) {
     document.getElementById('acc-e-id').value = id;
     document.getElementById('acc-e-name').value = name;
     let subType = REV_ICON_MAP[icon] || (type === 'liability' ? '信用卡' : '其他');
     document.getElementById('acc-e-type').value = subType;
     document.getElementById('acc-e-is_asset').checked = !!is_asset;
     document.getElementById('acc-e-billing-start').value = billing_start_day || 1;
-    toggleAccBillingField('acc-e-billing-field', subType);
+    document.getElementById('acc-e-currency').value = currency || 'TWD';
+    document.getElementById('acc-e-credit-limit').value = credit_limit || 0;
+    toggleAccBillingField('acc-e-billing-field', 'acc-e-credit-limit-field', subType);
     document.getElementById('acc-edit-overlay').classList.add('open');
   }
 
@@ -1201,8 +1274,12 @@
     const subType = document.getElementById('acc-e-type').value;
     const newType = subType === "信用卡" ? "liability" : "asset";
     const is_asset = document.getElementById("acc-e-is_asset").checked ? 1 : 0;
-    const body = { name: document.getElementById('acc-e-name').value.trim(), icon: ICON_MAP[subType] || '👝', type: newType, is_asset };
-    if (newType === 'liability') body.billing_start_day = parseInt(document.getElementById("acc-e-billing-start").value) || 1;
+    const currency = document.getElementById("acc-e-currency").value;
+    const body = { name: document.getElementById('acc-e-name').value.trim(), icon: ICON_MAP[subType] || '👝', type: newType, is_asset, currency };
+    if (newType === 'liability') {
+      body.billing_start_day = parseInt(document.getElementById("acc-e-billing-start").value) || 1;
+      body.credit_limit = parseFloat(document.getElementById("acc-e-credit-limit").value) || 0;
+    }
     const res = await fetch(`/api/accounts/${id}`, { method: 'PUT', body: JSON.stringify(body) });
     if (res.ok) reloadPage();
   }
@@ -1232,9 +1309,6 @@
   }
 
   // Budget (per-month)
-  let budgetYear = new Date().getFullYear();
-  let budgetMonth = new Date().getMonth() + 1;
-
   function updateBudgetMonthDisplay() {
     const el = document.getElementById('budget-month-display');
     if (el) el.textContent = `${budgetYear}年${budgetMonth}月`;
@@ -1309,9 +1383,13 @@
     const icon = ICON_MAP[subType] || '👝';
     const type = subType === "信用卡" ? "liability" : "asset";
     const is_asset = document.getElementById("macc-new-is_asset").checked ? 1 : 0;
+    const currency = document.getElementById("macc-new-currency").value;
     if (!name) return toast("請輸入帳戶名稱");
-    const body = { name, icon, type, is_asset };
-    if (type === 'liability') body.billing_start_day = parseInt(document.getElementById("macc-new-billing-start").value) || 1;
+    const body = { name, icon, type, is_asset, currency };
+    if (type === 'liability') {
+      body.billing_start_day = parseInt(document.getElementById("macc-new-billing-start").value) || 1;
+      body.credit_limit = parseFloat(document.getElementById("macc-new-credit-limit").value) || 0;
+    }
     const res = await fetch("/api/accounts", { method: "POST", body: JSON.stringify(body) });
     if (res.ok) reloadPage();
   }

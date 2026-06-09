@@ -151,12 +151,55 @@ def init_db():
         except sqlite3.OperationalError: pass
         try: conn.execute("ALTER TABLE accounts ADD COLUMN billing_start_day INTEGER DEFAULT 1")
         except sqlite3.OperationalError: pass
+        try: conn.execute("ALTER TABLE accounts ADD COLUMN currency TEXT DEFAULT 'TWD'")
+        except sqlite3.OperationalError: pass
         try: conn.execute("ALTER TABLE expenses ADD COLUMN account_id INTEGER DEFAULT 0")
         except sqlite3.OperationalError: pass
         try: conn.execute("ALTER TABLE expenses ADD COLUMN to_account_id INTEGER DEFAULT 0")
         except sqlite3.OperationalError: pass
         try: conn.execute("ALTER TABLE expenses ADD COLUMN stock_transaction_id INTEGER DEFAULT NULL")
         except sqlite3.OperationalError: pass
+        try: conn.execute("ALTER TABLE expenses ADD COLUMN to_amount REAL")
+        except sqlite3.OperationalError: pass
+        try: conn.execute("ALTER TABLE accounts ADD COLUMN credit_limit REAL DEFAULT 0")
+        except sqlite3.OperationalError: pass
+        try: conn.execute("ALTER TABLE expenses ADD COLUMN loan_payment_id INTEGER DEFAULT NULL")
+        except sqlite3.OperationalError: pass
+        try: conn.execute("ALTER TABLE expenses ADD COLUMN loan_id INTEGER DEFAULT NULL")
+        except sqlite3.OperationalError: pass
+
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS loans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL,
+                principal REAL NOT NULL,
+                remaining REAL NOT NULL,
+                interest_rate REAL DEFAULT 0,
+                start_date TEXT NOT NULL,
+                due_date TEXT,
+                account_id INTEGER NOT NULL,
+                status TEXT DEFAULT 'active',
+                note TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(user_id) REFERENCES users(id),
+                FOREIGN KEY(account_id) REFERENCES accounts(id)
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS loan_payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                loan_id INTEGER NOT NULL,
+                amount REAL NOT NULL,
+                date TEXT NOT NULL,
+                note TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(user_id) REFERENCES users(id),
+                FOREIGN KEY(loan_id) REFERENCES loans(id)
+            )
+        ''')
 
         # Migrate old "股票交易" virtual accounts: convert their transfer records to expense/income
         try:

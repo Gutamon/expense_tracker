@@ -1,0 +1,135 @@
+from flask import Blueprint, render_template, request, jsonify, session, abort, redirect
+from app.models.debt import DebtModel
+from app.models.account import AccountModel
+
+debt_bp = Blueprint("debt", __name__)
+debt_model = DebtModel()
+account_model = AccountModel()
+
+
+@debt_bp.before_request
+def require_login():
+    if 'user_id' not in session:
+        if request.path.startswith('/api/'):
+            return jsonify({"error": "未登入"}), 401
+        return redirect('/login')
+
+
+@debt_bp.route("/debts")
+def debts_page():
+    user_id = session['user_id']
+    credit_cards = debt_model.get_credit_cards(user_id)
+    loans = debt_model.get_loans(user_id)
+    accounts = account_model.get_by_user(user_id)
+    asset_accounts = [a for a in accounts if a.get('type') != 'liability']
+
+    total_cc_outstanding = sum(c['balance'] for c in credit_cards if c['balance'] > 0)
+    total_loan_owed = sum(l['remaining'] for l in loans if l['type'] == 'borrow' and l['status'] == 'active')
+    total_loan_receivable = sum(l['remaining'] for l in loans if l['type'] == 'lend' and l['status'] == 'active')
+
+    return render_template(
+        "debts.html",
+        credit_cards=credit_cards,
+        loans=loans,
+        asset_accounts=asset_accounts,
+        accounts=accounts,
+        username=session.get('username'),
+        total_cc_outstanding=total_cc_outstanding,
+        total_loan_owed=total_loan_owed,
+        total_loan_receivable=total_loan_receivable,
+    )
+
+
+# ── Credit Card API ──────────────────────────────────────────────────────────
+
+@debt_bp.route("/api/debts/cc/repay", methods=["POST"])
+def api_cc_repay():
+    data = request.get_json(force=True)
+    user_id = session['user_id']
+    from_id = data.get("from_account_id")
+    to_id = data.get("to_account_id")
+    amount = data.get("amount")
+    date = data.get("date")
+    if not all([from_id, to_id, amount, date]):
+        abort(400, description="缺少必要欄位")
+    expense_id = debt_model.repay_credit_card(
+        user_id=user_id,
+        from_account_id=int(from_id),
+        to_account_id=int(to_id),
+        amount=float(amount),
+        date=date,
+        note=data.get("note", "")
+    )
+    return jsonify({"success": True, "expense_id": expense_id}), 201
+
+
+# ── Loan API ─────────────────────────────────────────────────────────────────
+
+@debt_bp.route("/api/debts/loans", methods=["GET"])
+def api_loans_list():
+    return jsonify(debt_model.get_loans(session['user_id']))
+
+
+@debt_bp.route("/api/debts/loans", methods=["POST"])
+def api_loans_create():
+    data = request.get_json(force=True)
+    user_id = session['user_id']
+    required = ['name', 'type', 'principal', 'start_date', 'account_id']
+    for f in required:
+        if not data.get(f):
+            abort(400, description=f"缺少欄位：{f}")
+    if data['type'] not in ('borrow', 'lend'):
+        abort(400, description="type 必須為 borrow 或 lend")
+    loan_id = debt_model.create_loan(
+        user_id=user_id,
+        name=data['name'].strip(),
+        loan_type=data['type'],
+        principal=float(data['principal']),
+        interest_rate=float(data.get('interest_rate', 0)),
+        start_date=data['start_date'],
+        due_date=data.get('due_date') or None,
+        account_id=int(data['account_id']),
+        note=data.get('note', '')
+    )
+    return jsonify({"success": True, "id": loan_id}), 201
+
+
+@debt_bp.route("/api/debts/loans/<int:loan_id>", methods=["PUT"])
+def api_loans_update(loan_id):
+    data = request.get_json(force=True)
+    if not debt_model.update_loan(session['user_id'], loan_id, data):
+        abort(404, description="更新失敗")
+    return jsonify({"success": True})
+
+
+@debt_bp.route("/api/debts/loans/<int:loan_id>", methods=["DELETE"])
+def api_loans_delete(loan_id):
+    result = debt_model.delete_loan(session['user_id'], loan_id)
+    if result is False:
+        abort(400, description="此借貸已有還款紀錄，無法刪除")
+    return jsonify({"success": True})
+
+
+@debt_bp.route("/api/debts/loans/<int:loan_id>/payments", methods=["POST"])
+def api_payments_create(loan_id):
+    data = request.get_json(force=True)
+    user_id = session['user_id']
+    if not data.get('amount') or not data.get('date'):
+        abort(400, description="缺少金額或日期")
+    payment_id = debt_model.add_payment(
+        user_id=user_id,
+        loan_id=loan_id,
+        amount=float(data['amount']),
+        date=data['date'],
+        note=data.get('note', '')
+    )
+    if not payment_id:
+        abort(404, description="借貸不存在")
+    return jsonify({"success": True, "id": payment_id}), 201
+
+
+@debt_bp.route("/api/debts/payments/<int:payment_id>", methods=["DELETE"])
+def api_payments_delete(payment_id):
+    if not debt_model.delete_payment(session['user_id'], payment_id):
+        abort(404, description="還款紀錄不存在")
+    return jsonify({"success": True})

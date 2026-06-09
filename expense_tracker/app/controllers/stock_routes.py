@@ -66,6 +66,20 @@ def api_create_position():
 
     return jsonify({"success": True, "id": new_id}), 201
 
+@stock_bp.route("/api/stocks/<int:stock_id>/account", methods=["PATCH"])
+def api_update_stock_account(stock_id):
+    data = request.get_json(force=True)
+    account_id = data.get("account_id")
+    if not account_id:
+        abort(400, "缺少 account_id")
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE stocks SET account_id = ? WHERE id = ? AND user_id = ?",
+                       (int(account_id), stock_id, session['user_id']))
+        if cursor.rowcount == 0:
+            abort(404, "找不到此倉位")
+    return jsonify({"success": True})
+
 @stock_bp.route("/api/stocks/<int:stock_id>/name", methods=["PUT"])
 def api_update_stock_name(stock_id):
     data = request.get_json(force=True)

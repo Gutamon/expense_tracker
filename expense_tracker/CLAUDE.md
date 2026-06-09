@@ -68,3 +68,4 @@ New users get default categories in Chinese (餐飲, 交通, 薪水, etc.), defa
 - `sort_order` columns control display order; drag-to-reorder uses PATCH endpoints.
 - Stock prices are fetched live from yfinance on the stocks page and cached in the `stocks` table.
 - **Never use native browser dialogs** (`alert()`, `confirm()`, `prompt()`). All popups, confirmations, and modals must be custom-designed HTML/CSS elements that match the project's dark theme.
+- **Never allow user-initiated zoom.** Every page's `<meta name="viewport">` must include `user-scalable=no, maximum-scale=1.0`. In addition, `base.html` must keep the two JS touch-event listeners that block pinch-zoom (`touchmove` with >1 touch) and double-tap zoom (`touchend` within 300 ms). Chrome Android ignores the viewport attribute alone — both layers are required. Do not remove or relax either layer under any circumstance.

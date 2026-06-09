@@ -63,7 +63,7 @@ def index():
             account_balances[acc_id] -= e["amount"]
         elif e["type"] == "transfer":
             account_balances[acc_id] -= e["amount"]
-            account_balances[to_acc_id] += e["amount"]
+            account_balances[to_acc_id] += e.get("to_amount") or e["amount"]
 
     # 分群處理類別
     grouped_categories = {}
@@ -125,7 +125,7 @@ def charts():
                 account_balances[acc_id] -= e["amount"]
                 to_acc_id = e.get("to_account_id", 0)
                 if to_acc_id not in account_balances: account_balances[to_acc_id] = 0
-                account_balances[to_acc_id] += e["amount"]
+                account_balances[to_acc_id] += e.get("to_amount") or e["amount"]
 
     cash = 0
     liabilities = 0
@@ -162,6 +162,25 @@ def api_create():
     if not all(k in data for k in required): abort(400, description="缺少必要欄位")
 
     req_type = data.get("type", "expense")
+    to_amount = None
+
+    if req_type == "transfer":
+        to_amount_raw = data.get("to_amount")
+        if to_amount_raw is not None:
+            to_amount = float(to_amount_raw)
+
+        from_acc_id = int(data.get("account_id", 0))
+        to_acc_id_val = int(data.get("to_account_id", 0))
+        if from_acc_id and to_acc_id_val:
+            with get_db() as conn:
+                from_acc = conn.execute("SELECT type, currency FROM accounts WHERE id = ? AND user_id = ?", (from_acc_id, session['user_id'])).fetchone()
+                to_acc = conn.execute("SELECT type, currency FROM accounts WHERE id = ? AND user_id = ?", (to_acc_id_val, session['user_id'])).fetchone()
+            if from_acc and to_acc:
+                from_cur = from_acc['currency'] or 'TWD'
+                to_cur = to_acc['currency'] or 'TWD'
+                if from_cur != to_cur and (from_acc['type'] == 'liability' or to_acc['type'] == 'liability'):
+                    abort(400, description="跨幣別轉帳只允許在現金類帳戶之間進行")
+
     new_id = expense_model.create(
         user_id=session['user_id'],
         title=data["title"],
@@ -171,7 +190,8 @@ def api_create():
         note=data.get("note", ""),
         type=req_type,
         account_id=int(data.get("account_id", 0)),
-        to_account_id=int(data.get("to_account_id", 0)) if req_type == "transfer" else None
+        to_account_id=int(data.get("to_account_id", 0)) if req_type == "transfer" else None,
+        to_amount=to_amount
     )
     return jsonify({"success": True, "id": new_id}), 201
 
@@ -192,7 +212,8 @@ def api_update(expense_id):
     req_type = data.get("type", doc.get("type"))
     if req_type != "transfer":
         data["to_account_id"] = 0
-        
+        data["to_amount"] = None
+
     if not expense_model.update(expense_id, session['user_id'], data):
         abort(404, description="更新失敗或找不到此筆明細")
     return jsonify({"success": True})

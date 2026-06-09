@@ -226,12 +226,6 @@
     white-space: nowrap;
   }
 
-  .tx-note-text {
-    color: var(--muted);
-    font-size: .78rem;
-    word-break: break-all;
-  }
-
   .tx-amount {
     font-family: 'DM Mono', monospace;
     font-size: .85rem;
@@ -250,32 +244,30 @@
     gap: 6px;
   }
 
-  .tx-btn {
-    padding: 2px 8px;
-    font-size: .7rem;
-    border-radius: 4px;
-    cursor: pointer;
-    background: rgba(255, 255, 255, 0.04);
-    border: none;
-    font-family: inherit;
-    transition: background .15s;
-  }
-
-  .tx-btn.edit {
+  .icon-btn {
+    background: none;
+    border: 1px solid var(--border);
     color: var(--muted);
+    border-radius: 6px;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-size: .8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .2s;
+    font-family: inherit;
   }
 
-  .tx-btn.edit:hover {
-    color: var(--text);
-    background: rgba(255, 255, 255, 0.1);
+  .icon-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
-  .tx-btn.del {
+  .icon-btn.del:hover {
+    border-color: var(--danger);
     color: var(--danger);
-  }
-
-  .tx-btn.del:hover {
-    background: rgba(255, 95, 95, 0.12);
   }
 
   .badge {
@@ -427,6 +419,49 @@
     opacity: 1;
   }
 
+  .account-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  .account-label {
+    font-size: .7rem;
+    color: var(--muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .account-select {
+    font-size: .75rem;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-bottom: 1px dashed transparent;
+    padding: 1px 2px;
+    outline: none;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all .15s;
+    max-width: 130px;
+  }
+
+  .account-select:hover {
+    border-bottom-color: var(--border);
+    color: var(--text);
+  }
+
+  .account-select:focus {
+    border-bottom-color: var(--accent);
+    color: var(--text);
+  }
+
+  .account-select option {
+    background: #18181c;
+    color: #e8e8e8;
+  }
+
   .zero-section-header {
     margin-top: 20px;
     padding: 4px 0;
@@ -568,6 +603,14 @@
         <div class="stock-symbol">{{ s.symbol }}</div>
         <input type="text" class="stock-name-input" id="s-name-{{ s.id }}" value="{{ s.name | e }}"
           data-stock-id="{{ s.id }}" data-original="{{ s.name | e }}">
+        <div class="account-row">
+          <span class="account-label">交割戶</span>
+          <select class="account-select" data-stock-id="{{ s.id }}" onchange="changeStockAccount(this)">
+            {% for a in accounts if a.icon == '🏦' %}
+            <option value="{{ a.id }}" {% if a.id == s.account_id %}selected{% endif %}>{{ a.icon }} {{ a.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
       <div class="stock-stats">
         <div class="stat-item">
@@ -603,7 +646,6 @@
           <div class="tx-meta">
             <span class="badge {{ t.type }}">{{ t.type | upper }}</span>
             <span class="tx-date">{{ t.date }}</span>
-            {% if t.note %}<span class="tx-note-text">· {{ t.note }}</span>{% endif %}
           </div>
           <div class="tx-amount">
             {% if t.type == 'buy' or t.type == 'sell' %}
@@ -619,10 +661,9 @@
         {% if loop.first %}
         <div class="tx-row">
           <div class="tx-btns">
-            <button class="tx-btn edit" data-id="{{ t.id }}" data-type="{{ t.type }}" data-date="{{ t.date }}"
-              data-shares="{{ t.shares }}" data-price="{{ t.price }}" data-fee="{{ t.fee }}"
-              data-note="{{ t.note | e }}">編輯</button>
-            <button class="tx-btn del" onclick="deleteTx({{ t.id }})">刪除</button>
+            <button class="icon-btn edit" data-id="{{ t.id }}" data-type="{{ t.type }}" data-date="{{ t.date }}"
+              data-shares="{{ t.shares }}" data-price="{{ t.price }}" data-fee="{{ t.fee }}">✎</button>
+            <button class="icon-btn del" onclick="deleteTx({{ t.id }})">✕</button>
           </div>
         </div>
         {% endif %}
@@ -659,6 +700,14 @@
         <div class="stock-symbol">{{ s.symbol }}</div>
         <input type="text" class="stock-name-input" id="s-name-{{ s.id }}" value="{{ s.name | e }}"
           data-stock-id="{{ s.id }}" data-original="{{ s.name | e }}">
+        <div class="account-row">
+          <span class="account-label">交割戶</span>
+          <select class="account-select" data-stock-id="{{ s.id }}" onchange="changeStockAccount(this)">
+            {% for a in accounts if a.icon == '🏦' %}
+            <option value="{{ a.id }}" {% if a.id == s.account_id %}selected{% endif %}>{{ a.icon }} {{ a.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
       <div class="stock-stats">
         <div class="stat-item">
@@ -695,7 +744,6 @@
           <div class="tx-meta">
             <span class="badge {{ t.type }}">{{ t.type | upper }}</span>
             <span class="tx-date">{{ t.date }}</span>
-            {% if t.note %}<span class="tx-note-text">· {{ t.note }}</span>{% endif %}
           </div>
           <div class="tx-amount">
             {% if t.type == 'buy' or t.type == 'sell' %}
@@ -711,10 +759,9 @@
         {% if loop.first %}
         <div class="tx-row">
           <div class="tx-btns">
-            <button class="tx-btn edit" data-id="{{ t.id }}" data-type="{{ t.type }}" data-date="{{ t.date }}"
-              data-shares="{{ t.shares }}" data-price="{{ t.price }}" data-fee="{{ t.fee }}"
-              data-note="{{ t.note | e }}">編輯</button>
-            <button class="tx-btn del" onclick="deleteTx({{ t.id }})">刪除</button>
+            <button class="icon-btn edit" data-id="{{ t.id }}" data-type="{{ t.type }}" data-date="{{ t.date }}"
+              data-shares="{{ t.shares }}" data-price="{{ t.price }}" data-fee="{{ t.fee }}">✎</button>
+            <button class="icon-btn del" onclick="deleteTx({{ t.id }})">✕</button>
           </div>
         </div>
         {% endif %}
@@ -754,7 +801,7 @@
       <label>交割帳號 (資金進出帳戶)</label>
       <select id="pos-account">
         <option value="" disabled selected>請選擇交割帳號</option>
-        {% for a in accounts %}
+        {% for a in accounts if a.icon == '🏦' %}
         <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}</option>
         {% endfor %}
       </select>
@@ -802,10 +849,6 @@
     <div class="field" id="wrap-fee">
       <label>手續費</label>
       <input type="number" id="tx-fee" step="0.01" min="0" placeholder="0" autocomplete="off">
-    </div>
-    <div class="field">
-      <label>備註 (選填)</label>
-      <input type="text" id="tx-note" placeholder="..." autocomplete="off">
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeTxModal()">取消</button>
@@ -918,14 +961,13 @@
     document.getElementById('tx-shares').value = '';
     document.getElementById('tx-price').value = '';
     document.getElementById('tx-fee').value = '';
-    document.getElementById('tx-note').value = '';
     const titles = { buy: '買入', sell: '賣出', dividend: '現金股利', split: '股票分割' };
     document.getElementById('tx-title').textContent = titles[type];
     _configureTxFields(type);
     document.getElementById('tx-modal').classList.add('open');
   }
 
-  function editTx(id, type, date, shares, price, fee, note) {
+  function editTx(id, type, date, shares, price, fee) {
     document.getElementById('tx-id-edit').value = id;
     document.getElementById('tx-stock-id').value = '';
     document.getElementById('tx-type').value = type;
@@ -933,7 +975,6 @@
     document.getElementById('tx-shares').value = shares;
     document.getElementById('tx-price').value = price;
     document.getElementById('tx-fee').value = fee;
-    document.getElementById('tx-note').value = note;
     const titles = { buy: '買入 (修改)', sell: '賣出 (修改)', dividend: '現金股利 (修改)', split: '股票分割 (修改)' };
     document.getElementById('tx-title').textContent = titles[type];
     _configureTxFields(type);
@@ -942,7 +983,7 @@
 
   function closeTxModal() { document.getElementById('tx-modal').classList.remove('open'); }
 
-  document.querySelectorAll('.tx-btn.edit').forEach(btn => {
+  document.querySelectorAll('.icon-btn.edit').forEach(btn => {
     btn.addEventListener('click', function () {
       editTx(
         parseInt(this.dataset.id),
@@ -950,8 +991,7 @@
         this.dataset.date,
         parseFloat(this.dataset.shares),
         parseFloat(this.dataset.price),
-        parseFloat(this.dataset.fee),
-        this.dataset.note || ''
+        parseFloat(this.dataset.fee)
       );
     });
   });
@@ -973,7 +1013,6 @@
       shares: parseInt(document.getElementById('tx-shares').value || 0, 10),
       price: parseFloat(document.getElementById('tx-price').value || 0),
       fee: parseFloat(document.getElementById('tx-fee').value || 0),
-      note: document.getElementById('tx-note').value.trim(),
     };
     if (!body.date || (!body.price && type !== 'split')) { toast("請填寫必要欄位"); return; }
 
@@ -999,6 +1038,17 @@
     const isHidden = body.style.display === 'none';
     body.style.display = isHidden ? 'grid' : 'none';
     if (arrow) arrow.textContent = isHidden ? '▴' : '▾';
+  }
+
+  async function changeStockAccount(selectEl) {
+    const stockId = selectEl.dataset.stockId;
+    const accountId = parseInt(selectEl.value);
+    const res = await fetch(`/api/stocks/${stockId}/account`, {
+      method: 'PATCH',
+      body: JSON.stringify({ account_id: accountId })
+    });
+    if (res.ok) toast('交割帳戶已更新');
+    else { const err = await res.json(); toast('更新失敗: ' + (err.error || '')); }
   }
 
   async function deletePosition(stockId, symbol) {

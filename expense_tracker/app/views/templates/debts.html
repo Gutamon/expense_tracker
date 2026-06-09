@@ -1,0 +1,879 @@
+{% extends "base.html" %}
+
+{% block title %}負債管理 · 記帳本{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Summary ── */
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .summary-stats { display: flex; gap: 32px; flex-wrap: wrap; }
+  .s-item { display: flex; flex-direction: column; gap: 5px; }
+  .s-label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .s-value { font-size: 1.4rem; font-weight: 700; font-family: 'DM Mono', monospace; }
+  .s-value.danger { color: var(--danger); }
+  .s-value.accent { color: var(--accent); }
+  .s-value.muted { color: var(--muted); }
+
+  /* ── Section Tabs ── */
+  .debt-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+  }
+  .debt-tab {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: .95rem;
+    cursor: pointer;
+    padding: 7px 16px;
+    border-radius: 8px;
+    transition: all .2s;
+  }
+  .debt-tab.active { color: #111; background: var(--accent); font-weight: 500; }
+
+  /* ── Debt List & Card ── */
+  .debt-list { display: grid; gap: 20px; }
+  .debt-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .debt-card.closed { opacity: .55; filter: grayscale(60%); }
+  .debt-card.closed:hover { opacity: .8; filter: grayscale(20%); }
+
+  .debt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .debt-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .debt-name { font-size: 1.1rem; font-weight: 600; }
+  .debt-icon { font-size: 1.3rem; }
+
+  .debt-stats {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .stat-item { display: flex; flex-direction: column; gap: 3px; }
+  .stat-label { font-size: .7rem; color: var(--muted); }
+  .stat-value { font-family: 'DM Mono', monospace; font-size: .95rem; }
+  .stat-value.danger { color: var(--danger); }
+  .stat-value.accent { color: var(--accent); }
+
+  /* ── Progress Bar ── */
+  .progress-bar {
+    width: 100%;
+    height: 5px;
+    background: rgba(255,255,255,.07);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--accent);
+    transition: width .4s ease;
+  }
+  .progress-fill.danger { background: var(--danger); }
+  .progress-fill.warning { background: #f0a84a; }
+
+  /* ── Actions row ── */
+  .debt-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+    flex-wrap: wrap;
+  }
+  .btn-action {
+    background: rgba(255,255,255,.05);
+    border: 1px solid transparent;
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: .8rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .2s;
+  }
+  .btn-action:hover { background: rgba(255,255,255,.1); border-color: var(--border); }
+  .btn-action.primary { background: rgba(200,240,74,.1); color: var(--accent); }
+  .btn-action.primary:hover { background: rgba(200,240,74,.18); }
+
+  .tx-toggle {
+    margin-left: auto;
+    font-size: .8rem;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    padding: 4px 0;
+    font-family: inherit;
+  }
+  .tx-toggle:hover { color: var(--accent); }
+
+  /* ── Transaction list ── */
+  .tx-container { display: none; border-top: 1px dashed var(--border); padding-top: 12px; }
+  .tx-container.open { display: block; }
+  .tx-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+  }
+  .tx-item:last-child { border-bottom: none; }
+  .tx-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .tx-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: .85rem; min-width: 0; }
+  .tx-date { color: var(--muted); white-space: nowrap; font-family: 'DM Mono', monospace; font-size: .8rem; }
+  .tx-amount { font-family: 'DM Mono', monospace; font-size: .85rem; text-align: right; flex-shrink: 0; }
+  .tx-note { font-size: .75rem; color: var(--muted); padding: 0 4px; }
+  .tx-btns { display: flex; gap: 6px; }
+
+  /* ── Icon buttons ── */
+  .icon-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-size: .8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .2s;
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .icon-btn.del:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* ── Badges ── */
+  .badge {
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: .7rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .badge.borrow { background: rgba(255,95,95,.12); color: var(--danger); }
+  .badge.lend   { background: rgba(200,240,74,.12); color: var(--accent); }
+  .badge.closed { background: rgba(107,107,120,.12); color: var(--muted); }
+  .badge.cc     { background: rgba(74,138,240,.12); color: #4a8af0; }
+
+  /* ── Modals ── */
+  .btn { padding: 10px 16px; border: none; border-radius: 8px; font-family: inherit; font-size: .9rem; font-weight: 500; cursor: pointer; background: var(--accent); color: #111; }
+  .btn:hover { opacity: .9; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,.8);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 100; opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: auto; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 440px;
+    max-width: 92vw;
+    padding: 32px;
+    box-shadow: 0 20px 40px rgba(0,0,0,.5);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h3 { font-size: 1.1rem; margin-bottom: 24px; font-weight: 500; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
+  .field input, .field select, .field textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); padding: 10px 14px;
+    outline: none; font-family: inherit; box-sizing: border-box;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .modal-actions { display: flex; gap: 12px; margin-top: 24px; }
+  .modal-actions button { flex: 1; padding: 11px; }
+
+  .segmented-control {
+    display: flex; background: #0f0f11; border: 1px solid var(--border);
+    border-radius: 8px; padding: 4px; margin-bottom: 16px;
+  }
+  .segmented-control label {
+    flex: 1; text-align: center; padding: 8px 0; border-radius: 6px;
+    cursor: pointer; font-size: .85rem; font-weight: 500; color: var(--muted); transition: all .2s;
+  }
+  .segmented-control input[type="radio"] { display: none; }
+  .segmented-control input[type="radio"]:checked + label {
+    background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.5);
+  }
+
+  /* ── Closed loans section toggle ── */
+  .closed-section-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 0; cursor: pointer; color: var(--muted); font-size: .85rem;
+    border-top: 1px solid var(--border); margin-top: 8px;
+  }
+  .closed-section-header:hover { color: var(--text); }
+  #closed-loans-list { display: none; }
+  #closed-loans-list.open { display: grid; gap: 20px; padding-top: 16px; }
+
+  /* ── Empty state ── */
+  .empty-state {
+    text-align: center; padding: 60px 20px; color: var(--muted); font-size: .9rem;
+  }
+  .empty-state .e-icon { font-size: 2.5rem; margin-bottom: 12px; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--accent); color: #111;
+    border-radius: 8px; padding: 12px 20px;
+    font-size: .85rem; font-weight: 500;
+    opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 200;
+  }
+  #toast.show { opacity: 1; }
+
+  @media (max-width: 768px) {
+    .summary-card { flex-direction: column; align-items: flex-start; }
+    .summary-stats { gap: 20px; }
+    .debt-stats { gap: 14px; }
+    .modal { padding: 24px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Summary -->
+<div class="summary-card">
+  <div class="summary-stats">
+    <div class="s-item">
+      <span class="s-label">信用卡未繳</span>
+      <span class="s-value danger">NT$ {{ "%.0f"|format(total_cc_outstanding) }}</span>
+    </div>
+    <div class="s-item">
+      <span class="s-label">借入未還</span>
+      <span class="s-value danger">NT$ {{ "%.0f"|format(total_loan_owed) }}</span>
+    </div>
+    <div class="s-item">
+      <span class="s-label">借出未收</span>
+      <span class="s-value accent">NT$ {{ "%.0f"|format(total_loan_receivable) }}</span>
+    </div>
+  </div>
+  <button class="btn" onclick="openLoanModal()">＋ 新增借貸</button>
+</div>
+
+<!-- Section Tabs -->
+<div class="debt-tabs">
+  <button class="debt-tab active" id="tab-cc" onclick="switchTab('cc')">💳 信用卡</button>
+  <button class="debt-tab" id="tab-loans" onclick="switchTab('loans')">📋 借貸管理</button>
+</div>
+
+<!-- ── Credit Card Section ── -->
+<div id="section-cc">
+  {% if credit_cards %}
+  <div class="debt-list">
+    {% for card in credit_cards %}
+    {% set limit = card.get('credit_limit', 0)|float %}
+    {% set bal = card.balance|float %}
+    {% set avail = limit - bal if limit > 0 else 0 %}
+    {% set pct = [(bal / limit * 100)|int, 100]|min if limit > 0 else 0 %}
+    <div class="debt-card" id="cc-card-{{ card.id }}">
+      <div class="debt-header">
+        <div>
+          <div class="debt-title-row">
+            <span class="debt-icon">{{ card.icon }}</span>
+            <span class="debt-name">{{ card.name }}</span>
+            <span class="badge cc">信用卡</span>
+            {% if card.get('currency', 'TWD') != 'TWD' %}<span class="badge" style="background:rgba(74,138,240,.1);color:#4a8af0;">{{ card.currency }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="debt-stats">
+        <div class="stat-item">
+          <span class="stat-label">本期未繳</span>
+          <span class="stat-value danger">NT$ {{ "%.0f"|format(bal) }}</span>
+        </div>
+        {% if limit > 0 %}
+        <div class="stat-item">
+          <span class="stat-label">信用額度</span>
+          <span class="stat-value">NT$ {{ "%.0f"|format(limit) }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">可用額度</span>
+          <span class="stat-value accent">NT$ {{ "%.0f"|format(avail) }}</span>
+        </div>
+        {% endif %}
+        <div class="stat-item">
+          <span class="stat-label">帳單起算日</span>
+          <span class="stat-value">每月 {{ card.get('billing_start_day', 1) }} 號</span>
+        </div>
+      </div>
+
+      {% if limit > 0 %}
+      <div class="progress-bar">
+        <div class="progress-fill {% if pct >= 90 %}danger{% elif pct >= 70 %}warning{% endif %}"
+             style="width:{{ pct }}%"></div>
+      </div>
+      {% endif %}
+
+      <div class="debt-actions">
+        <button class="btn-action primary"
+          onclick="openRepayModal({{ card.id }}, '{{ card.name }}', {{ bal }})">還款</button>
+        <button class="tx-toggle" onclick="toggleTx('cc-tx-{{ card.id }}')">
+          近期消費 ({{ card.recent_txs|length }}) <span id="cc-tx-arrow-{{ card.id }}">▼</span>
+        </button>
+      </div>
+
+      <div class="tx-container" id="cc-tx-{{ card.id }}">
+        {% if card.recent_txs %}
+        {% for tx in card.recent_txs %}
+        <div class="tx-item">
+          <div class="tx-row">
+            <div class="tx-meta">
+              <span class="tx-date">{{ tx.date }}</span>
+              <span>{{ tx.title }}</span>
+              {% if tx.note %}<span class="tx-note">{{ tx.note }}</span>{% endif %}
+            </div>
+            <span class="tx-amount" style="color:var(--danger);">-NT$ {{ "%.0f"|format(tx.amount) }}</span>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div style="padding:12px 0;color:var(--muted);font-size:.85rem;">尚無消費紀錄</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="e-icon">💳</div>
+    <div>尚未設定信用卡帳戶</div>
+    <div style="margin-top:8px;font-size:.8rem;">請至 <a href="/settings?tab=accounts" style="color:var(--accent);">設定管理 › 帳戶</a> 新增信用卡</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── Loans Section ── -->
+<div id="section-loans" style="display:none;">
+  {% set active_loans = loans | selectattr('status', 'equalto', 'active') | list %}
+  {% set closed_loans = loans | selectattr('status', 'equalto', 'closed') | list %}
+
+  {% if active_loans %}
+  <div class="debt-list">
+    {% for loan in active_loans %}
+    {% set paid = loan.principal - loan.remaining %}
+    {% set pct = [(paid / loan.principal * 100)|int, 100]|min if loan.principal > 0 else 0 %}
+    <div class="debt-card" id="loan-card-{{ loan.id }}">
+      <div class="debt-header">
+        <div>
+          <div class="debt-title-row">
+            <span class="debt-name">{{ loan.name }}</span>
+            <span class="badge {{ loan.type }}">{% if loan.type == 'borrow' %}借入{% else %}借出{% endif %}</span>
+          </div>
+          <div style="font-size:.8rem;color:var(--muted);margin-top:4px;">
+            {{ loan.account_icon }} {{ loan.account_name }} ·
+            起始 {{ loan.start_date }}{% if loan.due_date %} · 到期 {{ loan.due_date }}{% endif %}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="icon-btn"
+            onclick="openLoanEdit({{ loan.id }}, '{{ loan.name }}', {{ loan.interest_rate }}, '{{ loan.due_date or '' }}', '{{ loan.note or '' }}')">✎</button>
+          <button class="icon-btn del" onclick="deleteLoan({{ loan.id }}, '{{ loan.name }}')">✕</button>
+        </div>
+      </div>
+
+      <div class="debt-stats">
+        <div class="stat-item">
+          <span class="stat-label">借款本金</span>
+          <span class="stat-value">NT$ {{ "%.0f"|format(loan.principal) }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">剩餘金額</span>
+          <span class="stat-value danger">NT$ {{ "%.0f"|format(loan.remaining) }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">已還金額</span>
+          <span class="stat-value accent">NT$ {{ "%.0f"|format(paid) }}</span>
+        </div>
+        {% if loan.interest_rate > 0 %}
+        <div class="stat-item">
+          <span class="stat-label">年利率</span>
+          <span class="stat-value">{{ loan.interest_rate }}%</span>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-fill" style="width:{{ pct }}%"></div>
+      </div>
+
+      <div class="debt-actions">
+        <button class="btn-action primary"
+          onclick="openPaymentModal({{ loan.id }}, '{{ loan.name }}', '{{ loan.type }}')">
+          {% if loan.type == 'borrow' %}還款{% else %}收款{% endif %}
+        </button>
+        <button class="tx-toggle" onclick="toggleTx('loan-tx-{{ loan.id }}')">
+          還款紀錄 ({{ loan.payment_count }}) <span id="loan-tx-arrow-{{ loan.id }}">▼</span>
+        </button>
+      </div>
+
+      <div class="tx-container" id="loan-tx-{{ loan.id }}">
+        {% if loan.payments %}
+        {% for p in loan.payments %}
+        <div class="tx-item">
+          <div class="tx-row">
+            <div class="tx-meta">
+              <span class="tx-date">{{ p.date }}</span>
+              {% if p.note %}<span class="tx-note">{{ p.note }}</span>{% endif %}
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="tx-amount {% if loan.type == 'borrow' %}danger{% else %}accent{% endif %}">
+                {% if loan.type == 'borrow' %}-{% else %}+{% endif %}NT$ {{ "%.0f"|format(p.amount) }}
+              </span>
+              <div class="tx-btns">
+                <button class="icon-btn del" onclick="deletePayment({{ p.id }})">✕</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div style="padding:12px 0;color:var(--muted);font-size:.85rem;">尚無還款紀錄</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% elif not closed_loans %}
+  <div class="empty-state">
+    <div class="e-icon">📋</div>
+    <div>尚無借貸紀錄</div>
+    <div style="margin-top:8px;font-size:.8rem;">點擊「新增借貸」開始管理你的借款</div>
+  </div>
+  {% endif %}
+
+  {% if closed_loans %}
+  <div class="closed-section-header" onclick="toggleClosedLoans()">
+    <span id="closed-arrow">▶</span>
+    <span>已結清借貸（{{ closed_loans|length }} 筆）</span>
+  </div>
+  <div id="closed-loans-list">
+    {% for loan in closed_loans %}
+    <div class="debt-card closed" id="loan-card-{{ loan.id }}">
+      <div class="debt-header">
+        <div>
+          <div class="debt-title-row">
+            <span class="debt-name">{{ loan.name }}</span>
+            <span class="badge {{ loan.type }}">{% if loan.type == 'borrow' %}借入{% else %}借出{% endif %}</span>
+            <span class="badge closed">已結清</span>
+          </div>
+          <div style="font-size:.8rem;color:var(--muted);margin-top:4px;">
+            本金 NT$ {{ "%.0f"|format(loan.principal) }} · {{ loan.account_icon }} {{ loan.account_name }}
+          </div>
+        </div>
+        <button class="icon-btn del" onclick="deleteLoan({{ loan.id }}, '{{ loan.name }}')">✕</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── Modals ── -->
+
+<!-- Credit Card Repayment Modal -->
+<div class="modal-overlay" id="repay-modal">
+  <div class="modal">
+    <h3>信用卡還款</h3>
+    <input type="hidden" id="repay-card-id">
+    <div class="field">
+      <label>信用卡</label>
+      <input type="text" id="repay-card-name" readonly style="color:var(--muted);">
+    </div>
+    <div class="field">
+      <label>本期未繳</label>
+      <input type="text" id="repay-outstanding" readonly style="color:var(--danger);font-family:'DM Mono',monospace;">
+    </div>
+    <div class="field">
+      <label>還款來源帳戶</label>
+      <select id="repay-from-account">
+        {% for a in asset_accounts %}
+        <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}{% if a.get('currency','TWD') != 'TWD' %} ({{ a.currency }}){% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>還款金額</label>
+      <input type="number" id="repay-amount" min="0.01" step="0.01" placeholder="0">
+    </div>
+    <div class="field">
+      <label>還款日期</label>
+      <input type="date" id="repay-date">
+    </div>
+    <div class="field">
+      <label>備註（選填）</label>
+      <input type="text" id="repay-note" placeholder="例：五月帳單" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeRepayModal()">取消</button>
+      <button class="btn" onclick="submitRepayment()">確認還款</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Loan Modal -->
+<div class="modal-overlay" id="loan-modal">
+  <div class="modal">
+    <h3>新增借貸</h3>
+    <div class="field">
+      <label>名稱</label>
+      <input type="text" id="loan-name" placeholder="例：小明借款" autocomplete="off">
+    </div>
+    <div class="field"><label>類型</label></div>
+    <div class="segmented-control">
+      <input type="radio" name="loan-type" id="loan-type-borrow" value="borrow" checked>
+      <label for="loan-type-borrow">借入（我欠人）</label>
+      <input type="radio" name="loan-type" id="loan-type-lend" value="lend">
+      <label for="loan-type-lend">借出（人欠我）</label>
+    </div>
+    <div class="field">
+      <label>借款金額</label>
+      <input type="number" id="loan-principal" min="0.01" step="0.01" placeholder="0">
+    </div>
+    <div class="field">
+      <label>相關帳戶</label>
+      <select id="loan-account">
+        {% for a in accounts %}
+        <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>借款日期</label>
+      <input type="date" id="loan-start-date">
+    </div>
+    <div class="field">
+      <label>到期日（選填）</label>
+      <input type="date" id="loan-due-date">
+    </div>
+    <div class="field">
+      <label>年利率（%，選填）</label>
+      <input type="number" id="loan-interest" min="0" step="0.01" placeholder="0">
+    </div>
+    <div class="field">
+      <label>備註（選填）</label>
+      <textarea id="loan-note" placeholder="例：緊急用途"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeLoanModal()">取消</button>
+      <button class="btn" onclick="submitLoan()">新增</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Loan Modal -->
+<div class="modal-overlay" id="loan-edit-modal">
+  <div class="modal">
+    <h3>編輯借貸</h3>
+    <input type="hidden" id="loan-e-id">
+    <div class="field">
+      <label>名稱</label>
+      <input type="text" id="loan-e-name" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>到期日（選填）</label>
+      <input type="date" id="loan-e-due-date">
+    </div>
+    <div class="field">
+      <label>年利率（%）</label>
+      <input type="number" id="loan-e-interest" min="0" step="0.01" placeholder="0">
+    </div>
+    <div class="field">
+      <label>備註</label>
+      <textarea id="loan-e-note"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeLoanEditModal()">取消</button>
+      <button class="btn" onclick="saveLoanEdit()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Payment Modal -->
+<div class="modal-overlay" id="payment-modal">
+  <div class="modal">
+    <h3 id="payment-modal-title">新增還款</h3>
+    <input type="hidden" id="payment-loan-id">
+    <div class="field">
+      <label>金額</label>
+      <input type="number" id="payment-amount" min="0.01" step="0.01" placeholder="0">
+    </div>
+    <div class="field">
+      <label>日期</label>
+      <input type="date" id="payment-date">
+    </div>
+    <div class="field">
+      <label>備註（選填）</label>
+      <input type="text" id="payment-note" placeholder="" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closePaymentModal()">取消</button>
+      <button class="btn" onclick="submitPayment()">確認</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal" style="width:360px;">
+    <h3 id="confirm-msg" style="font-size:1rem;margin-bottom:20px;"></h3>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="confirm-cancel">取消</button>
+      <button class="btn" id="confirm-ok" style="background:var(--danger);color:#fff;">確認刪除</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const TODAY = new Date().toISOString().slice(0, 10);
+
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  function toast(msg, isError) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.background = isError ? 'var(--danger)' : 'var(--accent)';
+    t.style.color = isError ? '#fff' : '#111';
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ── Confirm ────────────────────────────────────────────────────────────────
+  function showConfirm(msg) {
+    return new Promise(resolve => {
+      document.getElementById('confirm-msg').textContent = msg;
+      document.getElementById('confirm-modal').classList.add('open');
+      const ok = document.getElementById('confirm-ok');
+      const cancel = document.getElementById('confirm-cancel');
+      const cleanup = (val) => {
+        document.getElementById('confirm-modal').classList.remove('open');
+        ok.onclick = null; cancel.onclick = null;
+        resolve(val);
+      };
+      ok.onclick = () => cleanup(true);
+      cancel.onclick = () => cleanup(false);
+    });
+  }
+
+  // ── Section Tabs ───────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    document.getElementById('section-cc').style.display = tab === 'cc' ? 'block' : 'none';
+    document.getElementById('section-loans').style.display = tab === 'loans' ? 'block' : 'none';
+    document.getElementById('tab-cc').classList.toggle('active', tab === 'cc');
+    document.getElementById('tab-loans').classList.toggle('active', tab === 'loans');
+  }
+
+  // ── Transaction toggle ──────────────────────────────────────────────────��──
+  function toggleTx(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('open');
+    const arrowId = id.replace('cc-tx-', 'cc-tx-arrow-').replace('loan-tx-', 'loan-tx-arrow-');
+    const arrow = document.getElementById(arrowId);
+    if (arrow) arrow.textContent = el.classList.contains('open') ? '▲' : '▼';
+  }
+
+  // ── Closed loans toggle ────────────────────────────────────────────────────
+  function toggleClosedLoans() {
+    const el = document.getElementById('closed-loans-list');
+    const arrow = document.getElementById('closed-arrow');
+    if (el) el.classList.toggle('open');
+    if (arrow) arrow.textContent = el && el.classList.contains('open') ? '▼' : '▶';
+  }
+
+  // ── Credit Card Repayment ──────────────────────────────────────────────────
+  function openRepayModal(cardId, cardName, balance) {
+    document.getElementById('repay-card-id').value = cardId;
+    document.getElementById('repay-card-name').value = cardName;
+    document.getElementById('repay-outstanding').value = 'NT$ ' + balance.toFixed(0);
+    document.getElementById('repay-amount').value = balance > 0 ? balance.toFixed(0) : '';
+    document.getElementById('repay-date').value = TODAY;
+    document.getElementById('repay-note').value = '';
+    document.getElementById('repay-modal').classList.add('open');
+  }
+  function closeRepayModal() {
+    document.getElementById('repay-modal').classList.remove('open');
+  }
+  async function submitRepayment() {
+    const cardId = parseInt(document.getElementById('repay-card-id').value);
+    const fromId = parseInt(document.getElementById('repay-from-account').value);
+    const amount = parseFloat(document.getElementById('repay-amount').value);
+    const date = document.getElementById('repay-date').value;
+    const note = document.getElementById('repay-note').value.trim();
+    if (!amount || amount <= 0) return toast('請輸入還款金額', true);
+    if (!date) return toast('請選擇日期', true);
+    const res = await fetch('/api/debts/cc/repay', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ from_account_id: fromId, to_account_id: cardId, amount, date, note })
+    });
+    if (res.ok) { closeRepayModal(); toast('還款成功'); setTimeout(() => location.reload(), 800); }
+    else { const d = await res.json().catch(() => ({})); toast(d.error || '還款失敗', true); }
+  }
+
+  // ── Add Loan ───────────────────────────────────────────────────────────────
+  function openLoanModal() {
+    document.getElementById('loan-name').value = '';
+    document.getElementById('loan-type-borrow').checked = true;
+    document.getElementById('loan-principal').value = '';
+    document.getElementById('loan-start-date').value = TODAY;
+    document.getElementById('loan-due-date').value = '';
+    document.getElementById('loan-interest').value = '';
+    document.getElementById('loan-note').value = '';
+    document.getElementById('loan-modal').classList.add('open');
+    switchTab('loans');
+  }
+  function closeLoanModal() {
+    document.getElementById('loan-modal').classList.remove('open');
+  }
+  async function submitLoan() {
+    const name = document.getElementById('loan-name').value.trim();
+    const type = document.querySelector('input[name="loan-type"]:checked').value;
+    const principal = parseFloat(document.getElementById('loan-principal').value);
+    const account_id = parseInt(document.getElementById('loan-account').value);
+    const start_date = document.getElementById('loan-start-date').value;
+    const due_date = document.getElementById('loan-due-date').value || null;
+    const interest_rate = parseFloat(document.getElementById('loan-interest').value) || 0;
+    const note = document.getElementById('loan-note').value.trim();
+    if (!name) return toast('請輸入名稱', true);
+    if (!principal || principal <= 0) return toast('請輸入借款金額', true);
+    if (!start_date) return toast('請選擇借款日期', true);
+    const res = await fetch('/api/debts/loans', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, type, principal, account_id, start_date, due_date, interest_rate, note })
+    });
+    if (res.ok) { closeLoanModal(); toast('新增成功'); setTimeout(() => location.reload(), 800); }
+    else { const d = await res.json().catch(() => ({})); toast(d.error || '新增失敗', true); }
+  }
+
+  // ── Edit Loan ──────────────────────────────────────────────────────────────
+  function openLoanEdit(id, name, interest, dueDate, note) {
+    document.getElementById('loan-e-id').value = id;
+    document.getElementById('loan-e-name').value = name;
+    document.getElementById('loan-e-interest').value = interest || 0;
+    document.getElementById('loan-e-due-date').value = dueDate || '';
+    document.getElementById('loan-e-note').value = note || '';
+    document.getElementById('loan-edit-modal').classList.add('open');
+  }
+  function closeLoanEditModal() {
+    document.getElementById('loan-edit-modal').classList.remove('open');
+  }
+  async function saveLoanEdit() {
+    const id = document.getElementById('loan-e-id').value;
+    const body = {
+      name: document.getElementById('loan-e-name').value.trim(),
+      interest_rate: parseFloat(document.getElementById('loan-e-interest').value) || 0,
+      due_date: document.getElementById('loan-e-due-date').value || null,
+      note: document.getElementById('loan-e-note').value.trim()
+    };
+    if (!body.name) return toast('請輸入名稱', true);
+    const res = await fetch(`/api/debts/loans/${id}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    if (res.ok) { closeLoanEditModal(); toast('已更新'); setTimeout(() => location.reload(), 800); }
+    else { const d = await res.json().catch(() => ({})); toast(d.error || '更新失敗', true); }
+  }
+
+  // ── Delete Loan ────────────────────────────────────────────────────────────
+  async function deleteLoan(id, name) {
+    const confirmed = await showConfirm(`確定刪除「${name}」？此操作將同時刪除對應的帳務紀錄，且無法復原。`);
+    if (!confirmed) return;
+    const res = await fetch(`/api/debts/loans/${id}`, { method: 'DELETE' });
+    if (res.ok) { toast('已刪除'); setTimeout(() => location.reload(), 800); }
+    else { const d = await res.json().catch(() => ({})); toast(d.error || '刪除失敗（請先刪除還款紀錄）', true); }
+  }
+
+  // ── Add Payment ────────────────────────────────────────────────────────────
+  function openPaymentModal(loanId, loanName, loanType) {
+    document.getElementById('payment-loan-id').value = loanId;
+    document.getElementById('payment-modal-title').textContent =
+      loanType === 'borrow' ? `還款：${loanName}` : `收款：${loanName}`;
+    document.getElementById('payment-amount').value = '';
+    document.getElementById('payment-date').value = TODAY;
+    document.getElementById('payment-note').value = '';
+    document.getElementById('payment-modal').classList.add('open');
+  }
+  function closePaymentModal() {
+    document.getElementById('payment-modal').classList.remove('open');
+  }
+  async function submitPayment() {
+    const loanId = document.getElementById('payment-loan-id').value;
+    const amount = parseFloat(document.getElementById('payment-amount').value);
+    const date = document.getElementById('payment-date').value;
+    const note = document.getElementById('payment-note').value.trim();
+    if (!amount || amount <= 0) return toast('請輸入金額', true);
+    if (!date) return toast('請選擇日期', true);
+    const res = await fetch(`/api/debts/loans/${loanId}/payments`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ amount, date, note })
+    });
+    if (res.ok) { closePaymentModal(); toast('紀錄成功'); setTimeout(() => location.reload(), 800); }
+    else { const d = await res.json().catch(() => ({})); toast(d.error || '紀錄失敗', true); }
+  }
+
+  // ── Delete Payment ─────────────────────────────────────────────────────────
+  async function deletePayment(paymentId) {
+    const confirmed = await showConfirm('確定刪除此還款紀錄？對應的帳務紀錄也會一併移除。');
+    if (!confirmed) return;
+    const res = await fetch(`/api/debts/payments/${paymentId}`, { method: 'DELETE' });
+    if (res.ok) { toast('已刪除'); setTimeout(() => location.reload(), 800); }
+    else { const d = await res.json().catch(() => ({})); toast(d.error || '刪除失敗', true); }
+  }
+</script>
+{% endblock %}
