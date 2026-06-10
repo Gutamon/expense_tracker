@@ -1,38 +1,37 @@
 import re
-from datetime import datetime
-import yfinance as yf
-from flask import Blueprint, render_template, request, jsonify, session, abort, redirect
+from flask import Blueprint, render_template, request, jsonify, abort
 from app.models.stock import StockModel
 from app.models.account import AccountModel
-from app.models.db import get_db
+from app.models import csv_store
+
+try:
+    import yfinance as yf
+    _YF_AVAILABLE = True
+except ImportError:
+    _YF_AVAILABLE = False
 
 stock_bp = Blueprint("stock", __name__)
 stock_model = StockModel()
 
-@stock_bp.before_request
-def require_login():
-    if 'user_id' not in session:
-        if request.path.startswith('/api/'):
-            return jsonify({"error": "未登入"}), 401
-        return redirect('/login')
 
 @stock_bp.route("/stocks")
 def manage_stocks():
-    user_id = session['user_id']
-    stocks = stock_model.get_by_user(user_id)
-    stocks.sort(key=lambda x: (x['shares'] == 0, -x['id']))
-    transactions = stock_model.get_transactions(user_id)
-    accounts = AccountModel().get_by_user(user_id)
+    stocks = stock_model.get_all()
+    stocks.sort(key=lambda x: (int(x.get("shares") or 0) == 0, -int(x.get("id") or 0)))
+    transactions = stock_model.get_transactions()
+    accounts = AccountModel().get_all()
 
     total_cost = 0
     total_value = 0
     for s in stocks:
-        total_cost += s['shares'] * s['avg_price']
-        total_value += s['shares'] * s['current_price']
+        total_cost += float(s.get("shares") or 0) * float(s.get("avg_price") or 0)
+        total_value += float(s.get("shares") or 0) * float(s.get("current_price") or 0)
     total_pl = total_value - total_cost
 
-    return render_template("stocks.html", stocks=stocks, transactions=transactions, accounts=accounts,
-                           total_cost=total_cost, total_value=total_value, total_pl=total_pl, username=session.get('username'))
+    return render_template("stocks.html", stocks=stocks, transactions=transactions,
+                           accounts=accounts, total_cost=total_cost,
+                           total_value=total_value, total_pl=total_pl, username="")
+
 
 @stock_bp.route("/api/stocks", methods=["POST"])
 def api_create_position():
@@ -43,28 +42,55 @@ def api_create_position():
 
     if not symbol or not name or not account_id:
         abort(400, "缺少必要欄位 (代號、名稱、交割帳號)")
+    if not re.match(r"^[A-Z0-9.]+$", symbol):
+        abort(400, "代號只能包含大寫英文字母、數字與點")
 
-    if not re.match(r"^[A-Z0-9]+$", symbol):
-        abort(400, "代號只能包含大寫英文字母與數字")
-
-    yf_sym = f"{symbol}.TW" if (symbol.isdigit() or re.match(r'^\d{5}', symbol)) else symbol
-    try:
-        t = yf.Ticker(yf_sym)
-        price = t.info.get("regularMarketPrice") or t.info.get("currentPrice") or t.info.get("previousClose")
-        if price is None:
-            abort(400, "查無此股票代號 (yfinance 找不到報價)")
-    except:
-        abort(400, "查無此股票代號 (驗證失敗)")
-
-    new_id = stock_model.create_position(session['user_id'], symbol, name, int(account_id))
+    new_id = stock_model.create_position(symbol, name, int(account_id))
     if not new_id:
         abort(400, "該股票倉位已存在")
-
-    with get_db() as conn:
-        conn.execute("UPDATE stocks SET current_price = ?, updated_at = ? WHERE id = ?",
-                     (float(price), datetime.now().strftime("%Y-%m-%d %H:%M:%S"), new_id))
-
     return jsonify({"success": True, "id": new_id}), 201
+
+
+@stock_bp.route("/api/stocks/update-prices", methods=["POST"])
+def api_update_all_prices():
+    if not _YF_AVAILABLE:
+        return jsonify({"error": "yfinance 未安裝，請手動輸入現價"}), 503
+
+    stocks = stock_model.get_all()
+    if not stocks:
+        return jsonify({"updated": 0, "failed": []})
+
+    updated = 0
+    failed = []
+    for s in stocks:
+        symbol = s.get("symbol", "")
+        if not symbol:
+            continue
+        try:
+            ticker = yf.Ticker(symbol)
+            info = ticker.fast_info
+            price = float(info.last_price or 0)
+            if price > 0:
+                stock_model.update_price(s["id"], price)
+                updated += 1
+            else:
+                failed.append(symbol)
+        except Exception:
+            failed.append(symbol)
+
+    return jsonify({"updated": updated, "failed": failed})
+
+
+@stock_bp.route("/api/stocks/<int:stock_id>/price", methods=["PUT"])
+def api_update_stock_price(stock_id):
+    data = request.get_json(force=True)
+    price = data.get("price")
+    if price is None:
+        abort(400, "缺少 price")
+    if not stock_model.update_price(stock_id, float(price)):
+        abort(404, "找不到此倉位")
+    return jsonify({"success": True})
+
 
 @stock_bp.route("/api/stocks/<int:stock_id>/account", methods=["PATCH"])
 def api_update_stock_account(stock_id):
@@ -72,13 +98,14 @@ def api_update_stock_account(stock_id):
     account_id = data.get("account_id")
     if not account_id:
         abort(400, "缺少 account_id")
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE stocks SET account_id = ? WHERE id = ? AND user_id = ?",
-                       (int(account_id), stock_id, session['user_id']))
-        if cursor.rowcount == 0:
-            abort(404, "找不到此倉位")
-    return jsonify({"success": True})
+    rows = csv_store.read_csv("stocks.csv")
+    for r in rows:
+        if str(r.get("id")) == str(stock_id):
+            r["account_id"] = int(account_id)
+            csv_store.write_csv("stocks.csv", rows, csv_store.SCHEMA["stocks.csv"])
+            return jsonify({"success": True})
+    abort(404, "找不到此倉位")
+
 
 @stock_bp.route("/api/stocks/<int:stock_id>/name", methods=["PUT"])
 def api_update_stock_name(stock_id):
@@ -86,70 +113,52 @@ def api_update_stock_name(stock_id):
     name = data.get("name", "").strip()
     if not name:
         abort(400, "名稱不能為空")
+    rows = csv_store.read_csv("stocks.csv")
+    for r in rows:
+        if str(r.get("id")) == str(stock_id):
+            r["name"] = name
+            csv_store.write_csv("stocks.csv", rows, csv_store.SCHEMA["stocks.csv"])
+            return jsonify({"success": True})
+    abort(404, "找不到該倉位")
 
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE stocks SET name = ? WHERE id = ? AND user_id = ?", (name, stock_id, session['user_id']))
-        if cursor.rowcount == 0:
-            abort(404, "找不到該倉位")
-
-    return jsonify({"success": True})
-
-@stock_bp.route("/api/stocks/info/<symbol>")
-def api_stock_info(symbol):
-    symbol = symbol.upper().strip()
-    yf_sym = f"{symbol}.TW" if (symbol.isdigit() or re.match(r'^\d{5}', symbol)) else symbol
-    try:
-        t = yf.Ticker(yf_sym)
-        info = t.info
-        name = info.get("shortName") or info.get("longName") or ""
-        return jsonify({"name": name})
-    except:
-        return jsonify({"name": ""})
 
 @stock_bp.route("/api/stocks/transactions", methods=["POST"])
 def api_add_transaction():
     data = request.get_json(force=True)
-    required = ("stock_id", "type", "date")
-    if not all(k in data for k in required): abort(400, "缺少必要欄位")
+    if not all(k in data for k in ("stock_id", "type", "date")):
+        abort(400, "缺少必要欄位")
 
     t_type = data["type"]
     shares = int(data.get("shares", 0))
     price = float(data.get("price", 0))
     fee = float(data.get("fee", 0))
 
-    if t_type == "split":
-        if price <= 0: abort(400, "分割比例必須大於 0")
+    if t_type == "split" and price <= 0:
+        abort(400, "分割比例必須大於 0")
 
     new_id = stock_model.add_transaction(
-        user_id=session['user_id'],
         stock_id=int(data["stock_id"]),
         t_type=t_type,
         date=data["date"],
         shares=shares,
         price=price,
         fee=fee,
-        note=data.get("note", "")
+        note=data.get("note", ""),
     )
     return jsonify({"success": True, "id": new_id}), 201
 
-@stock_bp.route("/api/stocks/update_prices", methods=["POST"])
-def api_update_prices():
-    success = stock_model.update_prices(session['user_id'])
-    return jsonify({"success": success})
 
 @stock_bp.route("/api/stocks/transactions/<int:tx_id>", methods=["PUT"])
 def api_update_stock_transaction(tx_id):
     data = request.get_json(force=True)
     try:
         success = stock_model.update_transaction(
-            user_id=session['user_id'],
             tx_id=tx_id,
             date=data.get("date"),
             shares=data.get("shares", 0),
             price=data.get("price", 0),
             fee=data.get("fee", 0),
-            note=data.get("note", "")
+            note=data.get("note", ""),
         )
         if not success:
             abort(404, "找不到此明細或更新失敗")
@@ -157,24 +166,18 @@ def api_update_stock_transaction(tx_id):
     except ValueError as e:
         abort(400, str(e))
 
+
 @stock_bp.route("/api/stocks/<int:stock_id>", methods=["DELETE"])
 def api_delete_position(stock_id):
-    user_id = session['user_id']
-    with get_db() as conn:
-        cursor = conn.cursor()
-        stock = cursor.execute("SELECT id FROM stocks WHERE id = ? AND user_id = ?", (stock_id, user_id)).fetchone()
-        if not stock:
-            abort(404, "找不到此倉位")
-        tx_count = cursor.execute("SELECT COUNT(*) as c FROM stock_transactions WHERE stock_id = ? AND user_id = ?", (stock_id, user_id)).fetchone()['c']
-        if tx_count > 0:
-            abort(400, "此倉位有交易紀錄，無法直接刪除")
-        cursor.execute("DELETE FROM stocks WHERE id = ? AND user_id = ?", (stock_id, user_id))
+    if not stock_model.delete_position(stock_id):
+        abort(400, "此倉位有交易紀錄或找不到，無法刪除")
     return jsonify({"success": True})
+
 
 @stock_bp.route("/api/stocks/transactions/<int:tx_id>", methods=["DELETE"])
 def api_delete_stock_transaction(tx_id):
     try:
-        if stock_model.delete_transaction(session['user_id'], tx_id):
+        if stock_model.delete_transaction(tx_id):
             return jsonify({"success": True})
         abort(404, "找不到此明細或刪除失敗")
     except ValueError as e:

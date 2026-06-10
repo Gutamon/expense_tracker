@@ -3,7 +3,7 @@
 {% block title %}記帳本{% endblock %}
 
 {% block head %}
-<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js'></script>
+<script src="{{ url_for('static', filename='vendor/fullcalendar/index.global.min.js') }}"></script>
 <style>
   .title {
     font-size: .9rem;
@@ -511,12 +511,82 @@
   }
 
   /* ── Account Filters ── */
-  .acc-filters {
+  .acc-filter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 0;
+  }
+
+  .acc-filter-header:hover .acc-filter-toggle {
+    color: var(--text);
+  }
+
+  .acc-filter-toggle {
+    color: var(--muted);
+    font-size: .75rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: color .2s;
+  }
+
+  .acc-filter-toggle .arrow {
+    display: inline-block;
+    transition: transform .25s;
+    font-style: normal;
+    transform: rotate(0deg);
+  }
+
+  .acc-filter-toggle .arrow.open {
+    transform: rotate(180deg);
+  }
+
+  .acc-filter-body {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height .3s ease, margin-top .3s ease;
+    margin-top: 0;
+  }
+
+  .acc-filter-body.open {
+    max-height: 600px;
+    margin-top: 14px;
+  }
+
+  .acc-filter-all-row {
+    margin-bottom: 10px;
+  }
+
+  .acc-type-group {
+    margin-bottom: 10px;
+  }
+
+  .acc-type-label {
+    font-size: .7rem;
+    color: var(--muted);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .acc-type-buttons {
     display: flex;
     gap: 8px;
-    margin-bottom: 24px;
     overflow-x: auto;
-    padding-bottom: 4px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .acc-type-buttons::-webkit-scrollbar {
+    display: none;
+  }
+
+  .acc-filters {
+    margin-bottom: 24px;
   }
 
   .btn-filter {
@@ -694,17 +764,50 @@
 
 {% block content %}
 <!-- Account Filters -->
-<h2 class="title">持有帳戶篩選</h2>
 <div class="acc-filters" id="acc-filters">
-  <button class="btn-filter active" id="acc-filter-all" data-id="all" onclick="toggleAllFilter(this)">全部</button>
-  {% for a in all_accounts %}
-  {% if a.get('is_asset', 1) %}
-  <button class="btn-filter filter-locked" data-id="{{ a.id }}" data-bal="{{ account_balances.get(a.id, 0) }}"
-    onclick="toggleAccFilter(this)">
-    {{ a.icon }} {{ a.name }}{% if a.get('currency', 'TWD') != 'TWD' %} · {{ a.currency }}{% endif %}
-  </button>
-  {% endif %}
+  <div class="acc-filter-header" onclick="toggleAccFilterPanel()">
+    <h2 class="title" style="margin-bottom:0">持有帳戶篩選</h2>
+    <div class="acc-filter-toggle">
+      <span id="acc-filter-summary">全部</span>
+      <i class="arrow" id="acc-filter-arrow">&#9660;</i>
+    </div>
+  </div>
+  <div class="acc-filter-body" id="acc-filter-body">
+  <div class="acc-filter-all-row">
+    <button class="btn-filter active" id="acc-filter-all" data-id="all" onclick="toggleAllFilter(this)">全部</button>
+  </div>
+  {% set specific_types = ['現金', '銀行', '儲值支付', '其他', '信用卡'] %}
+  {% set icon_type_map = {'💵': '現金', '🏦': '銀行', '🪙': '儲值支付', '💳': '信用卡', '👝': '其他'} %}
+  {% for type_key in specific_types %}
+    {% set type_accs = [] %}
+    {% set ns = namespace() %}
+    {% for a in all_accounts %}
+      {% if a.get('is_asset', 1) %}
+        {% if a.type in specific_types %}
+          {% set ns.eff = a.type %}
+        {% else %}
+          {% set ns.eff = icon_type_map.get(a.icon, '其他') %}
+        {% endif %}
+        {% if ns.eff == type_key %}
+          {% if type_accs.append(a) %}{% endif %}
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+    {% if type_accs %}
+    <div class="acc-type-group">
+      <span class="acc-type-label">{{ type_key }}</span>
+      <div class="acc-type-buttons">
+        {% for a in type_accs %}
+        <button class="btn-filter filter-locked" data-id="{{ a.id }}" data-bal="{{ account_balances.get(a.id, 0) }}"
+          onclick="toggleAccFilter(this)">
+          {{ a.icon }} {{ a.name }}{% if a.get('currency', 'TWD') != 'TWD' %} · {{ a.currency }}{% endif %}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
   {% endfor %}
+  </div><!-- /acc-filter-body -->
 </div>
 
 <!-- Stats -->
@@ -1355,6 +1458,25 @@
     }
   }
 
+  // ── Account filter panel toggle ──
+  function toggleAccFilterPanel() {
+    const body = document.getElementById('acc-filter-body');
+    const arrow = document.getElementById('acc-filter-arrow');
+    const open = body.classList.toggle('open');
+    arrow.classList.toggle('open', open);
+  }
+
+  function updateAccFilterSummary() {
+    const summary = document.getElementById('acc-filter-summary');
+    if (!summary) return;
+    if (isAllFilterActive()) {
+      summary.textContent = '全部';
+    } else {
+      const n = document.querySelectorAll('.btn-filter.active[data-id]:not([data-id="all"])').length;
+      summary.textContent = n === 0 ? '未選取' : `${n} 個帳戶`;
+    }
+  }
+
   // ── Account filters ──
   let filterTimer = null;
 
@@ -1374,9 +1496,10 @@
     if (activating) {
       individual.forEach(b => { b.classList.remove('active'); b.classList.add('filter-locked'); });
     } else {
-      individual.forEach(b => { b.classList.add('active'); b.classList.remove('filter-locked'); });
+      individual.forEach(b => { b.classList.remove('active'); b.classList.remove('filter-locked'); });
     }
     if (filterTimer) clearTimeout(filterTimer);
+    updateAccFilterSummary();
     applyFilters();
   }
 
@@ -1384,6 +1507,7 @@
     if (btn.classList.contains('filter-locked')) return;
     btn.classList.toggle('active');
     if (filterTimer) clearTimeout(filterTimer);
+    updateAccFilterSummary();
     filterTimer = setTimeout(() => { applyFilters(); }, 1000);
   }
 
@@ -1600,6 +1724,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     updateMonthDisplay();
     applyFilters();
+    updateAccFilterSummary();
   });
 </script>
 {% endblock %}

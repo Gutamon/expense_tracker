@@ -578,8 +578,8 @@
       </span>
     </div>
   </div>
-  <div style="display:flex;gap:8px;flex-shrink:0;">
-    <button class="btn btn-ghost" onclick="updatePrices()">更新現價</button>
+  <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;">
+    <button class="btn btn-ghost" id="btn-refresh-prices" onclick="updateAllPrices()">↻ 更新現價</button>
     <button class="btn" onclick="openPosModal()">新增倉位</button>
   </div>
 </div>
@@ -619,7 +619,7 @@
         </div>
         <div class="stat-item">
           <span class="stat-label">均價 / 現價</span>
-          <span class="stat-value">${{ "%.2f" | format(s.avg_price) }} / ${{ "%.2f" | format(s.current_price) }}</span>
+          <span class="stat-value">${{ "%.2f" | format(s.avg_price) }} / <input type="number" step="0.01" min="0" value="{{ "%.2f" | format(s.current_price) }}" style="width:6rem;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:inherit;text-align:right;padding:0 2px;" onblur="updateStockPrice({{ s.id }}, this)" onkeydown="if(event.key==='Enter')this.blur()"></span>
         </div>
         <div class="stat-item">
           <span class="stat-label">損益</span>
@@ -716,7 +716,7 @@
         </div>
         <div class="stat-item">
           <span class="stat-label">均價 / 現價</span>
-          <span class="stat-value">${{ "%.2f" | format(s.avg_price) }} / ${{ "%.2f" | format(s.current_price) }}</span>
+          <span class="stat-value">${{ "%.2f" | format(s.avg_price) }} / <input type="number" step="0.01" min="0" value="{{ "%.2f" | format(s.current_price) }}" style="width:6rem;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:inherit;text-align:right;padding:0 2px;" onblur="updateStockPrice({{ s.id }}, this)" onkeydown="if(event.key==='Enter')this.blur()"></span>
         </div>
         <div class="stat-item">
           <span class="stat-label">損益</span>
@@ -862,6 +862,28 @@
 
 {% block scripts %}
 <script>
+  async function updateAllPrices() {
+    const btn = document.getElementById('btn-refresh-prices');
+    btn.textContent = '更新中...';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/stocks/update-prices', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        toast(data.error || '無法連線，請手動輸入現價');
+      } else {
+        let msg = `已更新 ${data.updated} 支`;
+        if (data.failed && data.failed.length) msg += `，查詢失敗: ${data.failed.join(', ')}`;
+        toast(msg);
+        if (data.updated > 0) setTimeout(() => location.reload(), 800);
+      }
+    } catch (e) {
+      toast('無法連線，請確認網路或手動輸入現價');
+    }
+    btn.textContent = '↻ 更新現價';
+    btn.disabled = false;
+  }
+
   document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
 
   function showConfirm(msg) {
@@ -1024,10 +1046,14 @@
     else { const err = await res.json(); toast("錯誤: " + (err.error || (editId ? "更新失敗" : "新增失敗"))); }
   }
 
-  async function updatePrices() {
-    toast("正在獲取最新收盤價...");
-    const res = await fetch("/api/stocks/update_prices", { method: "POST" });
-    if (res.ok) { toast("更新成功"); setTimeout(() => location.reload(), 1000); }
+  async function updateStockPrice(stockId, input) {
+    const price = parseFloat(input.value);
+    if (isNaN(price) || price < 0) { toast("請輸入有效的現價"); input.focus(); return; }
+    const res = await fetch(`/api/stocks/${stockId}/price`, {
+      method: "PUT", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ price })
+    });
+    if (res.ok) { toast("現價已更新"); setTimeout(() => location.reload(), 500); }
     else toast("更新失敗");
   }
 

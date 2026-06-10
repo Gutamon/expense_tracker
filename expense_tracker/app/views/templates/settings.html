@@ -3,7 +3,7 @@
 {% block title %}設定管理 · 記帳本{% endblock %}
 
 {% block head %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/sortablejs/Sortable.min.js') }}"></script>
 <style>
   .page-title {
     font-size: 1.4rem;
@@ -1033,10 +1033,104 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- ── 資料管理 ── -->
+<div style="margin-top:2rem;padding:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
+  <h2 style="font-size:1rem;font-weight:600;margin-bottom:1.25rem;">資料管理</h2>
+
+  <!-- Export row -->
+  <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.75rem;">匯出所有資料為 ZIP 備份檔，可用於還原或搬移。</p>
+  <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;">
+    <a href="/api/export/zip" style="display:inline-block;background:var(--accent);color:#111;text-decoration:none;padding:0.55rem 1.1rem;border-radius:8px;font-size:0.88rem;font-weight:500;">↓ 匯出備份 ZIP</a>
+    <button id="btn-wipe" onclick="wipeData()"
+      style="padding:0.55rem 1.1rem;border:none;border-radius:8px;background:#ff3b3b;color:#fff;font-size:0.88rem;font-weight:500;cursor:pointer;">↓ 匯出備份並刪除所有資料</button>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--border);margin:1.5rem 0;">
+
+  <!-- Import -->
+  <p style="font-size:0.85rem;font-weight:600;margin-bottom:0.4rem;">匯入資料</p>
+  <p style="font-size:0.82rem;color:var(--muted);margin-bottom:1rem;">支援本應用程式備份（ZIP）及其他記帳軟體匯出的 CSV、TXT、ZIP 檔案。</p>
+
+  <!-- Step 1: file picker -->
+  <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;">
+    <label style="cursor:pointer;padding:0.55rem 1rem;border:1px dashed var(--border);border-radius:8px;font-size:0.85rem;color:var(--muted);">
+      <span id="import-chosen-name">點選選擇 CSV / TXT / ZIP</span>
+      <input type="file" id="import-file-settings" accept=".csv,.txt,.zip" style="display:none;" onchange="importFileChosen(this)">
+    </label>
+    <button id="btn-import-analyze" onclick="importAnalyze()" disabled
+      style="padding:0.55rem 1rem;border:none;border-radius:8px;background:var(--accent);color:#111;font-size:0.88rem;font-weight:500;cursor:pointer;opacity:0.4;">分析檔案</button>
+  </div>
+
+  <!-- Step 2a: backup restore -->
+  <div id="import-backup-panel" style="display:none;margin-top:1rem;padding:1rem;border:1px solid var(--border);border-radius:8px;">
+    <p style="color:var(--accent);font-size:0.9rem;font-weight:600;margin-bottom:0.35rem;">✓ 偵測到本應用程式的備份檔案</p>
+    <p style="color:var(--muted);font-size:0.82rem;margin-bottom:1rem;">匯入將覆蓋現有全部資料，建議操作前先匯出備份。</p>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+      <button id="btn-do-restore" onclick="doRestore()"
+        style="padding:0.55rem 1.1rem;border:none;border-radius:8px;background:var(--accent);color:#111;font-size:0.88rem;font-weight:500;cursor:pointer;">覆蓋還原</button>
+      <button onclick="importReset()"
+        style="padding:0.55rem 1.1rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-size:0.88rem;cursor:pointer;">取消</button>
+    </div>
+  </div>
+
+  <!-- Step 2b: column mapping -->
+  <div id="import-mapping-panel" style="display:none;margin-top:1rem;">
+    <p style="font-size:0.85rem;margin-bottom:0.75rem;">將您 CSV 的欄位對應到本應用程式的欄位：</p>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <thead><tr>
+          <th style="text-align:left;padding:0.4rem 0.5rem;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500;white-space:nowrap;">本應用程式欄位</th>
+          <th style="text-align:left;padding:0.4rem 0.5rem;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500;">您的 CSV 欄位</th>
+        </tr></thead>
+        <tbody id="import-map-rows"></tbody>
+      </table>
+    </div>
+    <div id="import-type-section" style="display:none;margin-top:1rem;">
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.5rem;">請對應「類型」欄位的值：</p>
+      <div id="import-type-rows"></div>
+    </div>
+    <div style="overflow-x:auto;max-height:160px;overflow-y:auto;margin:1rem 0;border:1px solid var(--border);border-radius:6px;">
+      <table id="import-preview-tbl" style="border-collapse:collapse;font-size:0.78rem;min-width:100%;"></table>
+    </div>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+      <button id="btn-next-review" onclick="importGoReview()"
+        style="padding:0.55rem 1.1rem;border:none;border-radius:8px;background:var(--accent);color:#111;font-size:0.88rem;font-weight:500;cursor:pointer;">下一步：確認設定</button>
+      <button onclick="importReset()"
+        style="padding:0.55rem 1.1rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-size:0.88rem;cursor:pointer;">取消</button>
+    </div>
+  </div>
+
+  <!-- Step 3: review new categories / accounts -->
+  <div id="import-review-panel" style="display:none;margin-top:1rem;padding:1rem;border:1px solid var(--border);border-radius:8px;">
+    <p id="import-review-total" style="font-size:0.88rem;font-weight:600;margin-bottom:1rem;"></p>
+
+    <div id="import-review-cats-wrap" style="display:none;margin-bottom:1rem;">
+      <div style="display:flex;align-items:baseline;gap:0.6rem;margin-bottom:0.5rem;">
+        <p style="font-size:0.82rem;color:var(--muted);margin:0;">將新增以下類別：</p>
+        <span style="font-size:0.75rem;color:var(--muted);opacity:0.6;">點擊標籤可切換收 / 支</span>
+      </div>
+      <div id="import-review-cats" style="display:flex;flex-wrap:wrap;gap:0.4rem;"></div>
+    </div>
+
+    <div id="import-review-accs-wrap" style="display:none;margin-bottom:1rem;">
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.5rem;">將新增以下帳戶：</p>
+      <div id="import-review-accs"></div>
+    </div>
+
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+      <button id="btn-do-import" onclick="doImport()"
+        style="padding:0.55rem 1.1rem;border:none;border-radius:8px;background:var(--accent);color:#111;font-size:0.88rem;font-weight:500;cursor:pointer;">確認匯入</button>
+      <button onclick="importReset()"
+        style="padding:0.55rem 1.1rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-size:0.88rem;cursor:pointer;">取消</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/sortablejs/Sortable.min.js') }}"></script>
 <script>
   function toast(msg) {
     const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");
@@ -1392,6 +1486,301 @@
     }
     const res = await fetch("/api/accounts", { method: "POST", body: JSON.stringify(body) });
     if (res.ok) reloadPage();
+  }
+
+  // ── Import wizard ────────────────────────────────────────────────────────────
+  // Fields: label, required flag
+  const IMPORT_FIELDS = [
+    { k:'date',     label:'日期',   req:true  },
+    { k:'amount',   label:'金額',   req:true  },
+    { k:'title',    label:'標題',   req:false },
+    { k:'category', label:'類別',   req:false },
+    { k:'account',  label:'帳戶',   req:false },
+    { k:'note',     label:'備註',   req:false },
+    { k:'type',     label:'類型',   req:false },
+    { k:'currency', label:'幣別',   req:false },
+  ];
+  let _importCols = [], _importPreview = [], _importTmp = '', _importRestoreFile = null;
+  let _importMapping = {}, _importTypeMapping = {}, _importColValues = {};
+  let _restoreConfirming = false, _wipeConfirming = false;
+
+  function importFileChosen(input) {
+    const file = input.files[0];
+    document.getElementById('import-chosen-name').textContent = file ? file.name : '點選選擇 CSV / TXT / ZIP';
+    const btn = document.getElementById('btn-import-analyze');
+    btn.disabled = !file; btn.style.opacity = file ? '1' : '0.4';
+    importReset(true);
+  }
+
+  function importReset(keepFile) {
+    ['import-backup-panel','import-mapping-panel','import-review-panel'].forEach(id => {
+      document.getElementById(id).style.display = 'none';
+    });
+    _importCols = []; _importPreview = []; _importTmp = ''; _importRestoreFile = null;
+    _importMapping = {}; _importTypeMapping = {}; _importColValues = {};
+    _restoreConfirming = false;
+    if (!keepFile) {
+      document.getElementById('import-file-settings').value = '';
+      document.getElementById('import-chosen-name').textContent = '點選選擇 CSV / TXT / ZIP';
+      const btn = document.getElementById('btn-import-analyze');
+      btn.disabled = true; btn.style.opacity = '0.4';
+    }
+  }
+
+  async function importAnalyze() {
+    const file = document.getElementById('import-file-settings').files[0];
+    if (!file) return;
+    const btn = document.getElementById('btn-import-analyze');
+    btn.textContent = '分析中...'; btn.disabled = true; btn.style.opacity = '0.6';
+    const fd = new FormData(); fd.append('file', file);
+    try {
+      const res = await fetch('/api/import/preview', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) { toast(data.error || data.description || '分析失敗'); return; }
+      if (data.type === 'backup') {
+        _importRestoreFile = file;
+        document.getElementById('import-backup-panel').style.display = 'block';
+      } else {
+        _importCols = data.columns; _importPreview = data.preview; _importTmp = data.tmp_filename;
+        _importColValues = data.column_values || {};
+        renderImportMapping(data.suggested_mapping);
+        document.getElementById('import-mapping-panel').style.display = 'block';
+      }
+    } catch(e) { toast('分析失敗：' + e.message); }
+    finally { btn.textContent = '分析檔案'; btn.disabled = false; btn.style.opacity = '1'; }
+  }
+
+  function _selStyle() {
+    return 'width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.3rem 0.5rem;font-size:0.82rem;';
+  }
+  function _cellStyle(last) {
+    return `padding:0.4rem 0.5rem;border-bottom:${last?'none':'1px solid var(--border)'};`;
+  }
+
+  function renderImportMapping(suggested) {
+    const tbody = document.getElementById('import-map-rows');
+    tbody.innerHTML = '';
+    const opts = '<option value="">（略過）</option>' + _importCols.map(c=>`<option value="${c}">${c}</option>`).join('');
+    IMPORT_FIELDS.forEach(({k, label, req}, idx) => {
+      const sel = document.createElement('select');
+      sel.id = 'imap-' + k; sel.innerHTML = opts; sel.style.cssText = _selStyle();
+      if (suggested[k]) sel.value = suggested[k];
+      if (k === 'type') sel.addEventListener('change', renderImportTypeMapping);
+      const last = idx === IMPORT_FIELDS.length - 1;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td style="${_cellStyle(last)}white-space:nowrap;">${label}${req?' <span style="color:var(--danger)">*</span>':''}</td><td style="${_cellStyle(last)}"></td>`;
+      tr.cells[1].appendChild(sel);
+      tbody.appendChild(tr);
+    });
+    renderImportTypeMapping();
+    renderImportPreview();
+  }
+
+  function renderImportTypeMapping() {
+    const typeCol = document.getElementById('imap-type')?.value;
+    const sec = document.getElementById('import-type-section');
+    if (!typeCol) { sec.style.display = 'none'; return; }
+    const vals = (_importColValues[typeCol] && _importColValues[typeCol].length)
+      ? _importColValues[typeCol]
+      : [...new Set(_importPreview.map(r=>r[typeCol]).filter(Boolean))];
+    if (!vals.length) { sec.style.display = 'none'; return; }
+    sec.style.display = 'block';
+    const container = document.getElementById('import-type-rows');
+    container.innerHTML = '';
+    for (const v of vals) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;font-size:0.85rem;';
+      row.innerHTML = `<span style="flex:1;color:var(--muted);">${v}</span><span>→</span>
+        <select id="itypemap-${encodeURIComponent(v)}" style="flex:1;${_selStyle()}">
+          <option value="expense">支出</option>
+          <option value="income">收入</option>
+          <option value="transfer">轉帳</option>
+        </select>`;
+      container.appendChild(row);
+      const lower = v.toLowerCase();
+      const sel = row.querySelector('select');
+      if (lower.includes('收入') || lower === 'income' || lower === 'in') sel.value = 'income';
+      else if (lower.includes('轉') || lower === 'transfer') sel.value = 'transfer';
+    }
+  }
+
+  function renderImportPreview() {
+    if (!_importPreview.length) return;
+    const tbl = document.getElementById('import-preview-tbl');
+    const cols = _importCols.slice(0, 8);
+    const th = s => `<th style="background:var(--surface);color:var(--muted);padding:0.3rem 0.5rem;border:1px solid var(--border);white-space:nowrap;">${s}</th>`;
+    const td = s => `<td style="padding:0.3rem 0.5rem;border:1px solid var(--border);white-space:nowrap;">${s}</td>`;
+    tbl.innerHTML = '<thead><tr>' + cols.map(th).join('') + '</tr></thead>'
+      + '<tbody>' + _importPreview.map(r=>'<tr>' + cols.map(c=>td(r[c]||'')).join('') + '</tr>').join('') + '</tbody>';
+  }
+
+  function _collectMapping() {
+    const mapping = {}, typeMapping = {};
+    for (const {k} of IMPORT_FIELDS) {
+      const sel = document.getElementById('imap-' + k);
+      if (sel && sel.value) mapping[k] = sel.value;
+    }
+    const typeCol = mapping.type;
+    if (typeCol) {
+      const vals = (_importColValues[typeCol] && _importColValues[typeCol].length)
+        ? _importColValues[typeCol]
+        : [...new Set(_importPreview.map(r=>r[typeCol]).filter(Boolean))];
+      for (const v of vals) {
+        const sel = document.getElementById(`itypemap-${encodeURIComponent(v)}`);
+        if (sel) typeMapping[v] = sel.value;
+      }
+    }
+    return { mapping, typeMapping };
+  }
+
+  async function importGoReview() {
+    const { mapping, typeMapping } = _collectMapping();
+    if (!mapping.date) { toast('請先設定「日期」欄位'); return; }
+    if (!mapping.amount) { toast('請先設定「金額」欄位'); return; }
+    _importMapping = mapping; _importTypeMapping = typeMapping;
+
+    const btn = document.getElementById('btn-next-review');
+    btn.textContent = '載入中...'; btn.disabled = true;
+    try {
+      const res = await fetch('/api/import/analyze', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ tmp_filename: _importTmp, mapping, type_mapping: typeMapping })
+      });
+      const data = await res.json();
+      if (!res.ok) { toast(data.description || '分析失敗'); return; }
+      renderImportReview(data);
+      document.getElementById('import-mapping-panel').style.display = 'none';
+      document.getElementById('import-review-panel').style.display = 'block';
+    } catch(e) { toast('載入失敗：' + e.message); }
+    finally { btn.textContent = '下一步：確認設定'; btn.disabled = false; }
+  }
+
+  function _catTypeColor(t) {
+    return t === 'income' ? 'var(--accent)' : t === 'transfer' ? '#4a8af0' : 'var(--danger)';
+  }
+  function _catTypeLabel(t) {
+    return t === 'income' ? '收入' : t === 'transfer' ? '轉帳' : '支出';
+  }
+  function _nextCatType(t) {
+    return t === 'expense' ? 'income' : 'expense';
+  }
+  function _updateCatTag(el) {
+    const t = el.dataset.catType;
+    const color = _catTypeColor(t);
+    el.style.borderColor = color;
+    el.style.color = color;
+    el.querySelector('.cat-type-lbl').textContent = _catTypeLabel(t);
+  }
+  function toggleCatType(el) {
+    el.dataset.catType = _nextCatType(el.dataset.catType);
+    _updateCatTag(el);
+  }
+
+  function renderImportReview(data) {
+    document.getElementById('import-review-total').textContent =
+      `共 ${data.total} 筆記錄將被匯入` + (data.new_categories.length || data.new_accounts.length ? '，並建立以下設定：' : '。');
+
+    const catsWrap = document.getElementById('import-review-cats-wrap');
+    const catsDiv  = document.getElementById('import-review-cats');
+    if (data.new_categories.length) {
+      catsDiv.innerHTML = data.new_categories.map(c => {
+        const color = _catTypeColor(c.type);
+        return `<span data-cat-name="${c.name.replace(/"/g,'&quot;')}" data-cat-type="${c.type}"
+          onclick="toggleCatType(this)" title="點擊切換類型"
+          style="padding:0.25rem 0.6rem;border-radius:6px;border:1px solid ${color};color:${color};font-size:0.78rem;cursor:pointer;user-select:none;">
+          ${c.name} <span class="cat-type-lbl" style="opacity:0.7">${_catTypeLabel(c.type)}</span>
+        </span>`;
+      }).join('');
+      catsWrap.style.display = 'block';
+    } else { catsWrap.style.display = 'none'; }
+
+    const accsWrap = document.getElementById('import-review-accs-wrap');
+    const accsDiv  = document.getElementById('import-review-accs');
+    if (data.new_accounts.length) {
+      const currencies = ['TWD','USD','EUR','JPY','GBP','CNY','HKD','AUD','CAD','SGD'];
+      const typeOpts = `<option value="asset">資產</option><option value="liability">負債</option>`;
+      accsDiv.innerHTML = data.new_accounts.map(a => {
+        const curOpts = currencies.map(c => `<option value="${c}"${c===a.currency?' selected':''}>${c}</option>`).join('');
+        return `<div style="display:grid;grid-template-columns:1fr auto auto auto auto;align-items:center;gap:0.5rem;margin-bottom:0.5rem;font-size:0.85rem;">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${a.name}</span>
+          <span style="color:var(--muted);font-size:0.78rem;white-space:nowrap;">幣別</span>
+          <select id="iacc-cur-${encodeURIComponent(a.name)}" style="width:80px;${_selStyle()}">${curOpts}</select>
+          <span style="color:var(--muted);font-size:0.78rem;white-space:nowrap;">類型</span>
+          <select id="iacc-type-${encodeURIComponent(a.name)}" style="width:80px;${_selStyle()}">${typeOpts}</select>
+        </div>`;
+      }).join('');
+      accsWrap.style.display = 'block';
+    } else { accsWrap.style.display = 'none'; }
+  }
+
+  async function doRestore() {
+    const btn = document.getElementById('btn-do-restore');
+    if (!_restoreConfirming) {
+      _restoreConfirming = true;
+      btn.textContent = '確認覆蓋？再按一次確認';
+      btn.style.background = 'var(--danger)';
+      setTimeout(() => {
+        if (_restoreConfirming) { _restoreConfirming = false; btn.textContent = '覆蓋還原'; btn.style.background = ''; }
+      }, 4000);
+      return;
+    }
+    _restoreConfirming = false;
+    btn.textContent = '還原中...'; btn.disabled = true;
+    const fd = new FormData(); fd.append('file', _importRestoreFile);
+    const res = await fetch('/api/import/restore', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (res.ok) { toast('還原成功'); setTimeout(() => location.reload(), 1000); }
+    else { toast(data.error || data.description || '還原失敗'); btn.textContent = '覆蓋還原'; btn.style.background = ''; btn.disabled = false; }
+  }
+
+  async function doImport() {
+    const account_currencies = {}, account_types = {}, category_type_overrides = {};
+    document.querySelectorAll('[id^="iacc-cur-"]').forEach(sel => {
+      const name = decodeURIComponent(sel.id.replace('iacc-cur-', ''));
+      account_currencies[name] = sel.value;
+    });
+    document.querySelectorAll('[id^="iacc-type-"]').forEach(sel => {
+      const name = decodeURIComponent(sel.id.replace('iacc-type-', ''));
+      account_types[name] = sel.value;
+    });
+    document.querySelectorAll('[data-cat-name]').forEach(el => {
+      category_type_overrides[el.dataset.catName] = el.dataset.catType;
+    });
+    const btn = document.getElementById('btn-do-import');
+    btn.textContent = '匯入中...'; btn.disabled = true;
+    const res = await fetch('/api/import/csv', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ tmp_filename: _importTmp, mapping: _importMapping, type_mapping: _importTypeMapping, account_currencies, account_types, category_type_overrides })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      toast(`已匯入 ${data.imported} 筆`);
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      toast(data.error || data.description || '匯入失敗');
+      btn.textContent = '確認匯入'; btn.disabled = false;
+    }
+  }
+
+  async function wipeData() {
+    const btn = document.getElementById('btn-wipe');
+    if (!_wipeConfirming) {
+      _wipeConfirming = true;
+      btn.textContent = '確認刪除所有資料？再按一次確認';
+      setTimeout(() => {
+        if (_wipeConfirming) { _wipeConfirming = false; btn.textContent = '↓ 匯出備份並刪除所有資料'; }
+      }, 5000);
+      return;
+    }
+    _wipeConfirming = false;
+    btn.textContent = '處理中...'; btn.disabled = true;
+    // Trigger ZIP download first
+    window.location.href = '/api/export/zip';
+    // Then wipe after a short delay (download starts independently)
+    setTimeout(async () => {
+      await fetch('/api/data/wipe', { method: 'POST' });
+      setTimeout(() => window.location.href = '/onboarding', 1200);
+    }, 1500);
   }
 </script>
 {% endblock %}

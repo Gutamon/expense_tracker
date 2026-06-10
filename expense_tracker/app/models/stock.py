@@ -1,44 +1,70 @@
-import re
-import math
 from datetime import datetime
-from app.models.db import get_db
-import yfinance as yf
+from app.models.csv_store import read_csv, write_csv, next_id, SCHEMA
+from app.models.expense import ExpenseModel
+
+expense_model = ExpenseModel()
+
 
 class StockModel:
-    def get_by_user(self, user_id: int):
-        with get_db() as conn:
-            rows = conn.execute("SELECT * FROM stocks WHERE user_id = ?", (user_id,)).fetchall()
-            return [dict(r) for r in rows]
+    def get_all(self) -> list:
+        return read_csv("stocks.csv")
 
-    def get_transactions(self, user_id: int, stock_id: int = None):
-        with get_db() as conn:
-            if stock_id:
-                rows = conn.execute("SELECT * FROM stock_transactions WHERE user_id = ? AND stock_id = ? ORDER BY date DESC, id DESC", (user_id, stock_id)).fetchall()
-            else:
-                rows = conn.execute("SELECT t.*, s.symbol, s.name FROM stock_transactions t JOIN stocks s ON t.stock_id = s.id WHERE t.user_id = ? ORDER BY t.date DESC, t.id DESC", (user_id,)).fetchall()
-            return [dict(r) for r in rows]
+    def get_transactions(self, stock_id: int = None) -> list:
+        txs = read_csv("stock_transactions.csv")
+        if stock_id:
+            txs = [t for t in txs if str(t.get("stock_id")) == str(stock_id)]
+        stocks = {str(s["id"]): s for s in read_csv("stocks.csv")}
+        for t in txs:
+            s = stocks.get(str(t.get("stock_id")), {})
+            t["symbol"] = s.get("symbol", "")
+            t["name"] = s.get("name", "")
+        txs.sort(key=lambda t: (t.get("date", ""), t.get("id", "")), reverse=True)
+        return txs
 
-    def create_position(self, user_id: int, symbol: str, name: str, account_id: int):
-        with get_db() as conn:
-            cursor = conn.cursor()
-            row = cursor.execute("SELECT * FROM stocks WHERE user_id = ? AND symbol = ?", (user_id, symbol)).fetchone()
-            if row:
-                return False # 已經存在
-            cursor.execute("INSERT INTO stocks (user_id, symbol, name, account_id) VALUES (?, ?, ?, ?)", (user_id, symbol, name, account_id))
-            return cursor.lastrowid
+    def create_position(self, symbol: str, name: str, account_id: int):
+        rows = read_csv("stocks.csv")
+        if any(r.get("symbol") == symbol for r in rows):
+            return False
+        new_id = next_id(rows)
+        rows.append({
+            "id": new_id,
+            "symbol": symbol,
+            "name": name,
+            "shares": 0,
+            "avg_price": 0,
+            "current_price": 0,
+            "updated_at": "",
+            "account_id": account_id,
+        })
+        write_csv("stocks.csv", rows, SCHEMA["stocks.csv"])
+        return new_id
 
-    def _update_stock_avg(self, conn, stock_id: int):
-        rows = conn.execute("SELECT * FROM stock_transactions WHERE stock_id = ? ORDER BY date ASC, id ASC", (stock_id,)).fetchall()
+    def update_price(self, stock_id: int, price: float) -> bool:
+        rows = read_csv("stocks.csv")
+        stock_id = str(stock_id)
+        for r in rows:
+            if str(r.get("id")) == stock_id:
+                r["current_price"] = float(price)
+                r["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                write_csv("stocks.csv", rows, SCHEMA["stocks.csv"])
+                return True
+        return False
+
+    def _update_stock_avg(self, stock_id):
+        txs = read_csv("stock_transactions.csv")
+        txs = [t for t in txs if str(t.get("stock_id")) == str(stock_id)]
+        txs.sort(key=lambda t: (t.get("date", ""), t.get("id", "")))
+
         shares = 0.0
         total_cost = 0.0
-        for r in rows:
-            t_type = r['type']
-            t_shares = r['shares']
-            t_price = r['price']
-            if t_type == 'buy':
+        for t in txs:
+            t_type = t.get("type")
+            t_shares = float(t.get("shares") or 0)
+            t_price = float(t.get("price") or 0)
+            if t_type == "buy":
                 shares += t_shares
                 total_cost += t_shares * t_price
-            elif t_type == 'sell':
+            elif t_type == "sell":
                 if shares > 0:
                     avg_cost = total_cost / shares
                     total_cost -= t_shares * avg_cost
@@ -46,164 +72,154 @@ class StockModel:
                 if shares <= 0:
                     shares = 0
                     total_cost = 0
-            elif t_type == 'split':
-                # split ratio is stored in 'price' (e.g. 2 means 1 share becomes 2)
-                # cost basis remains the same, shares multiply
+            elif t_type == "split":
                 shares = shares * t_price
 
-        # 確保股數是整數
         shares = int(round(shares))
         avg_price = (total_cost / shares) if shares > 0 else 0
-        conn.execute("UPDATE stocks SET shares = ?, avg_price = ? WHERE id = ?", (shares, avg_price, stock_id))
 
-    def add_transaction(self, user_id: int, stock_id: int, t_type: str, date: str, shares: float, price: float, fee: float, note: str):
+        stock_rows = read_csv("stocks.csv")
+        for r in stock_rows:
+            if str(r.get("id")) == str(stock_id):
+                r["shares"] = shares
+                r["avg_price"] = round(avg_price, 4)
+                break
+        write_csv("stocks.csv", stock_rows, SCHEMA["stocks.csv"])
+
+    def add_transaction(self, stock_id: int, t_type: str, date: str, shares: float,
+                        price: float, fee: float, note: str):
         shares = int(shares)
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        with get_db() as conn:
-            cursor = conn.cursor()
+        stock_rows = read_csv("stocks.csv")
+        stock = next((r for r in stock_rows if str(r.get("id")) == str(stock_id)), None)
+        if not stock:
+            return None
+        settlement_acc_id = stock.get("account_id", 0)
+        symbol = stock.get("symbol", "")
 
-            stock_info = cursor.execute("SELECT account_id, symbol FROM stocks WHERE id = ?", (stock_id,)).fetchone()
-            settlement_acc_id = stock_info["account_id"]
-            symbol = stock_info["symbol"]
+        tx_rows = read_csv("stock_transactions.csv")
+        tx_id = next_id(tx_rows)
+        tx_rows.append({
+            "id": tx_id,
+            "stock_id": stock_id,
+            "type": t_type,
+            "date": date,
+            "shares": shares,
+            "price": price,
+            "fee": fee,
+            "note": note or "",
+            "created_at": created_at,
+        })
+        write_csv("stock_transactions.csv", tx_rows, SCHEMA["stock_transactions.csv"])
 
-            cursor.execute('''
-                INSERT INTO stock_transactions (user_id, stock_id, type, date, shares, price, fee, note, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (user_id, stock_id, t_type, date, shares, price, fee, note, created_at))
-            tx_id = cursor.lastrowid
+        amount = 0
+        exp_type = None
+        title = ""
+        if t_type == "buy":
+            amount = shares * price + fee
+            exp_type = "expense"
+            title = f"買入 {symbol}"
+        elif t_type == "sell":
+            amount = shares * price - fee
+            exp_type = "income"
+            title = f"賣出 {symbol}"
+        elif t_type == "dividend":
+            amount = price
+            exp_type = "income"
+            title = f"{symbol} 股利"
 
-            # 買入＝交割帳戶支出；賣出/股利＝交割帳戶收入；分割不產生現金流
-            amount = 0
-            exp_type = None
-            title = ""
+        if amount > 0 and exp_type:
+            expense_model.create_with_links(
+                title=title, amount=amount, category="股票交易",
+                date=date, note=note or "", type=exp_type,
+                account_id=int(settlement_acc_id),
+                stock_transaction_id=tx_id,
+            )
 
-            if t_type == "buy":
-                amount = shares * price + fee
-                exp_type = "expense"
-                title = f"買入 {symbol}"
-            elif t_type == "sell":
-                amount = shares * price - fee
-                exp_type = "income"
-                title = f"賣出 {symbol}"
-            elif t_type == "dividend":
-                amount = price
-                exp_type = "income"
-                title = f"{symbol} 股利"
+        self._update_stock_avg(stock_id)
+        return tx_id
 
-            if amount > 0 and exp_type:
-                cursor.execute('''
-                    INSERT INTO expenses (user_id, title, amount, date, category, account_id, to_account_id, type, created_at, stock_transaction_id)
-                    VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
-                ''', (user_id, title, amount, date, "股票交易", settlement_acc_id, exp_type, created_at, tx_id))
-
-            self._update_stock_avg(conn, stock_id)
-            return tx_id
-
-    def delete_transaction(self, user_id: int, tx_id: int) -> bool:
-        with get_db() as conn:
-            cursor = conn.cursor()
-            tx = cursor.execute("SELECT stock_id, created_at FROM stock_transactions WHERE id = ? AND user_id = ?", (tx_id, user_id)).fetchone()
-            if not tx: return False
-            stock_id = tx['stock_id']
-            created_at = tx['created_at']
-
-            latest = cursor.execute("SELECT id FROM stock_transactions WHERE stock_id = ? AND user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1", (stock_id, user_id)).fetchone()
-            if latest and latest['id'] != tx_id:
-                raise ValueError("只能刪除最上層（最新）的交易紀錄")
-
-            cursor.execute("DELETE FROM stock_transactions WHERE id = ?", (tx_id,))
-            # Delete by stock_transaction_id (new records) or legacy created_at match
-            cursor.execute("DELETE FROM expenses WHERE user_id = ? AND stock_transaction_id = ?", (user_id, tx_id))
-            cursor.execute("DELETE FROM expenses WHERE user_id = ? AND category = '股票交易' AND created_at = ? AND stock_transaction_id IS NULL", (user_id, created_at))
-
-            self._update_stock_avg(conn, stock_id)
-            return True
-
-    def update_transaction(self, user_id: int, tx_id: int, date: str, shares: float, price: float, fee: float, note: str) -> bool:
-        shares = int(shares)
-        with get_db() as conn:
-            cursor = conn.cursor()
-            tx = cursor.execute("SELECT stock_id, type, created_at FROM stock_transactions WHERE id = ? AND user_id = ?", (tx_id, user_id)).fetchone()
-            if not tx: return False
-            stock_id = tx['stock_id']
-            t_type = tx['type']
-            created_at = tx['created_at']
-
-            latest = cursor.execute("SELECT id FROM stock_transactions WHERE stock_id = ? AND user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1", (stock_id, user_id)).fetchone()
-            if latest and latest['id'] != tx_id:
-                raise ValueError("只能修改最上層（最新）的交易紀錄")
-
-            cursor.execute('''
-                UPDATE stock_transactions
-                SET date = ?, shares = ?, price = ?, fee = ?, note = ?
-                WHERE id = ?
-            ''', (date, shares, price, fee, note, tx_id))
-
-            amount = 0
-            if t_type == "buy": amount = shares * price + fee
-            elif t_type == "sell": amount = shares * price - fee
-            elif t_type == "dividend": amount = price
-
-            if amount > 0 and t_type != "split":
-                # Update by stock_transaction_id (new records)
-                updated = cursor.execute('''
-                    UPDATE expenses SET amount = ?, date = ?
-                    WHERE user_id = ? AND stock_transaction_id = ?
-                ''', (amount, date, user_id, tx_id)).rowcount
-                # Fallback for legacy records linked by created_at
-                if not updated:
-                    cursor.execute('''
-                        UPDATE expenses SET amount = ?, date = ?
-                        WHERE user_id = ? AND category = '股票交易' AND created_at = ? AND stock_transaction_id IS NULL
-                    ''', (amount, date, user_id, created_at))
-
-            self._update_stock_avg(conn, stock_id)
-            return True
-
-    def update_prices(self, user_id: int):
-        stocks = self.get_by_user(user_id)
-        if not stocks: return True
-
-        # 建立原始代碼與 yfinance 代碼的對照表
-        symbol_map = {}
-        for s in stocks:
-            original = s['symbol']
-            # 若 ticker 只含數字或 5 碼數字開頭 → 視為台股
-            if original.isdigit() or re.match(r'^\d{5}', original):
-                symbol_map[original] = f"{original}.TW"
-            else:
-                symbol_map[original] = original
-
-        yf_symbols = list(set(symbol_map.values()))
-        
-        try:
-            # 一次 batch 載入所有 ticker
-            tickers = yf.Tickers(" ".join(yf_symbols))
-
-            with get_db() as conn:
-                cursor = conn.cursor()
-                updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                for s in stocks:
-                    orig_sym = s['symbol']
-                    yf_sym = symbol_map[orig_sym]
-                    
-                    price = None
-                    try:
-                        # 確保：yfinance 取價使用 info["regularMarketPrice"]
-                        info = tickers.tickers[yf_sym].info
-                        price = info.get("regularMarketPrice")
-                        
-                        # 備用方案
-                        if price is None:
-                            price = info.get("currentPrice") or info.get("previousClose")
-                        
-                        if price is not None and not math.isnan(float(price)):
-                            cursor.execute("UPDATE stocks SET current_price = ?, updated_at = ? WHERE id = ?", (float(price), updated_at, s['id']))
-                    except Exception as parse_e:
-                        print(f"Error parsing price for {orig_sym}: {parse_e}")
-                        continue
-            return True
-        except Exception as e:
-            print(f"Error updating prices: {e}")
+    def delete_transaction(self, tx_id: int) -> bool:
+        tx_rows = read_csv("stock_transactions.csv")
+        tx_id = str(tx_id)
+        tx = next((t for t in tx_rows if str(t.get("id")) == tx_id), None)
+        if not tx:
             return False
+        stock_id = tx["stock_id"]
+
+        latest = max(
+            (t for t in tx_rows if str(t.get("stock_id")) == str(stock_id)),
+            key=lambda t: (t.get("created_at", ""), t.get("id", "")),
+            default=None
+        )
+        if latest and str(latest.get("id")) != tx_id:
+            raise ValueError("只能刪除最上層（最新）的交易紀錄")
+
+        tx_rows = [t for t in tx_rows if str(t.get("id")) != tx_id]
+        write_csv("stock_transactions.csv", tx_rows, SCHEMA["stock_transactions.csv"])
+
+        expense_model.delete_where(stock_transaction_id=tx_id)
+
+        self._update_stock_avg(stock_id)
+        return True
+
+    def update_transaction(self, tx_id: int, date: str, shares: float, price: float,
+                           fee: float, note: str) -> bool:
+        shares = int(shares)
+        tx_rows = read_csv("stock_transactions.csv")
+        tx_id = str(tx_id)
+        tx = next((t for t in tx_rows if str(t.get("id")) == tx_id), None)
+        if not tx:
+            return False
+        stock_id = tx["stock_id"]
+        t_type = tx.get("type")
+
+        latest = max(
+            (t for t in tx_rows if str(t.get("stock_id")) == str(stock_id)),
+            key=lambda t: (t.get("created_at", ""), t.get("id", "")),
+            default=None
+        )
+        if latest and str(latest.get("id")) != tx_id:
+            raise ValueError("只能修改最上層（最新）的交易紀錄")
+
+        for t in tx_rows:
+            if str(t.get("id")) == tx_id:
+                t["date"] = date
+                t["shares"] = shares
+                t["price"] = price
+                t["fee"] = fee
+                t["note"] = note or ""
+                break
+        write_csv("stock_transactions.csv", tx_rows, SCHEMA["stock_transactions.csv"])
+
+        amount = 0
+        if t_type == "buy":    amount = shares * price + fee
+        elif t_type == "sell": amount = shares * price - fee
+        elif t_type == "dividend": amount = price
+
+        if amount > 0 and t_type != "split":
+            updated = expense_model.update_where(
+                match={"stock_transaction_id": tx_id},
+                updates={"amount": amount, "date": date}
+            )
+            if not updated:
+                expense_model.update_where(
+                    match={"category": "股票交易", "stock_transaction_id": ""},
+                    updates={"amount": amount, "date": date}
+                )
+
+        self._update_stock_avg(stock_id)
+        return True
+
+    def delete_position(self, stock_id: int) -> bool:
+        stock_id = str(stock_id)
+        tx_rows = read_csv("stock_transactions.csv")
+        if any(str(t.get("stock_id")) == stock_id for t in tx_rows):
+            return False
+        rows = read_csv("stocks.csv")
+        new_rows = [r for r in rows if str(r.get("id")) != stock_id]
+        if len(new_rows) == len(rows):
+            return False
+        write_csv("stocks.csv", new_rows, SCHEMA["stocks.csv"])
+        return True

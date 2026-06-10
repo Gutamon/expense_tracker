@@ -1,132 +1,181 @@
-from app.models.db import get_db
+from app.models.csv_store import read_csv, write_csv, next_id, SCHEMA
+
 
 class CategoryModel:
     DEFAULT_CATEGORIES = [
-        {"name": "餐飲", "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "生活"},
-        {"name": "交通", "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "生活"},
-        {"name": "娛樂", "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "休閒"},
-        {"name": "購物", "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "生活"},
-        {"name": "醫療", "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "健康"},
-        {"name": "住宿", "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "生活"},
-        {"name": "教育", "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "學習"},
-        {"name": "薪水", "type": "income", "is_asset": 1, "in_budget": 0, "group_name": "主要收入"},
-        {"name": "獎金", "type": "income", "is_asset": 1, "in_budget": 0, "group_name": "額外收入"},
-        {"name": "其他", "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "其他"}
+        {"name": "餐飲",  "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "生活"},
+        {"name": "交通",  "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "生活"},
+        {"name": "娛樂",  "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "休閒"},
+        {"name": "購物",  "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "生活"},
+        {"name": "醫療",  "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "健康"},
+        {"name": "住宿",  "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "生活"},
+        {"name": "教育",  "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "學習"},
+        {"name": "薪水",  "type": "income",  "is_asset": 1, "in_budget": 0, "group_name": "主要收入"},
+        {"name": "獎金",  "type": "income",  "is_asset": 1, "in_budget": 0, "group_name": "額外收入"},
+        {"name": "其他",  "type": "expense", "is_asset": 1, "in_budget": 1, "group_name": "其他"},
     ]
 
-    def create_defaults(self, user_id):
-        with get_db() as conn:
-            cursor = conn.cursor()
+    def create_defaults(self):
+        group_model = CategoryGroupModel()
+        group_model.create_defaults()
 
-            # 建立預設群組 (name, type)
-            default_groups = [
-                ("生活", "expense"), ("休閒", "expense"), ("健康", "expense"),
-                ("學習", "expense"), ("主要收入", "income"), ("額外收入", "income"), ("其他", "expense")
-            ]
-            for i, (gname, gtype) in enumerate(default_groups):
-                cursor.execute(
-                    "INSERT INTO category_groups (user_id, name, sort_order, type) VALUES (?, ?, ?, ?)",
-                    (user_id, gname, i, gtype)
-                )
-                
-            # 建立預設類別
-            for i, cat in enumerate(self.DEFAULT_CATEGORIES):
-                cursor.execute(
-                    "INSERT INTO categories (user_id, name, type, is_asset, in_budget, group_name, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                    (user_id, cat["name"], cat["type"], cat["is_asset"], cat["in_budget"], cat["group_name"], i)
-                )
+        rows = read_csv("categories.csv")
+        for i, cat in enumerate(self.DEFAULT_CATEGORIES):
+            new_id = next_id(rows)
+            rows.append({
+                "id": new_id,
+                "name": cat["name"],
+                "type": cat["type"],
+                "is_asset": cat["is_asset"],
+                "in_budget": cat["in_budget"],
+                "group_name": cat["group_name"],
+                "sort_order": i,
+                "monthly_budget": 0,
+            })
+        write_csv("categories.csv", rows, SCHEMA["categories.csv"])
 
-    def get_by_user(self, user_id):
-        with get_db() as conn:
-            rows = conn.execute("SELECT * FROM categories WHERE user_id = ? ORDER BY sort_order, id", (user_id,)).fetchall()
-            return [dict(r) for r in rows]
+    def get_all(self) -> list:
+        rows = read_csv("categories.csv")
+        rows.sort(key=lambda r: (int(r.get("sort_order") or 0), int(r.get("id") or 0)))
+        return rows
 
-    def create(self, user_id, name, type="expense", is_asset=1, in_budget=1, group_name=""):
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO categories (user_id, name, type, is_asset, in_budget, group_name, sort_order) VALUES (?, ?, ?, ?, ?, ?, 99)", 
-                (user_id, name, type, int(is_asset), int(in_budget), group_name)
-            )
-            return cursor.lastrowid
+    def create(self, name, type="expense", is_asset=1, in_budget=1, group_name="") -> int:
+        rows = read_csv("categories.csv")
+        new_id = next_id(rows)
+        rows.append({
+            "id": new_id,
+            "name": name,
+            "type": type,
+            "is_asset": int(is_asset),
+            "in_budget": int(in_budget),
+            "group_name": group_name,
+            "sort_order": 99,
+            "monthly_budget": 0,
+        })
+        write_csv("categories.csv", rows, SCHEMA["categories.csv"])
+        return new_id
 
-    def update(self, cat_id, user_id, name, type="expense", is_asset=1, in_budget=1, group_name=""):
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE categories SET name = ?, type = ?, is_asset = ?, in_budget = ?, group_name = ? WHERE id = ? AND user_id = ?", 
-                (name, type, int(is_asset), int(in_budget), group_name, cat_id, user_id)
-            )
-            return cursor.rowcount > 0
-            
-    def update_sort_orders(self, user_id, id_order_list):
-        with get_db() as conn:
-            cursor = conn.cursor()
-            for order, item_id in enumerate(id_order_list):
-                cursor.execute("UPDATE categories SET sort_order = ? WHERE id = ? AND user_id = ?", (order, item_id, user_id))
-            return True
+    def update(self, cat_id, name, type="expense", is_asset=1, in_budget=1, group_name="") -> bool:
+        rows = read_csv("categories.csv")
+        cat_id = str(cat_id)
+        for r in rows:
+            if str(r.get("id")) == cat_id:
+                r["name"] = name
+                r["type"] = type
+                r["is_asset"] = int(is_asset)
+                r["in_budget"] = int(in_budget)
+                r["group_name"] = group_name
+                write_csv("categories.csv", rows, SCHEMA["categories.csv"])
+                return True
+        return False
 
-    def delete(self, cat_id, user_id, replace_with_id=None):
-        with get_db() as conn:
-            cursor = conn.cursor()
-            if replace_with_id:
-                old_row = cursor.execute("SELECT name FROM categories WHERE id = ? AND user_id = ?", (cat_id, user_id)).fetchone()
-                new_row = cursor.execute("SELECT name FROM categories WHERE id = ? AND user_id = ?", (replace_with_id, user_id)).fetchone()
-                if old_row and new_row:
-                    cursor.execute("UPDATE expenses SET category = ? WHERE category = ? AND user_id = ?", (new_row['name'], old_row['name'], user_id))
+    def update_sort_orders(self, id_order_list) -> bool:
+        rows = read_csv("categories.csv")
+        order_map = {str(item_id): i for i, item_id in enumerate(id_order_list)}
+        for r in rows:
+            if str(r.get("id")) in order_map:
+                r["sort_order"] = order_map[str(r["id"])]
+        write_csv("categories.csv", rows, SCHEMA["categories.csv"])
+        return True
 
-            cursor.execute("DELETE FROM categories WHERE id = ? AND user_id = ?", (cat_id, user_id))
-            return cursor.rowcount > 0
+    def delete(self, cat_id, replace_with_id=None) -> bool:
+        rows = read_csv("categories.csv")
+        cat_id = str(cat_id)
+        old_name = next((r["name"] for r in rows if str(r.get("id")) == cat_id), None)
+        if old_name is None:
+            return False
 
-    def update_budget(self, cat_id, user_id, monthly_budget):
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE categories SET monthly_budget = ? WHERE id = ? AND user_id = ?", (float(monthly_budget), cat_id, user_id))
-            return cursor.rowcount > 0
+        if replace_with_id:
+            new_name = next((r["name"] for r in rows if str(r.get("id")) == str(replace_with_id)), None)
+            if new_name:
+                exp_rows = read_csv("expenses.csv")
+                for e in exp_rows:
+                    if e.get("category") == old_name:
+                        e["category"] = new_name
+                write_csv("expenses.csv", exp_rows, SCHEMA["expenses.csv"])
+
+        rows = [r for r in rows if str(r.get("id")) != cat_id]
+        write_csv("categories.csv", rows, SCHEMA["categories.csv"])
+        return True
+
+    def update_budget(self, cat_id, monthly_budget) -> bool:
+        rows = read_csv("categories.csv")
+        cat_id = str(cat_id)
+        for r in rows:
+            if str(r.get("id")) == cat_id:
+                r["monthly_budget"] = float(monthly_budget)
+                write_csv("categories.csv", rows, SCHEMA["categories.csv"])
+                return True
+        return False
+
 
 class CategoryGroupModel:
-    def get_by_user(self, user_id):
-        with get_db() as conn:
-            rows = conn.execute("SELECT * FROM category_groups WHERE user_id = ? ORDER BY sort_order, id", (user_id,)).fetchall()
-            return [dict(r) for r in rows]
-            
-    def create(self, user_id, name, type='expense'):
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO category_groups (user_id, name, sort_order, type) VALUES (?, ?, 99, ?)", (user_id, name, type))
-            return cursor.lastrowid
+    DEFAULT_GROUPS = [
+        ("生活", "expense"), ("休閒", "expense"), ("健康", "expense"),
+        ("學習", "expense"), ("主要收入", "income"), ("額外收入", "income"), ("其他", "expense"),
+    ]
 
-    def update(self, group_id, user_id, name, type=None):
-        with get_db() as conn:
-            cursor = conn.cursor()
-            old_row = cursor.execute("SELECT name FROM category_groups WHERE id = ? AND user_id = ?", (group_id, user_id)).fetchone()
-            if not old_row: return False
-            old_name = old_row["name"]
+    def create_defaults(self):
+        rows = read_csv("category_groups.csv")
+        for i, (gname, gtype) in enumerate(self.DEFAULT_GROUPS):
+            new_id = next_id(rows)
+            rows.append({"id": new_id, "name": gname, "sort_order": i, "type": gtype})
+        write_csv("category_groups.csv", rows, SCHEMA["category_groups.csv"])
 
-            if type is not None:
-                cursor.execute("UPDATE category_groups SET name = ?, type = ? WHERE id = ? AND user_id = ?", (name, type, group_id, user_id))
-            else:
-                cursor.execute("UPDATE category_groups SET name = ? WHERE id = ? AND user_id = ?", (name, group_id, user_id))
-            updated = cursor.rowcount > 0
+    def get_all(self) -> list:
+        rows = read_csv("category_groups.csv")
+        rows.sort(key=lambda r: (int(r.get("sort_order") or 0), int(r.get("id") or 0)))
+        return rows
 
-            if old_name != name:
-                cursor.execute("UPDATE categories SET group_name = ? WHERE group_name = ? AND user_id = ?", (name, old_name, user_id))
+    def create(self, name, type="expense") -> int:
+        rows = read_csv("category_groups.csv")
+        new_id = next_id(rows)
+        rows.append({"id": new_id, "name": name, "sort_order": 99, "type": type})
+        write_csv("category_groups.csv", rows, SCHEMA["category_groups.csv"])
+        return new_id
 
-            return updated
-            
-    def update_sort_orders(self, user_id, id_order_list):
-        with get_db() as conn:
-            cursor = conn.cursor()
-            for order, item_id in enumerate(id_order_list):
-                cursor.execute("UPDATE category_groups SET sort_order = ? WHERE id = ? AND user_id = ?", (order, item_id, user_id))
-            return True
-            
-    def delete(self, group_id, user_id):
-        with get_db() as conn:
-            cursor = conn.cursor()
-            # 刪除前先把底下的類別 group_name 設為未分類
-            old_row = cursor.execute("SELECT name FROM category_groups WHERE id = ? AND user_id = ?", (group_id, user_id)).fetchone()
-            if old_row:
-                cursor.execute("UPDATE categories SET group_name = '未分類' WHERE group_name = ? AND user_id = ?", (old_row["name"], user_id))
-            cursor.execute("DELETE FROM category_groups WHERE id = ? AND user_id = ?", (group_id, user_id))
-            return cursor.rowcount > 0
+    def update(self, group_id, name, type=None) -> bool:
+        rows = read_csv("category_groups.csv")
+        group_id = str(group_id)
+        old_name = None
+        for r in rows:
+            if str(r.get("id")) == group_id:
+                old_name = r["name"]
+                r["name"] = name
+                if type is not None:
+                    r["type"] = type
+                break
+        if old_name is None:
+            return False
+        write_csv("category_groups.csv", rows, SCHEMA["category_groups.csv"])
+
+        if old_name != name:
+            cat_rows = read_csv("categories.csv")
+            for c in cat_rows:
+                if c.get("group_name") == old_name:
+                    c["group_name"] = name
+            write_csv("categories.csv", cat_rows, SCHEMA["categories.csv"])
+        return True
+
+    def update_sort_orders(self, id_order_list) -> bool:
+        rows = read_csv("category_groups.csv")
+        order_map = {str(item_id): i for i, item_id in enumerate(id_order_list)}
+        for r in rows:
+            if str(r.get("id")) in order_map:
+                r["sort_order"] = order_map[str(r["id"])]
+        write_csv("category_groups.csv", rows, SCHEMA["category_groups.csv"])
+        return True
+
+    def delete(self, group_id) -> bool:
+        rows = read_csv("category_groups.csv")
+        group_id = str(group_id)
+        old_name = next((r["name"] for r in rows if str(r.get("id")) == group_id), None)
+        if old_name:
+            cat_rows = read_csv("categories.csv")
+            for c in cat_rows:
+                if c.get("group_name") == old_name:
+                    c["group_name"] = "未分類"
+            write_csv("categories.csv", cat_rows, SCHEMA["categories.csv"])
+        rows = [r for r in rows if str(r.get("id")) != group_id]
+        write_csv("category_groups.csv", rows, SCHEMA["category_groups.csv"])
+        return True

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>歡迎使用 · 帳本</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/globals.css') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0f0f11">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1.5rem; }
+
+    .ob-wrap {
+      width: 100%; max-width: 520px;
+    }
+
+    .ob-logo {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: .06rem;
+      margin-bottom: 0.5rem;
+    }
+    .ob-logo span { color: var(--accent); }
+
+    .ob-subtitle {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+
+    .ob-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .ob-card h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+    .ob-card p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.65rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: opacity .15s;
+    }
+    .btn:active { opacity: .75; }
+    .btn-accent { background: var(--accent); color: #111; width: 100%; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); width: 100%; }
+
+    .file-label {
+      display: block;
+      padding: 0.65rem 1rem;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+      cursor: pointer;
+      margin-bottom: 0.75rem;
+      transition: border-color .2s;
+    }
+    .file-label:hover { border-color: var(--accent); color: var(--accent); }
+
+    input[type="file"] { display: none; }
+
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 0.75rem 1.2rem; border-radius: 10px;
+      font-size: 0.85rem; opacity: 0; transition: opacity .3s;
+      pointer-events: none; max-width: 280px;
+    }
+    .toast.show { opacity: 1; }
+    .toast.error { border-color: var(--danger); color: var(--danger); }
+    .toast.success { border-color: var(--accent); color: var(--accent); }
+
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(0,0,0,0.2); border-top-color: #111;
+      border-radius: 50%; animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="ob-wrap">
+    <div class="ob-logo">帳 <span>·</span> 本</div>
+    <p class="ob-subtitle">請選擇您的使用方式</p>
+
+    <!-- Fresh Start -->
+    <div class="ob-card">
+      <h3>✦ 開始使用</h3>
+      <p>建立預設帳戶與類別，馬上開始記帳。進入應用程式後可在「設定管理」匯入舊有記帳資料。</p>
+      <button class="btn btn-accent" id="btn-fresh">開始使用</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    function toast(msg, type = '') {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    document.getElementById('btn-fresh').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-fresh');
+      btn.innerHTML = '<span class="spinner"></span> 建立中...';
+      btn.disabled = true;
+      const res = await fetch('/api/onboarding/fresh', { method: 'POST' });
+      if (res.ok) window.location.href = '/';
+      else { toast('建立失敗，請重試', 'error'); btn.textContent = '開始使用'; btn.disabled = false; }
+    });
+
+    document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+    var _lt = 0;
+    document.addEventListener('touchend', e => { var n = Date.now(); if (n - _lt < 300) e.preventDefault(); _lt = n; }, { passive: false });
+  </script>
+</body>
+</html>

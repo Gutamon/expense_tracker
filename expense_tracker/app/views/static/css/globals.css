@@ -24,7 +24,7 @@ html {
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Noto Sans TC', sans-serif;
+  font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
   font-weight: 300;
   min-height: 100vh;
   overflow-x: hidden;
@@ -35,4 +35,5 @@ body {
 input, textarea, select {
   user-select: text;
   -webkit-user-select: text;
+  font-size: max(1rem, 16px);
 }

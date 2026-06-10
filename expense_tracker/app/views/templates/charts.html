@@ -3,7 +3,7 @@
 {% block title %}圖表分析 · 記帳本{% endblock %}
 
 {% block head %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
 <style>
   .page-title {
     font-size: 1.4rem;
