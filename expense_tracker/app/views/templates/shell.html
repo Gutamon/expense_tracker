@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>記帳本</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/globals.css') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0f0f11">
+  <style>
+    html, body { height: 100%; overflow: hidden; }
+
+    /* ── Desktop top header ── */
+    .shell-header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 56px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      z-index: 20;
+    }
+    .logo { font-size: 1.1rem; font-weight: 700; letter-spacing: .04rem; }
+    .logo span { color: var(--accent); }
+    .top-nav { display: flex; align-items: center; }
+    .top-nav button {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 6px 14px;
+      border-radius: 6px;
+      transition: color .2s;
+    }
+    .top-nav button:hover { color: var(--text); }
+    .top-nav button.active { color: var(--accent); }
+
+    /* ── Iframe containers ── */
+    .tab-frame {
+      display: none;
+      position: fixed;
+      top: 56px; left: 0; right: 0;
+      width: 100%;
+      height: calc(100% - 56px);
+      border: none;
+      background: var(--bg);
+    }
+    .tab-frame.active { display: block; }
+
+    /* ── Mobile bottom nav (island) ── */
+    .bottom-nav {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 30;
+      padding: 0 16px calc(12px + env(safe-area-inset-bottom)) 16px;
+      pointer-events: none;
+    }
+    .bottom-nav__inner {
+      pointer-events: all;
+      display: flex;
+      align-items: stretch;
+      width: 100%;
+      background: rgba(18, 18, 22, 0.72);
+      backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      height: 64px;
+      overflow: hidden;
+      box-shadow: 0 4px 32px rgba(0, 0, 0, 0.50), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+    .bottom-nav__item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.6rem;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: color .18s;
+      -webkit-tap-highlight-color: transparent;
+      min-width: 0;
+    }
+    .bottom-nav__item svg {
+      width: 20px; height: 20px;
+      flex-shrink: 0;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .bottom-nav__item span { display: block; white-space: nowrap; }
+    .bottom-nav__item.active { color: var(--accent); }
+    .bottom-nav__item.active svg { stroke: var(--accent); }
+
+    /* ── RWD ── */
+    @media (max-width: 768px) {
+      .shell-header { display: none; }
+      .bottom-nav { display: flex; }
+      .tab-frame {
+        top: 0;
+        height: 100%;
+      }
+    }
+    @media (min-width: 769px) {
+      .shell-header { display: flex; }
+      .bottom-nav { display: none; }
+      .tab-frame { top: 56px; height: calc(100% - 56px); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Desktop top header -->
+  <header class="shell-header">
+    <div class="logo">帳 <span>·</span> 本</div>
+    <nav class="top-nav">
+      <button id="top-home"     onclick="switchTab('home')">記帳專區</button>
+      <button id="top-charts"   onclick="switchTab('charts')">圖表分析</button>
+      <button id="top-settings" onclick="switchTab('settings')">設定管理</button>
+      <button id="top-stocks"   onclick="switchTab('stocks')">股票專區</button>
+      <button id="top-debts"    onclick="switchTab('debts')">負債管理</button>
+    </nav>
+  </header>
+
+  <!-- Iframe containers (lazy-loaded) -->
+  <iframe id="frame-home"     class="tab-frame"></iframe>
+  <iframe id="frame-charts"   class="tab-frame"></iframe>
+  <iframe id="frame-stocks"   class="tab-frame"></iframe>
+  <iframe id="frame-debts"    class="tab-frame"></iframe>
+  <iframe id="frame-settings" class="tab-frame"></iframe>
+
+  <!-- Mobile bottom nav (island) -->
+  <nav class="bottom-nav" aria-label="主選單">
+    <div class="bottom-nav__inner">
+
+      <button class="bottom-nav__item" id="nav-home" onclick="switchTab('home')">
+        <svg viewBox="0 0 24 24">
+          <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/>
+          <path d="M9 21V12h6v9"/>
+        </svg>
+        <span>記帳</span>
+      </button>
+
+      <button class="bottom-nav__item" id="nav-charts" onclick="switchTab('charts')">
+        <svg viewBox="0 0 24 24">
+          <rect x="3" y="12" width="4" height="9" rx="1"/>
+          <rect x="10" y="7" width="4" height="14" rx="1"/>
+          <rect x="17" y="3" width="4" height="18" rx="1"/>
+        </svg>
+        <span>圖表</span>
+      </button>
+
+      <button class="bottom-nav__item" id="nav-stocks" onclick="switchTab('stocks')">
+        <svg viewBox="0 0 24 24">
+          <polyline points="3 17 8 12 13 15 21 7"/>
+          <polyline points="16 7 21 7 21 12"/>
+        </svg>
+        <span>股票</span>
+      </button>
+
+      <button class="bottom-nav__item" id="nav-debts" onclick="switchTab('debts')">
+        <svg viewBox="0 0 24 24">
+          <rect x="2" y="6" width="20" height="13" rx="2"/>
+          <path d="M2 10h20"/>
+          <path d="M6 15h4"/>
+        </svg>
+        <span>負債</span>
+      </button>
+
+      <button class="bottom-nav__item" id="nav-settings" onclick="switchTab('settings')">
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        <span>設定</span>
+      </button>
+
+    </div>
+  </nav>
+
+  <script>
+    // Pinch-zoom + double-tap lock (Chrome Android ignores viewport meta alone)
+    document.addEventListener('touchmove', function(e) {
+      if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+    var _lastTap = 0;
+    document.addEventListener('touchend', function(e) {
+      var now = Date.now();
+      if (now - _lastTap < 300) e.preventDefault();
+      _lastTap = now;
+    }, { passive: false });
+
+    // ── Tab switching ──────────────────────────────────────────────────────────
+    var SRCS = {
+      home:     '/home?embed=1',
+      charts:   '/charts?embed=1',
+      stocks:   '/stocks?embed=1',
+      debts:    '/debts?embed=1',
+      settings: '/settings?embed=1',
+    };
+
+    var activeTab = null;
+
+    function switchTab(name) {
+      if (activeTab === name) return;
+
+      // Deactivate previous
+      if (activeTab) {
+        document.getElementById('frame-' + activeTab).classList.remove('active');
+        document.getElementById('nav-' + activeTab).classList.remove('active');
+        document.getElementById('top-' + activeTab).classList.remove('active');
+      }
+
+      // Lazy-load iframe on first visit
+      var frame = document.getElementById('frame-' + name);
+      if (!frame.getAttribute('src')) {
+        frame.src = SRCS[name];
+      }
+      frame.classList.add('active');
+
+      // Mark nav buttons active
+      document.getElementById('nav-' + name).classList.add('active');
+      document.getElementById('top-' + name).classList.add('active');
+
+      activeTab = name;
+      try { sessionStorage.setItem('shell_tab', name); } catch(e) {}
+    }
+
+    function reloadTab(name) {
+      var frame = document.getElementById('frame-' + name);
+      if (frame && frame.getAttribute('src')) {
+        frame.src = frame.src;
+      }
+    }
+
+    // Restore last tab (or default to home)
+    switchTab(function() {
+      try { return sessionStorage.getItem('shell_tab') || 'home'; } catch(e) { return 'home'; }
+    }());
+  </script>
+</body>
+</html>

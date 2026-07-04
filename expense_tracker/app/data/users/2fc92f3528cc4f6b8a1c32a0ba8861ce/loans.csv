@@ -1,0 +1,2 @@
+﻿id,name,type,principal,remaining,interest_rate,start_date,due_date,account_id,linked_account_id,status,note,created_at
+1,手機,borrow,1000.0,1000.0,0.5,2026-05-01,,1,6,active,,2026-07-05 00:54:17

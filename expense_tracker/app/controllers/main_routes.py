@@ -2,28 +2,50 @@ from flask import Blueprint, render_template, request, jsonify, abort, redirect
 from app.models.expense import ExpenseModel
 from app.models.category import CategoryModel
 from app.models.account import AccountModel
+from app.models.debt import DebtModel
 from app.models import csv_store
+from app.models import rates as rates_model
 from datetime import datetime
 
 main_bp = Blueprint("main", __name__)
 expense_model = ExpenseModel()
 category_model = CategoryModel()
 account_model = AccountModel()
+debt_model = DebtModel()
 
 
 @main_bp.route("/")
+def shell():
+    if csv_store.is_first_run():
+        # Render directly — avoid a redirect that would create a second device
+        # before the browser stores the cookie from the first response.
+        return render_template("onboarding.html")
+    return render_template("shell.html")
+
+
+@main_bp.route("/home")
 def index():
     if csv_store.is_first_run():
         return redirect("/onboarding")
 
     expenses = expense_model.get_all()
     categories = category_model.get_all()
+    accounts = account_model.get_all()
+    account_map = {a["id"]: a for a in accounts}
 
     cat_dict = {c["name"]: c for c in categories}
 
     total_balance = 0
     budget_used = 0
     account_balances = {}
+
+    # Seed each account's balance from its opening_balance
+    for acc in accounts:
+        ob = float(acc.get("opening_balance") or 0)
+        if ob:
+            account_balances[acc["id"]] = ob
+        if int(acc.get("is_asset") or 0):
+            total_balance += ob
 
     for e in expenses:
         cat_info = cat_dict.get(e["category"], {})
@@ -53,14 +75,54 @@ def index():
             account_balances[acc_id] -= float(e.get("amount") or 0)
             account_balances[to_acc_id] += float(e.get("to_amount") or e.get("amount") or 0)
 
+    # Convert each account's balance into TWD for the proportion bar / totals.
+    rates = rates_model.get_rates()
+    account_balances_twd = {}
+    for acc in accounts:
+        cur = acc.get("currency") or "TWD"
+        account_balances_twd[acc["id"]] = rates_model.to_twd(
+            account_balances.get(acc["id"], 0), cur, rates)
+
+    # Initial "所選資產總額" (all accounts selected), in TWD. The client recomputes
+    # this from the account filters, but rendering the converted value avoids a flash.
+    total_balance = sum(account_balances_twd.values())
+
+    # Loan net adjustment: lent-but-unreturned is a receivable asset (+),
+    # borrowed-but-unrepaid is a liability (-). Both include accrued interest.
+    loans = debt_model.get_loans()
+    lend_net = sum(
+        float(l.get("remaining") or 0) + float(l.get("accrued_interest") or 0)
+        for l in loans if l.get("type") == "lend" and l.get("status") == "active"
+    )
+    borrow_net = sum(
+        float(l.get("remaining") or 0) + float(l.get("accrued_interest") or 0)
+        for l in loans if l.get("type") == "borrow" and l.get("status") == "active"
+    )
+    loan_net = round(lend_net - borrow_net, 2)
+    total_balance = round(total_balance + loan_net, 2)
+
     grouped_categories = {}
     for c in categories:
         g = c.get("group_name", "未分類") or "未分類"
         grouped_categories.setdefault(g, []).append(c)
 
     monthly_budget = float(csv_store.get_setting("monthly_budget", 0) or 0)
-    accounts = account_model.get_all()
-    account_map = {a["id"]: a for a in accounts}
+
+    # Collect linked account IDs from stocks and loans — these should not appear
+    # as options in the expense-entry dropdowns.
+    linked_ids = set()
+    for r in csv_store.read_csv("stocks.csv"):
+        lid = int(r.get("linked_account_id") or 0)
+        if lid:
+            linked_ids.add(lid)
+    for r in csv_store.read_csv("loans.csv"):
+        lid = int(r.get("linked_account_id") or 0)
+        if lid:
+            linked_ids.add(lid)
+    entry_accounts = [a for a in accounts if a["id"] not in linked_ids]
+    cc_account_ids = [a["id"] for a in accounts
+                      if a.get("sub_type") == "信用卡"
+                      or (a.get("type") == "liability" and not a.get("sub_type"))]
 
     filtered_grouped_categories = {}
     for g, cats in grouped_categories.items():
@@ -77,10 +139,16 @@ def index():
         total_balance=total_balance,
         budget_used=budget_used,
         monthly_budget=monthly_budget,
-        accounts=accounts,
+        accounts=entry_accounts,
         all_accounts=accounts,
         account_map=account_map,
         account_balances=account_balances,
+        account_balances_twd=account_balances_twd,
+        rates=rates,
+        rates_updated_at=rates_model.get_updated_at(),
+        cc_account_ids=cc_account_ids,
+        lend_net=lend_net,
+        borrow_net=borrow_net,
         username="",
     )
 
@@ -95,6 +163,11 @@ def charts():
     account_map = {a["id"]: a for a in accounts}
 
     account_balances = {}
+    for acc in accounts:
+        ob = float(acc.get("opening_balance") or 0)
+        if ob:
+            account_balances[acc["id"]] = ob
+
     for e in expenses:
         cat_info = cat_dict.get(e["category"], {})
         is_asset = int(cat_info.get("is_asset", 1) or 1)
@@ -129,6 +202,37 @@ def update_budget():
     if "monthly_budget" not in data: abort(400, description="缺少必要欄位")
     csv_store.set_setting("monthly_budget", float(data["monthly_budget"]))
     return jsonify({"success": True})
+
+
+# ── Exchange rates ────────────────────────────────────────────────────────────
+
+@main_bp.route("/api/rates", methods=["GET"])
+def api_rates():
+    return jsonify({"rates": rates_model.get_rates(),
+                    "updated_at": rates_model.get_updated_at()})
+
+
+@main_bp.route("/api/rates/refresh", methods=["POST"])
+def api_rates_refresh():
+    return jsonify(rates_model.refresh_rates())
+
+
+# ── Balance correction ────────────────────────────────────────────────────────
+
+@main_bp.route("/api/accounts/<account_id>/adjust-balance", methods=["POST"])
+def api_adjust_balance(account_id):
+    """Set an account's actual balance by nudging opening_balance (not income/expense)."""
+    data = request.get_json(force=True)
+    if "target" not in data:
+        abort(400, description="缺少目標餘額")
+    try:
+        target = float(data["target"])
+    except (ValueError, TypeError):
+        abort(400, description="目標餘額格式錯誤")
+    delta = account_model.adjust_opening_balance(account_id, target)
+    if delta is None:
+        abort(404, description="找不到此帳戶")
+    return jsonify({"success": True, "delta": delta, "target": target})
 
 
 @main_bp.route("/api/expenses", methods=["GET"])
@@ -279,7 +383,9 @@ def api_monthly():
 
 @main_bp.route("/api/charts/category")
 def api_category():
-    return jsonify(expense_model.get_category_summary())
+    year = request.args.get("year", type=int)
+    month = request.args.get("month", type=int)
+    return jsonify(expense_model.get_category_summary(year=year, month=month))
 
 
 @main_bp.app_errorhandler(400)

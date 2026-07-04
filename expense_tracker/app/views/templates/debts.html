@@ -4,50 +4,64 @@
 
 {% block head %}
 <style>
-  /* ── Summary ── */
-  .summary-card {
+  /* ── Per-Tab Summary ── */
+  .tab-summary {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 24px 28px;
-    margin-bottom: 24px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
     gap: 16px;
   }
-  .summary-stats { display: flex; gap: 32px; flex-wrap: wrap; }
-  .s-item { display: flex; flex-direction: column; gap: 5px; }
-  .s-label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
-  .s-value { font-size: 1.4rem; font-weight: 700; font-family: 'DM Mono', monospace; }
-  .s-value.danger { color: var(--danger); }
-  .s-value.accent { color: var(--accent); }
-  .s-value.muted { color: var(--muted); }
 
-  /* ── Section Tabs ── */
-  .debt-tabs {
+  .summary-stats {
     display: flex;
-    gap: 8px;
-    margin-bottom: 24px;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 12px;
+    gap: 32px;
+    flex-wrap: wrap;
   }
-  .debt-tab {
-    background: transparent;
-    border: none;
+
+  .s-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .s-label {
+    font-size: .75rem;
     color: var(--muted);
-    font-family: inherit;
-    font-size: .95rem;
-    cursor: pointer;
-    padding: 7px 16px;
-    border-radius: 8px;
-    transition: all .2s;
+    text-transform: uppercase;
+    letter-spacing: .05em;
   }
-  .debt-tab.active { color: #111; background: var(--accent); font-weight: 500; }
+
+  .s-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .s-value.danger {
+    color: var(--danger);
+  }
+
+  .s-value.accent {
+    color: var(--accent);
+  }
+
+  .s-value.muted {
+    color: var(--muted);
+  }
+
 
   /* ── Debt List & Card ── */
-  .debt-list { display: grid; gap: 20px; }
+  .debt-list {
+    display: grid;
+    gap: 20px;
+  }
+
   .debt-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -57,8 +71,16 @@
     flex-direction: column;
     gap: 16px;
   }
-  .debt-card.closed { opacity: .55; filter: grayscale(60%); }
-  .debt-card.closed:hover { opacity: .8; filter: grayscale(20%); }
+
+  .debt-card.closed {
+    opacity: .55;
+    filter: grayscale(60%);
+  }
+
+  .debt-card.closed:hover {
+    opacity: .8;
+    filter: grayscale(20%);
+  }
 
   .debt-header {
     display: flex;
@@ -66,14 +88,22 @@
     align-items: flex-start;
     gap: 12px;
   }
+
   .debt-title-row {
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
   }
-  .debt-name { font-size: 1.1rem; font-weight: 600; }
-  .debt-icon { font-size: 1.3rem; }
+
+  .debt-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  .debt-icon {
+    font-size: 1.3rem;
+  }
 
   .debt-stats {
     display: flex;
@@ -81,28 +111,94 @@
     flex-wrap: wrap;
     align-items: flex-start;
   }
-  .stat-item { display: flex; flex-direction: column; gap: 3px; }
-  .stat-label { font-size: .7rem; color: var(--muted); }
-  .stat-value { font-family: 'DM Mono', monospace; font-size: .95rem; }
-  .stat-value.danger { color: var(--danger); }
-  .stat-value.accent { color: var(--accent); }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .stat-label {
+    font-size: .7rem;
+    color: var(--muted);
+  }
+
+  .stat-value {
+    font-family: 'DM Mono', monospace;
+    font-size: .95rem;
+  }
+
+  .stat-value.danger {
+    color: var(--danger);
+  }
+
+  .stat-value.accent {
+    color: var(--accent);
+  }
+
+  /* ── Loan Formula ── */
+  .loan-formula {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .formula-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+
+  .formula-value {
+    font-family: 'DM Mono', monospace;
+    font-size: .95rem;
+  }
+
+  .formula-label {
+    font-size: .68rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .formula-op {
+    font-size: 1rem;
+    color: var(--muted);
+    padding-bottom: 18px;
+    flex-shrink: 0;
+  }
+
+  .formula-eq {
+    font-size: 1rem;
+    color: var(--muted);
+    padding-bottom: 18px;
+    flex-shrink: 0;
+  }
 
   /* ── Progress Bar ── */
   .progress-bar {
     width: 100%;
     height: 5px;
-    background: rgba(255,255,255,.07);
+    background: rgba(255, 255, 255, .07);
     border-radius: 3px;
     overflow: hidden;
   }
+
   .progress-fill {
     height: 100%;
     border-radius: 3px;
     background: var(--accent);
     transition: width .4s ease;
   }
-  .progress-fill.danger { background: var(--danger); }
-  .progress-fill.warning { background: #f0a84a; }
+
+  .progress-fill.danger {
+    background: var(--danger);
+  }
+
+  .progress-fill.warning {
+    background: #f0a84a;
+  }
 
   /* ── Actions row ── */
   .debt-actions {
@@ -113,8 +209,9 @@
     padding-top: 14px;
     flex-wrap: wrap;
   }
+
   .btn-action {
-    background: rgba(255,255,255,.05);
+    background: rgba(255, 255, 255, .05);
     border: 1px solid transparent;
     color: var(--text);
     padding: 6px 12px;
@@ -124,9 +221,20 @@
     font-family: inherit;
     transition: all .2s;
   }
-  .btn-action:hover { background: rgba(255,255,255,.1); border-color: var(--border); }
-  .btn-action.primary { background: rgba(200,240,74,.1); color: var(--accent); }
-  .btn-action.primary:hover { background: rgba(200,240,74,.18); }
+
+  .btn-action:hover {
+    background: rgba(255, 255, 255, .1);
+    border-color: var(--border);
+  }
+
+  .btn-action.primary {
+    background: rgba(200, 240, 74, .1);
+    color: var(--accent);
+  }
+
+  .btn-action.primary:hover {
+    background: rgba(200, 240, 74, .18);
+  }
 
   .tx-toggle {
     margin-left: auto;
@@ -141,25 +249,74 @@
     padding: 4px 0;
     font-family: inherit;
   }
-  .tx-toggle:hover { color: var(--accent); }
+
+  .tx-toggle:hover {
+    color: var(--accent);
+  }
 
   /* ── Transaction list ── */
-  .tx-container { display: none; border-top: 1px dashed var(--border); padding-top: 12px; }
-  .tx-container.open { display: block; }
+  .tx-container {
+    display: none;
+    border-top: 1px dashed var(--border);
+    padding-top: 12px;
+  }
+
+  .tx-container.open {
+    display: block;
+  }
+
   .tx-item {
     display: flex;
     flex-direction: column;
     gap: 4px;
     padding: 10px 0;
-    border-bottom: 1px solid rgba(255,255,255,.05);
+    border-bottom: 1px solid rgba(255, 255, 255, .05);
   }
-  .tx-item:last-child { border-bottom: none; }
-  .tx-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-  .tx-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: .85rem; min-width: 0; }
-  .tx-date { color: var(--muted); white-space: nowrap; font-family: 'DM Mono', monospace; font-size: .8rem; }
-  .tx-amount { font-family: 'DM Mono', monospace; font-size: .85rem; text-align: right; flex-shrink: 0; }
-  .tx-note { font-size: .75rem; color: var(--muted); padding: 0 4px; }
-  .tx-btns { display: flex; gap: 6px; }
+
+  .tx-item:last-child {
+    border-bottom: none;
+  }
+
+  .tx-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .tx-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: .85rem;
+    min-width: 0;
+  }
+
+  .tx-date {
+    color: var(--muted);
+    white-space: nowrap;
+    font-family: 'DM Mono', monospace;
+    font-size: .8rem;
+  }
+
+  .tx-amount {
+    font-family: 'DM Mono', monospace;
+    font-size: .85rem;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .tx-note {
+    font-size: .75rem;
+    color: var(--muted);
+    padding: 0 4px;
+  }
+
+  .tx-btns {
+    display: flex;
+    gap: 6px;
+  }
 
   /* ── Icon buttons ── */
   .icon-btn {
@@ -178,8 +335,16 @@
     font-family: inherit;
     flex-shrink: 0;
   }
-  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .icon-btn.del:hover { border-color: var(--danger); color: var(--danger); }
+
+  .icon-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .icon-btn.del:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
 
   /* ── Badges ── */
   .badge {
@@ -189,131 +354,294 @@
     font-weight: 500;
     white-space: nowrap;
   }
-  .badge.borrow { background: rgba(255,95,95,.12); color: var(--danger); }
-  .badge.lend   { background: rgba(200,240,74,.12); color: var(--accent); }
-  .badge.closed { background: rgba(107,107,120,.12); color: var(--muted); }
-  .badge.cc     { background: rgba(74,138,240,.12); color: #4a8af0; }
+
+  .badge.borrow {
+    background: rgba(255, 95, 95, .12);
+    color: var(--danger);
+  }
+
+  .badge.lend {
+    background: rgba(200, 240, 74, .12);
+    color: var(--accent);
+  }
+
+  .badge.closed {
+    background: rgba(107, 107, 120, .12);
+    color: var(--muted);
+  }
+
+  .badge.cc {
+    background: rgba(74, 138, 240, .12);
+    color: #4a8af0;
+  }
 
   /* ── Modals ── */
-  .btn { padding: 10px 16px; border: none; border-radius: 8px; font-family: inherit; font-size: .9rem; font-weight: 500; cursor: pointer; background: var(--accent); color: #111; }
-  .btn:hover { opacity: .9; }
-  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
-  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: .9rem;
+    font-weight: 500;
+    cursor: pointer;
+    background: var(--accent);
+    color: #111;
+  }
+
+  .btn:hover {
+    opacity: .9;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
 
   .modal-overlay {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,.8);
-    display: flex; justify-content: center; align-items: center;
-    z-index: 100; opacity: 0; pointer-events: none; transition: opacity .2s;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, .8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+    padding: 24px 20px;
+    padding-top: calc(24px + env(safe-area-inset-top));
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
   }
-  .modal-overlay.open { opacity: 1; pointer-events: auto; }
+
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .modal {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    width: 440px;
-    max-width: 92vw;
-    padding: 32px;
-    box-shadow: 0 20px 40px rgba(0,0,0,.5);
-    max-height: 90vh;
+    width: 100%;
+    max-width: 440px;
+    padding: 32px 32px 0;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, .5);
+    max-height: 85vh;
     overflow-y: auto;
+    overflow-x: hidden;
   }
-  .modal h3 { font-size: 1.1rem; margin-bottom: 24px; font-weight: 500; }
-  .field { margin-bottom: 16px; }
-  .field label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
-  .field input, .field select, .field textarea {
-    width: 100%; background: var(--bg); border: 1px solid var(--border);
-    border-radius: 8px; color: var(--text); padding: 10px 14px;
-    outline: none; font-family: inherit; box-sizing: border-box;
+
+  .modal h3 {
+    font-size: 1.1rem;
+    margin-bottom: 24px;
+    font-weight: 500;
   }
-  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
-  .field textarea { resize: vertical; min-height: 60px; }
-  .modal-actions { display: flex; gap: 12px; margin-top: 24px; }
-  .modal-actions button { flex: 1; padding: 11px; }
+
+  .field {
+    margin-bottom: 16px;
+    min-width: 0;
+  }
+
+  .field label {
+    display: block;
+    font-size: .8rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 14px;
+    outline: none;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    border-color: var(--accent);
+  }
+
+  .field textarea {
+    resize: vertical;
+    min-height: 60px;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 12px;
+    position: sticky;
+    bottom: 0;
+    margin: 0 -32px;
+    padding: 16px 32px 32px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+
+  .modal-actions button {
+    flex: 1;
+    padding: 11px;
+  }
 
   .segmented-control {
-    display: flex; background: #0f0f11; border: 1px solid var(--border);
-    border-radius: 8px; padding: 4px; margin-bottom: 16px;
+    display: flex;
+    background: #0f0f11;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 16px;
   }
+
   .segmented-control label {
-    flex: 1; text-align: center; padding: 8px 0; border-radius: 6px;
-    cursor: pointer; font-size: .85rem; font-weight: 500; color: var(--muted); transition: all .2s;
+    flex: 1;
+    text-align: center;
+    padding: 8px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: .85rem;
+    font-weight: 500;
+    color: var(--muted);
+    transition: all .2s;
   }
-  .segmented-control input[type="radio"] { display: none; }
-  .segmented-control input[type="radio"]:checked + label {
-    background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.5);
+
+  .segmented-control input[type="radio"] {
+    display: none;
+  }
+
+  .segmented-control input[type="radio"]:checked+label {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
   }
 
   /* ── Closed loans section toggle ── */
   .closed-section-header {
-    display: flex; align-items: center; gap: 10px;
-    padding: 14px 0; cursor: pointer; color: var(--muted); font-size: .85rem;
-    border-top: 1px solid var(--border); margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 0;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: .85rem;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
   }
-  .closed-section-header:hover { color: var(--text); }
-  #closed-loans-list { display: none; }
-  #closed-loans-list.open { display: grid; gap: 20px; padding-top: 16px; }
+
+  .closed-section-header:hover {
+    color: var(--text);
+  }
+
+  #closed-loans-list {
+    display: none;
+  }
+
+  #closed-loans-list.open {
+    display: grid;
+    gap: 20px;
+    padding-top: 16px;
+  }
 
   /* ── Empty state ── */
   .empty-state {
-    text-align: center; padding: 60px 20px; color: var(--muted); font-size: .9rem;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-size: .9rem;
   }
-  .empty-state .e-icon { font-size: 2.5rem; margin-bottom: 12px; }
 
-  /* ── Toast ── */
-  #toast {
-    position: fixed; bottom: 24px; right: 24px;
-    background: var(--accent); color: #111;
-    border-radius: 8px; padding: 12px 20px;
-    font-size: .85rem; font-weight: 500;
-    opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 200;
+  .empty-state .e-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
   }
-  #toast.show { opacity: 1; }
+
 
   @media (max-width: 768px) {
-    .summary-card { flex-direction: column; align-items: flex-start; }
-    .summary-stats { gap: 20px; }
-    .debt-stats { gap: 14px; }
-    .modal { padding: 24px; }
+    .tab-summary {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .summary-stats {
+      gap: 20px;
+    }
+
+    .debt-stats {
+      gap: 14px;
+    }
+
+    .modal {
+      padding: 24px 20px 0;
+    }
+
+    .modal-actions {
+      margin: 0 -20px;
+      padding: 14px 20px 24px;
+    }
+
+    #toast {
+      bottom: calc(76px + env(safe-area-inset-bottom) + 16px);
+    }
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Summary -->
-<div class="summary-card">
-  <div class="summary-stats">
-    <div class="s-item">
-      <span class="s-label">信用卡未繳</span>
-      <span class="s-value danger">NT$ {{ "%.0f"|format(total_cc_outstanding) }}</span>
-    </div>
-    <div class="s-item">
-      <span class="s-label">借入未還</span>
-      <span class="s-value danger">NT$ {{ "%.0f"|format(total_loan_owed) }}</span>
-    </div>
-    <div class="s-item">
-      <span class="s-label">借出未收</span>
-      <span class="s-value accent">NT$ {{ "%.0f"|format(total_loan_receivable) }}</span>
-    </div>
-  </div>
-  <button class="btn" onclick="openLoanModal()">＋ 新增借貸</button>
-</div>
+{% set active_loans_count = loans | selectattr('status', 'equalto', 'active') | list | length %}
 
 <!-- Section Tabs -->
-<div class="debt-tabs">
-  <button class="debt-tab active" id="tab-cc" onclick="switchTab('cc')">💳 信用卡</button>
-  <button class="debt-tab" id="tab-loans" onclick="switchTab('loans')">📋 借貸管理</button>
+<div class="page-tabs">
+  <button class="page-tab active" id="tab-cc" onclick="switchTab('cc')">💳 信用卡{% if credit_cards %} ({{
+    credit_cards|length }}張){% endif %}</button>
+  <button class="page-tab" id="tab-loans" onclick="switchTab('loans')">📋 借貸{% if active_loans_count %} ({{
+    active_loans_count }}筆){% endif %}</button>
 </div>
 
 <!-- ── Credit Card Section ── -->
 <div id="section-cc">
+  <div class="tab-summary">
+    <div class="summary-stats">
+      <div class="s-item">
+        <span class="s-label">信用卡未繳總額</span>
+        <span class="s-value danger">NT$ {{ "%.0f"|format(total_cc_outstanding) }}</span>
+      </div>
+      <div class="s-item">
+        <span class="s-label">本期新增消費</span>
+        <span class="s-value">NT$ {{ "%.0f"|format(total_cycle_charges) }}</span>
+      </div>
+      <div class="s-item">
+        <span class="s-label">持卡數</span>
+        <span class="s-value muted">{{ credit_cards|length }} 張</span>
+      </div>
+    </div>
+    <button class="btn" onclick="openCCModal()">＋ 新增信用卡</button>
+  </div>
   {% if credit_cards %}
   <div class="debt-list">
     {% for card in credit_cards %}
     {% set limit = card.get('credit_limit', 0)|float %}
-    {% set bal = card.balance|float %}
+    {% set bal = card.total_outstanding|float %}
+    {% set due = card.statement_due|float %}
     {% set avail = limit - bal if limit > 0 else 0 %}
     {% set pct = [(bal / limit * 100)|int, 100]|min if limit > 0 else 0 %}
+    {% set status_map = {'paid_off': ['已繳清', 'lend'], 'current_clear': ['本期已繳清', 'lend'], 'min_paid': ['已繳最低', 'cc'],
+    'partial': ['部分繳款', 'cc'], 'unpaid': ['未繳', 'borrow']} %}
+    {% set st = status_map.get(card.status, ['未繳', 'borrow']) %}
     <div class="debt-card" id="cc-card-{{ card.id }}">
       <div class="debt-header">
         <div>
@@ -321,14 +649,32 @@
             <span class="debt-icon">{{ card.icon }}</span>
             <span class="debt-name">{{ card.name }}</span>
             <span class="badge cc">信用卡</span>
-            {% if card.get('currency', 'TWD') != 'TWD' %}<span class="badge" style="background:rgba(74,138,240,.1);color:#4a8af0;">{{ card.currency }}</span>{% endif %}
+            <span class="badge {{ st[1] }}">{{ st[0] }}</span>
+            {% if card.get('currency', 'TWD') != 'TWD' %}<span class="badge"
+              style="background:rgba(74,138,240,.1);color:#4a8af0;">{{ card.currency }}</span>{% endif %}
           </div>
         </div>
+        <button class="icon-btn"
+          onclick="openCCModal({{ card.id }}, '{{ card.name }}', {{ card.get('billing_start_day', 1) }}, {{ card.get('credit_limit', 0)|float }}, {{ card.get('payment_due_day', 0) }}, {{ card.get('min_payment_pct', 10)|float }}, {{ card.get('min_payment_floor', 1000)|float }}, {{ card.get('apr', 0)|float }}, '{{ card.get('currency', 'TWD') }}')">✎</button>
       </div>
 
       <div class="debt-stats">
         <div class="stat-item">
-          <span class="stat-label">本期未繳</span>
+          <span class="stat-label">本期應繳{% if card.due_date %} · 截止 {{ card.due_date }}{% endif %}</span>
+          <span class="stat-value danger">NT$ {{ "%.0f"|format(due) }}</span>
+        </div>
+        {% if card.min_payment|float > 0 %}
+        <div class="stat-item">
+          <span class="stat-label">最低應繳</span>
+          <span class="stat-value">NT$ {{ "%.0f"|format(card.min_payment|float) }}</span>
+        </div>
+        {% endif %}
+        <div class="stat-item">
+          <span class="stat-label">本期新增消費</span>
+          <span class="stat-value">NT$ {{ "%.0f"|format(card.cycle_charges|float) }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">累計未繳</span>
           <span class="stat-value danger">NT$ {{ "%.0f"|format(bal) }}</span>
         </div>
         {% if limit > 0 %}
@@ -350,13 +696,14 @@
       {% if limit > 0 %}
       <div class="progress-bar">
         <div class="progress-fill {% if pct >= 90 %}danger{% elif pct >= 70 %}warning{% endif %}"
-             style="width:{{ pct }}%"></div>
+          style="width:{{ pct }}%"></div>
       </div>
       {% endif %}
 
       <div class="debt-actions">
         <button class="btn-action primary"
-          onclick="openRepayModal({{ card.id }}, '{{ card.name }}', {{ bal }})">還款</button>
+          onclick="openRepayModal({{ card.id }}, '{{ card.name }}', {{ due }}, {{ card.min_payment|float }}, {{ bal }})">還款</button>
+        <button class="btn-action" onclick="openInterestModal({{ card.id }}, '{{ card.name }}')">記利息</button>
         <button class="tx-toggle" onclick="toggleTx('cc-tx-{{ card.id }}')">
           近期消費 ({{ card.recent_txs|length }}) <span id="cc-tx-arrow-{{ card.id }}">▼</span>
         </button>
@@ -386,8 +733,7 @@
   {% else %}
   <div class="empty-state">
     <div class="e-icon">💳</div>
-    <div>尚未設定信用卡帳戶</div>
-    <div style="margin-top:8px;font-size:.8rem;">請至 <a href="/settings?tab=accounts" style="color:var(--accent);">設定管理 › 帳戶</a> 新增信用卡</div>
+    <div>尚無信用卡</div>
   </div>
   {% endif %}
 </div>
@@ -396,6 +742,27 @@
 <div id="section-loans" style="display:none;">
   {% set active_loans = loans | selectattr('status', 'equalto', 'active') | list %}
   {% set closed_loans = loans | selectattr('status', 'equalto', 'closed') | list %}
+  {% set net = total_loan_receivable - total_loan_owed %}
+
+  <div class="tab-summary">
+    <div class="summary-stats">
+      <div class="s-item">
+        <span class="s-label">借入未還</span>
+        <span class="s-value danger">NT$ {{ "%.0f"|format(total_loan_owed) }}</span>
+      </div>
+      <div class="s-item">
+        <span class="s-label">借出未收</span>
+        <span class="s-value accent">NT$ {{ "%.0f"|format(total_loan_receivable) }}</span>
+      </div>
+      <div class="s-item">
+        <span class="s-label">淨收支</span>
+        <span class="s-value {% if net >= 0 %}accent{% else %}danger{% endif %}">
+          NT$ {{ "%.0f"|format(net|abs) }}{% if net >= 0 %} 淨收{% else %} 淨欠{% endif %}
+        </span>
+      </div>
+    </div>
+    <button class="btn" onclick="openLoanModal()">＋ 新增借貸</button>
+  </div>
 
   {% if active_loans %}
   <div class="debt-list">
@@ -416,30 +783,39 @@
         </div>
         <div style="display:flex;gap:6px;">
           <button class="icon-btn"
-            onclick="openLoanEdit({{ loan.id }}, '{{ loan.name }}', {{ loan.interest_rate }}, '{{ loan.due_date or '' }}', '{{ loan.note or '' }}')">✎</button>
+            onclick="openLoanEdit({{ loan.id }}, '{{ loan.name }}', {{ loan.interest_rate }}, '{{ loan.start_date or '' }}', '{{ loan.due_date or '' }}', '{{ loan.note or '' }}')">✎</button>
+          {% if loan.payment_count == 0 %}
           <button class="icon-btn del" onclick="deleteLoan({{ loan.id }}, '{{ loan.name }}')">✕</button>
+          {% endif %}
         </div>
       </div>
 
-      <div class="debt-stats">
-        <div class="stat-item">
-          <span class="stat-label">借款本金</span>
-          <span class="stat-value">NT$ {{ "%.0f"|format(loan.principal) }}</span>
+      <div class="loan-formula">
+        <div class="formula-item">
+          <span class="formula-value">NT$ {{ "%.0f"|format(loan.principal) }}</span>
+          <span class="formula-label">借款本金</span>
         </div>
-        <div class="stat-item">
-          <span class="stat-label">剩餘金額</span>
-          <span class="stat-value danger">NT$ {{ "%.0f"|format(loan.remaining) }}</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">已還金額</span>
-          <span class="stat-value accent">NT$ {{ "%.0f"|format(paid) }}</span>
-        </div>
-        {% if loan.interest_rate > 0 %}
-        <div class="stat-item">
-          <span class="stat-label">年利率</span>
-          <span class="stat-value">{{ loan.interest_rate }}%</span>
+        {% if paid > 0 %}
+        <span class="formula-op">−</span>
+        <div class="formula-item">
+          <span class="formula-value accent">NT$ {{ "%.0f"|format(paid) }}</span>
+          <span class="formula-label">已還金額</span>
         </div>
         {% endif %}
+        {% if loan.accrued_interest > 0 %}
+        <span class="formula-op">+</span>
+        <div class="formula-item">
+          <span class="formula-value" style="color:#f0a84a;">NT$ {{ "%.0f"|format(loan.accrued_interest) }}</span>
+          <span class="formula-label">推估利息（{{ loan.days_elapsed }} 天 / {{ loan.interest_rate }}%）</span>
+        </div>
+        {% endif %}
+        <span class="formula-eq">=</span>
+        <div class="formula-item">
+          {% set total = loan.remaining + loan.accrued_interest %}
+          <span class="formula-value {% if total > 0 %}danger{% else %}accent{% endif %}">NT$ {{ "%.0f"|format(total)
+            }}</span>
+          <span class="formula-label">{% if loan.accrued_interest > 0 %}本利合計{% else %}剩餘本金{% endif %}</span>
+        </div>
       </div>
 
       <div class="progress-bar">
@@ -486,8 +862,7 @@
   {% elif not closed_loans %}
   <div class="empty-state">
     <div class="e-icon">📋</div>
-    <div>尚無借貸紀錄</div>
-    <div style="margin-top:8px;font-size:.8rem;">點擊「新增借貸」開始管理你的借款</div>
+    <div>尚無借貸項目</div>
   </div>
   {% endif %}
 
@@ -510,7 +885,9 @@
             本金 NT$ {{ "%.0f"|format(loan.principal) }} · {{ loan.account_icon }} {{ loan.account_name }}
           </div>
         </div>
+        {% if loan.payment_count == 0 %}
         <button class="icon-btn del" onclick="deleteLoan({{ loan.id }}, '{{ loan.name }}')">✕</button>
+        {% endif %}
       </div>
     </div>
     {% endfor %}
@@ -530,14 +907,19 @@
       <input type="text" id="repay-card-name" readonly style="color:var(--muted);">
     </div>
     <div class="field">
-      <label>本期未繳</label>
+      <label>本期應繳</label>
       <input type="text" id="repay-outstanding" readonly style="color:var(--danger);font-family:'DM Mono',monospace;">
+    </div>
+    <div class="field" id="repay-min-hint" style="margin-top:-8px;display:none;">
+      <span style="font-size:.78rem;color:var(--muted);">最低應繳 <span id="repay-min-val"
+          style="color:var(--accent);font-family:'DM Mono',monospace;"></span></span>
     </div>
     <div class="field">
       <label>還款來源帳戶</label>
       <select id="repay-from-account">
         {% for a in asset_accounts %}
-        <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}{% if a.get('currency','TWD') != 'TWD' %} ({{ a.currency }}){% endif %}</option>
+        <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}{% if a.get('currency','TWD') != 'TWD' %} ({{ a.currency
+          }}){% endif %}</option>
         {% endfor %}
       </select>
     </div>
@@ -556,6 +938,34 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeRepayModal()">取消</button>
       <button class="btn" onclick="submitRepayment()">確認還款</button>
+    </div>
+  </div>
+</div>
+
+<!-- Credit Card Interest Modal -->
+<div class="modal-overlay" id="interest-modal">
+  <div class="modal">
+    <h3>記一筆循環利息</h3>
+    <input type="hidden" id="interest-card-id">
+    <div class="field">
+      <label>信用卡</label>
+      <input type="text" id="interest-card-name" readonly style="color:var(--muted);">
+    </div>
+    <div class="field">
+      <label>利息金額（依實際帳單輸入）</label>
+      <input type="number" id="interest-amount" min="0.01" step="0.01" placeholder="0">
+    </div>
+    <div class="field">
+      <label>日期</label>
+      <input type="date" id="interest-date">
+    </div>
+    <div class="field">
+      <label>備註（選填）</label>
+      <input type="text" id="interest-note" placeholder="例：五月帳單循環利息" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeInterestModal()">取消</button>
+      <button class="btn" onclick="submitInterest()">確認</button>
     </div>
   </div>
 </div>
@@ -620,6 +1030,10 @@
       <input type="text" id="loan-e-name" autocomplete="off">
     </div>
     <div class="field">
+      <label>借款日期</label>
+      <input type="date" id="loan-e-start-date">
+    </div>
+    <div class="field">
       <label>到期日（選填）</label>
       <input type="date" id="loan-e-due-date">
     </div>
@@ -644,6 +1058,15 @@
     <h3 id="payment-modal-title">新增還款</h3>
     <input type="hidden" id="payment-loan-id">
     <div class="field">
+      <label>來源帳戶</label>
+      <select id="payment-account">
+        {% for a in asset_accounts %}
+        <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}{% if a.get('currency','TWD') != 'TWD' %} ({{ a.currency
+          }}){% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
       <label>金額</label>
       <input type="number" id="payment-amount" min="0.01" step="0.01" placeholder="0">
     </div>
@@ -664,7 +1087,7 @@
 
 <!-- Confirm Modal -->
 <div class="modal-overlay" id="confirm-modal">
-  <div class="modal" style="width:360px;">
+  <div class="modal" style="max-width:360px;">
     <h3 id="confirm-msg" style="font-size:1rem;margin-bottom:20px;"></h3>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="confirm-cancel">取消</button>
@@ -681,6 +1104,10 @@
   const TODAY = new Date().toISOString().slice(0, 10);
 
   // ── Toast ──────────────────────────────────────────────────────────────────
+  function _reloadTabs(...tabs) {
+    tabs.forEach(t => { try { window.parent.reloadTab(t); } catch (e) { } });
+  }
+
   function toast(msg, isError) {
     const t = document.getElementById('toast');
     t.textContent = msg;
@@ -713,6 +1140,7 @@
     document.getElementById('section-loans').style.display = tab === 'loans' ? 'block' : 'none';
     document.getElementById('tab-cc').classList.toggle('active', tab === 'cc');
     document.getElementById('tab-loans').classList.toggle('active', tab === 'loans');
+    NavState.set('debts', 'tab', tab);
   }
 
   // ── Transaction toggle ──────────────────────────────────────────────────��──
@@ -734,17 +1162,54 @@
   }
 
   // ── Credit Card Repayment ──────────────────────────────────────────────────
-  function openRepayModal(cardId, cardName, balance) {
+  function openRepayModal(cardId, cardName, statementDue, minPayment, totalOutstanding) {
     document.getElementById('repay-card-id').value = cardId;
     document.getElementById('repay-card-name').value = cardName;
-    document.getElementById('repay-outstanding').value = 'NT$ ' + balance.toFixed(0);
-    document.getElementById('repay-amount').value = balance > 0 ? balance.toFixed(0) : '';
+    document.getElementById('repay-outstanding').value = 'NT$ ' + statementDue.toFixed(0);
+    const minHint = document.getElementById('repay-min-hint');
+    if (minPayment > 0) {
+      document.getElementById('repay-min-val').textContent = 'NT$ ' + minPayment.toFixed(0);
+      minHint.style.display = 'block';
+    } else {
+      minHint.style.display = 'none';
+    }
+    // 預設帶入本期應繳；若本期已繳清但仍有未出帳消費，帶入累計未繳
+    const preset = statementDue > 0 ? statementDue : (totalOutstanding > 0 ? totalOutstanding : 0);
+    document.getElementById('repay-amount').value = preset > 0 ? preset.toFixed(0) : '';
     document.getElementById('repay-date').value = TODAY;
     document.getElementById('repay-note').value = '';
     document.getElementById('repay-modal').classList.add('open');
   }
   function closeRepayModal() {
     document.getElementById('repay-modal').classList.remove('open');
+  }
+
+  // ── Credit Card Interest ───────────────────────────────────────────────────
+  function openInterestModal(cardId, cardName) {
+    document.getElementById('interest-card-id').value = cardId;
+    document.getElementById('interest-card-name').value = cardName;
+    document.getElementById('interest-amount').value = '';
+    document.getElementById('interest-date').value = TODAY;
+    document.getElementById('interest-note').value = '';
+    document.getElementById('interest-modal').classList.add('open');
+  }
+  function closeInterestModal() {
+    document.getElementById('interest-modal').classList.remove('open');
+  }
+  async function submitInterest() {
+    const cardId = parseInt(document.getElementById('interest-card-id').value);
+    const amount = parseFloat(document.getElementById('interest-amount').value);
+    const date = document.getElementById('interest-date').value;
+    const note = document.getElementById('interest-note').value.trim();
+    if (!amount || amount <= 0) return toast('請輸入利息金額', true);
+    if (!date) return toast('請選擇日期', true);
+    const res = await fetch('/api/debts/cc/interest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account_id: cardId, amount, date, note })
+    });
+    if (res.ok) { closeInterestModal(); toast('已記錄循環利息'); _reloadTabs('home'); setTimeout(() => location.reload(), 800); }
+    else { const d = await res.json().catch(() => ({})); toast(d.error || '記錄失敗', true); }
   }
   async function submitRepayment() {
     const cardId = parseInt(document.getElementById('repay-card-id').value);
@@ -756,10 +1221,10 @@
     if (!date) return toast('請選擇日期', true);
     const res = await fetch('/api/debts/cc/repay', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ from_account_id: fromId, to_account_id: cardId, amount, date, note })
     });
-    if (res.ok) { closeRepayModal(); toast('還款成功'); setTimeout(() => location.reload(), 800); }
+    if (res.ok) { closeRepayModal(); toast('還款成功'); _reloadTabs('home'); setTimeout(() => location.reload(), 800); }
     else { const d = await res.json().catch(() => ({})); toast(d.error || '還款失敗', true); }
   }
 
@@ -773,7 +1238,6 @@
     document.getElementById('loan-interest').value = '';
     document.getElementById('loan-note').value = '';
     document.getElementById('loan-modal').classList.add('open');
-    switchTab('loans');
   }
   function closeLoanModal() {
     document.getElementById('loan-modal').classList.remove('open');
@@ -792,18 +1256,19 @@
     if (!start_date) return toast('請選擇借款日期', true);
     const res = await fetch('/api/debts/loans', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, type, principal, account_id, start_date, due_date, interest_rate, note })
     });
-    if (res.ok) { closeLoanModal(); toast('新增成功'); setTimeout(() => location.reload(), 800); }
+    if (res.ok) { closeLoanModal(); toast('新增成功'); _reloadTabs('settings', 'home'); setTimeout(() => location.reload(), 800); }
     else { const d = await res.json().catch(() => ({})); toast(d.error || '新增失敗', true); }
   }
 
   // ── Edit Loan ──────────────────────────────────────────────────────────────
-  function openLoanEdit(id, name, interest, dueDate, note) {
+  function openLoanEdit(id, name, interest, startDate, dueDate, note) {
     document.getElementById('loan-e-id').value = id;
     document.getElementById('loan-e-name').value = name;
     document.getElementById('loan-e-interest').value = interest || 0;
+    document.getElementById('loan-e-start-date').value = startDate || '';
     document.getElementById('loan-e-due-date').value = dueDate || '';
     document.getElementById('loan-e-note').value = note || '';
     document.getElementById('loan-edit-modal').classList.add('open');
@@ -813,19 +1278,22 @@
   }
   async function saveLoanEdit() {
     const id = document.getElementById('loan-e-id').value;
+    const startDate = document.getElementById('loan-e-start-date').value;
     const body = {
       name: document.getElementById('loan-e-name').value.trim(),
       interest_rate: parseFloat(document.getElementById('loan-e-interest').value) || 0,
+      start_date: startDate || null,
       due_date: document.getElementById('loan-e-due-date').value || null,
       note: document.getElementById('loan-e-note').value.trim()
     };
     if (!body.name) return toast('請輸入名稱', true);
+    if (!body.start_date) return toast('請選擇借款日期', true);
     const res = await fetch(`/api/debts/loans/${id}`, {
       method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    if (res.ok) { closeLoanEditModal(); toast('已更新'); setTimeout(() => location.reload(), 800); }
+    if (res.ok) { closeLoanEditModal(); toast('已更新'); _reloadTabs('settings', 'home'); setTimeout(() => location.reload(), 800); }
     else { const d = await res.json().catch(() => ({})); toast(d.error || '更新失敗', true); }
   }
 
@@ -834,7 +1302,7 @@
     const confirmed = await showConfirm(`確定刪除「${name}」？此操作將同時刪除對應的帳務紀錄，且無法復原。`);
     if (!confirmed) return;
     const res = await fetch(`/api/debts/loans/${id}`, { method: 'DELETE' });
-    if (res.ok) { toast('已刪除'); setTimeout(() => location.reload(), 800); }
+    if (res.ok) { toast('已刪除'); _reloadTabs('settings', 'home'); setTimeout(() => location.reload(), 800); }
     else { const d = await res.json().catch(() => ({})); toast(d.error || '刪除失敗（請先刪除還款紀錄）', true); }
   }
 
@@ -853,17 +1321,19 @@
   }
   async function submitPayment() {
     const loanId = document.getElementById('payment-loan-id').value;
+    const account_id = parseInt(document.getElementById('payment-account').value);
     const amount = parseFloat(document.getElementById('payment-amount').value);
     const date = document.getElementById('payment-date').value;
     const note = document.getElementById('payment-note').value.trim();
+    if (!account_id) return toast('請選擇來源帳戶', true);
     if (!amount || amount <= 0) return toast('請輸入金額', true);
     if (!date) return toast('請選擇日期', true);
     const res = await fetch(`/api/debts/loans/${loanId}/payments`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ amount, date, note })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account_id, amount, date, note })
     });
-    if (res.ok) { closePaymentModal(); toast('紀錄成功'); setTimeout(() => location.reload(), 800); }
+    if (res.ok) { closePaymentModal(); toast('紀錄成功'); _reloadTabs('home'); setTimeout(() => location.reload(), 800); }
     else { const d = await res.json().catch(() => ({})); toast(d.error || '紀錄失敗', true); }
   }
 
@@ -872,8 +1342,110 @@
     const confirmed = await showConfirm('確定刪除此還款紀錄？對應的帳務紀錄也會一併移除。');
     if (!confirmed) return;
     const res = await fetch(`/api/debts/payments/${paymentId}`, { method: 'DELETE' });
-    if (res.ok) { toast('已刪除'); setTimeout(() => location.reload(), 800); }
+    if (res.ok) { toast('已刪除'); _reloadTabs('home'); setTimeout(() => location.reload(), 800); }
     else { const d = await res.json().catch(() => ({})); toast(d.error || '刪除失敗', true); }
   }
+
+  // ── Restore tab state ──────────────────────────────────────────────────────
+  switchTab(NavState.get('debts', 'tab', 'cc'));
+
+  // ── Credit Card Add / Edit ─────────────────────────────────────────────────
+  function openCCModal(id, name, billingStart, creditLimit, dueDay, minPct, minFloor, apr, currency) {
+    document.getElementById('cc-modal-id').value = id || '';
+    document.getElementById('cc-modal-title').textContent = id ? '編輯信用卡' : '新增信用卡';
+    document.getElementById('cc-modal-save-btn').textContent = id ? '儲存' : '新增';
+    document.getElementById('cc-modal-name').value = name || '';
+    document.getElementById('cc-modal-billing-start').value = billingStart || 1;
+    document.getElementById('cc-modal-credit-limit').value = creditLimit || 0;
+    document.getElementById('cc-modal-due-day').value = dueDay || 0;
+    document.getElementById('cc-modal-min-pct').value = (minPct !== undefined && minPct !== null) ? minPct : 10;
+    document.getElementById('cc-modal-min-floor').value = (minFloor !== undefined && minFloor !== null) ? minFloor : 1000;
+    document.getElementById('cc-modal-apr').value = apr || 0;
+    document.getElementById('cc-modal-currency').value = currency || 'TWD';
+    document.getElementById('cc-modal').classList.add('open');
+  }
+  function closeCCModal() {
+    document.getElementById('cc-modal').classList.remove('open');
+  }
+  async function saveCCModal() {
+    const id = document.getElementById('cc-modal-id').value;
+    const name = document.getElementById('cc-modal-name').value.trim();
+    if (!name) return toast('請輸入卡片名稱', true);
+    const body = {
+      name,
+      icon: '💳',
+      type: 'liability',
+      sub_type: '信用卡',
+      is_asset: 1,
+      billing_start_day: parseInt(document.getElementById('cc-modal-billing-start').value) || 1,
+      credit_limit: parseFloat(document.getElementById('cc-modal-credit-limit').value) || 0,
+      payment_due_day: parseInt(document.getElementById('cc-modal-due-day').value) || 0,
+      min_payment_pct: parseFloat(document.getElementById('cc-modal-min-pct').value) || 0,
+      min_payment_floor: parseFloat(document.getElementById('cc-modal-min-floor').value) || 0,
+      apr: parseFloat(document.getElementById('cc-modal-apr').value) || 0,
+      currency: document.getElementById('cc-modal-currency').value,
+    };
+    const url = id ? `/api/accounts/${id}` : '/api/accounts';
+    const method = id ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (res.ok) { closeCCModal(); toast(id ? '已更新' : '新增成功'); _reloadTabs('settings', 'home'); setTimeout(() => location.reload(), 800); }
+    else { const d = await res.json().catch(() => ({})); toast(d.error || '儲存失敗', true); }
+  }
 </script>
+
+<!-- Credit Card Add/Edit Modal -->
+<div class="modal-overlay" id="cc-modal">
+  <div class="modal">
+    <h3 id="cc-modal-title">新增信用卡</h3>
+    <input type="hidden" id="cc-modal-id">
+    <div class="field">
+      <label>卡片名稱</label>
+      <input type="text" id="cc-modal-name" placeholder="例：CUBE" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>帳單起算日</label>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="number" id="cc-modal-billing-start" min="1" max="28" value="1" style="width:80px">
+        <span style="color:var(--muted);font-size:.85rem;">號</span>
+      </div>
+      <p style="font-size:.75rem;color:var(--muted);margin:6px 0 0;">帳單週期為每月該日起至下月前一日止</p>
+    </div>
+    <div class="field">
+      <label>信用額度 (NT$)</label>
+      <input type="number" id="cc-modal-credit-limit" min="0" value="0" placeholder="0" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>繳款截止日（號，選填）</label>
+      <input type="number" id="cc-modal-due-day" min="0" max="28" value="0" placeholder="未設定" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>最低應繳比例 (%)</label>
+      <input type="number" id="cc-modal-min-pct" min="0" max="100" step="0.1" value="10" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>最低應繳下限 (NT$)</label>
+      <input type="number" id="cc-modal-min-floor" min="0" value="1000" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>年利率 (%，循環利率供參考)</label>
+      <input type="number" id="cc-modal-apr" min="0" step="0.01" value="0" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>幣別</label>
+      <select id="cc-modal-currency">
+        <option value="TWD">TWD（台幣）</option>
+        <option value="USD">USD（美元）</option>
+        <option value="JPY">JPY（日幣）</option>
+        <option value="KRW">KRW（韓元）</option>
+        <option value="CNY">CNY（人民幣）</option>
+        <option value="EUR">EUR（歐元）</option>
+        <option value="GBP">GBP（英鎊）</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeCCModal()">取消</button>
+      <button class="btn" id="cc-modal-save-btn" style="flex:1" onclick="saveCCModal()">新增</button>
+    </div>
+  </div>
+</div>
 {% endblock %}

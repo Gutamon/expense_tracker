@@ -1,17 +1,20 @@
 import csv
 import os
 
+from flask import g, has_request_context
+
 INT_FIELDS = {
     "expenses.csv": {"id", "account_id", "to_account_id", "stock_transaction_id", "loan_id", "loan_payment_id"},
     "categories.csv": {"id", "is_asset", "in_budget", "sort_order"},
     "category_groups.csv": {"id", "sort_order"},
-    "accounts.csv": {"id", "sort_order", "is_asset", "billing_start_day"},
-    "stocks.csv": {"id", "shares", "account_id"},
+    "accounts.csv": {"id", "sort_order", "is_asset", "billing_start_day", "payment_due_day"},
+    "stocks.csv": {"id", "shares", "account_id", "linked_account_id"},
     "stock_transactions.csv": {"id", "stock_id", "shares"},
-    "loans.csv": {"id", "account_id"},
+    "loans.csv": {"id", "account_id", "linked_account_id"},
     "loan_payments.csv": {"id", "loan_id"},
     "monthly_budgets.csv": {"id", "year", "month"},
     "cat_monthly_budgets.csv": {"id", "category_id", "year", "month"},
+    "monthly_history.csv": {"id", "year", "month"},
     "settings.csv": set(),
 }
 
@@ -19,13 +22,14 @@ FLOAT_FIELDS = {
     "expenses.csv": {"amount", "to_amount"},
     "categories.csv": {"monthly_budget"},
     "category_groups.csv": set(),
-    "accounts.csv": {"credit_limit"},
+    "accounts.csv": {"credit_limit", "min_payment_pct", "min_payment_floor", "apr", "opening_balance"},
     "stocks.csv": {"avg_price", "current_price"},
     "stock_transactions.csv": {"price", "fee"},
     "loans.csv": {"principal", "remaining", "interest_rate"},
     "loan_payments.csv": {"amount"},
     "monthly_budgets.csv": {"amount"},
     "cat_monthly_budgets.csv": {"amount"},
+    "monthly_history.csv": {"amount"},
     "settings.csv": set(),
 }
 
@@ -54,32 +58,50 @@ SCHEMA = {
     "categories.csv": ["id", "name", "type", "is_asset", "in_budget", "group_name",
                        "sort_order", "monthly_budget"],
     "category_groups.csv": ["id", "name", "sort_order", "type"],
-    "accounts.csv": ["id", "name", "icon", "sort_order", "type", "is_asset",
-                     "billing_start_day", "currency", "credit_limit"],
+    "accounts.csv": ["id", "name", "icon", "sort_order", "type", "sub_type", "is_asset",
+                     "billing_start_day", "currency", "credit_limit",
+                     "payment_due_day", "min_payment_pct", "min_payment_floor", "apr", "opening_balance"],
     "stocks.csv": ["id", "symbol", "name", "shares", "avg_price", "current_price",
-                   "updated_at", "account_id"],
+                   "updated_at", "account_id", "linked_account_id"],
     "stock_transactions.csv": ["id", "stock_id", "type", "date", "shares", "price",
                                 "fee", "note", "created_at"],
     "loans.csv": ["id", "name", "type", "principal", "remaining", "interest_rate",
-                  "start_date", "due_date", "account_id", "status", "note", "created_at"],
+                  "start_date", "due_date", "account_id", "linked_account_id", "status", "note", "created_at"],
     "loan_payments.csv": ["id", "loan_id", "amount", "date", "note", "created_at"],
     "monthly_budgets.csv": ["id", "year", "month", "amount"],
     "cat_monthly_budgets.csv": ["id", "category_id", "year", "month", "amount"],
+    "monthly_history.csv": ["id", "year", "month", "category", "type", "amount"],
     "settings.csv": ["key", "value"],
 }
 
-_DATA_DIR = None
+_DATA_DIR = None  # root data dir (parent of the per-device users/ folder)
 
 
 def set_data_dir(path: str):
+    """Set the root data directory. Per-device folders live beneath it."""
     global _DATA_DIR
     _DATA_DIR = path
 
 
-def _data_dir() -> str:
+def root_dir() -> str:
+    """Return the root data directory (holds the users/ folder)."""
     if _DATA_DIR:
         return _DATA_DIR
     return os.path.join(os.path.dirname(__file__), "..", "data")
+
+
+def _data_dir() -> str:
+    """Resolve the active data directory.
+
+    During a request this is the current device's folder (bound to flask.g by the
+    before_request hook). Outside a request context (startup / CLI) it falls back to
+    the root directory.
+    """
+    if has_request_context():
+        d = getattr(g, "data_dir", None)
+        if d:
+            return d
+    return root_dir()
 
 
 def _path(filename: str) -> str:
@@ -137,16 +159,56 @@ def set_setting(key: str, value):
 
 
 def is_first_run() -> bool:
-    rows = read_csv("accounts.csv")
-    return len(rows) == 0
+    if get_setting("onboarded") == "true":
+        return False
+    return len(read_csv("accounts.csv")) == 0
 
 
-def init_data_dir():
-    d = _data_dir()
-    os.makedirs(d, exist_ok=True)
+def _migrate_opening_balance():
+    """Convert legacy 期初餘額 expense rows to account opening_balance field."""
+    exp_rows = read_csv("expenses.csv")
+    ob_rows = [e for e in exp_rows if e.get("category") == "期初餘額"]
+    if not ob_rows:
+        return
+    acc_rows = read_csv("accounts.csv")
+    acc_map = {str(r["id"]): r for r in acc_rows}
+    for e in ob_rows:
+        acc_id = str(e.get("account_id", 0))
+        amount = float(e.get("amount") or 0)
+        signed = amount if e.get("type") == "income" else -amount
+        if acc_id in acc_map:
+            acc_map[acc_id]["opening_balance"] = float(acc_map[acc_id].get("opening_balance") or 0) + signed
+    write_csv("accounts.csv", acc_rows, SCHEMA["accounts.csv"])
+    remaining = [e for e in exp_rows if e.get("category") != "期初餘額"]
+    write_csv("expenses.csv", remaining, SCHEMA["expenses.csv"])
+
+
+def _init_dir(path: str):
+    """Create a data directory and seed any missing CSV files (header only)."""
+    os.makedirs(path, exist_ok=True)
     for filename, fieldnames in SCHEMA.items():
-        p = os.path.join(d, filename)
+        p = os.path.join(path, filename)
         if not os.path.exists(p):
             with open(p, "w", encoding="utf-8-sig", newline="") as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
+
+
+def init_current_user():
+    """Seed the current device's folder and run one-time migrations.
+
+    Runs against the active data dir (bound to flask.g during a request), so it must
+    be called after g.data_dir is set. Invoked once when a device folder is created.
+    """
+    _init_dir(_data_dir())
+    _migrate_opening_balance()
+
+
+def init_data_dir():
+    """Ensure the root data dir and its users/ subfolder exist.
+
+    Called at startup. Data is now per-device, so this no longer seeds the CSV files
+    at the root — per-device seeding happens via init_current_user().
+    """
+    from config import Config
+    os.makedirs(os.path.join(root_dir(), Config.USERS_SUBDIR), exist_ok=True)

@@ -68,20 +68,103 @@
     background: var(--danger);
   }
 
+  /* ── Total card header + correction button ── */
+  .total-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .total-header .label {
+    margin-bottom: 0;
+  }
+
+  .btn-correct {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 16px;
+    padding: 4px 12px;
+    font-size: .75rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+
+  .btn-correct:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── Asset proportion bar ── */
+  .prop-bar {
+    display: flex;
+    height: 14px;
+    border-radius: 7px;
+    overflow: hidden;
+    background: var(--border);
+  }
+
+  .prop-seg {
+    height: 100%;
+    transition: width .35s ease;
+    min-width: 2px;
+  }
+
+  .prop-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin-top: 14px;
+  }
+
+  .prop-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .78rem;
+    min-width: 0;
+  }
+
+  .prop-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .prop-legend-name {
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .prop-legend-pct {
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .prop-legend-amt {
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    margin-left: 2px;
+  }
+
+  .prop-legend-native {
+    color: #5bc0de;
+    font-family: 'DM Mono', monospace;
+    font-size: .72rem;
+  }
+
   /* ── Two-column grid ── */
   .grid {
     display: grid;
     grid-template-columns: 340px 1fr;
     gap: 24px;
     align-items: start;
-  }
-
-  /* ── Form card ── */
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 28px;
   }
 
   .card h2 {
@@ -95,6 +178,7 @@
 
   .field {
     margin-bottom: 16px;
+    min-width: 0;
   }
 
   .field label {
@@ -306,30 +390,6 @@
     gap: 8px;
   }
 
-  .icon-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    border-radius: 6px;
-    width: 30px;
-    height: 30px;
-    cursor: pointer;
-    font-size: .8rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all .2s;
-  }
-
-  .icon-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  .icon-btn.del:hover {
-    border-color: var(--danger);
-    color: var(--danger);
-  }
 
   .empty {
     text-align: center;
@@ -338,32 +398,8 @@
     font-size: .9rem;
   }
 
-  /* ── Modal ── */
-  .overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, .7);
-    backdrop-filter: blur(4px);
-    z-index: 100;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .overlay.open {
-    display: flex;
-  }
-
   .modal {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 32px;
-    width: 90%;
-    max-width: 450px;
     animation: pop .25s ease;
-    max-height: 90vh;
-    overflow-y: auto;
   }
 
   @media (min-width: 768px) {
@@ -392,54 +428,6 @@
       opacity: 1;
       transform: scale(1)
     }
-  }
-
-  .modal h3 {
-    font-size: 1rem;
-    font-weight: 500;
-    margin-bottom: 20px;
-  }
-
-  .modal-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-  }
-
-  .btn-ghost {
-    flex: 1;
-    padding: 10px;
-    border: 1px solid var(--border);
-    background: none;
-    color: var(--text);
-    border-radius: 8px;
-    font-family: inherit;
-    cursor: pointer;
-  }
-
-  .btn-ghost:hover {
-    border-color: var(--accent);
-  }
-
-  /* ── Toast ── */
-  #toast {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: var(--accent);
-    color: #111;
-    border-radius: 8px;
-    padding: 12px 20px;
-    font-size: .85rem;
-    font-weight: 500;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity .3s;
-    z-index: 200;
-  }
-
-  #toast.show {
-    opacity: 1;
   }
 
   /* ── Calendar / View Toggle ── */
@@ -614,6 +602,15 @@
 
   @media (max-width: 768px) {
 
+    .modal {
+      padding: 24px 20px 0;
+    }
+
+    .modal-actions {
+      margin: 0 -20px;
+      padding: 14px 20px 24px;
+    }
+
     .stats {
       grid-template-columns: 1fr;
     }
@@ -629,7 +626,7 @@
     .fab-add {
       display: flex;
       position: fixed;
-      bottom: 24px;
+      bottom: calc(76px + env(safe-area-inset-bottom) + 16px);
       right: 24px;
       width: 56px;
       height: 56px;
@@ -643,7 +640,7 @@
       justify-content: center;
       cursor: pointer;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-      z-index: 50;
+      z-index: 10;
       transition: transform .15s, opacity .15s;
     }
 
@@ -687,6 +684,7 @@
       grid-row: 1 / 3;
       justify-self: end;
     }
+
   }
 
   /* ── Month Navigator ── */
@@ -759,6 +757,53 @@
   .budget-section {
     margin-bottom: 12px;
   }
+
+  /* ── Mobile panel nav ── */
+  .panel-nav {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+    .panel-nav {
+      display: flex;
+      background: #0f0f11;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px;
+      margin-bottom: 16px;
+    }
+
+    .panel-tab {
+      flex: 1;
+      text-align: center;
+      padding: 8px 0;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .85rem;
+      font-weight: 500;
+      color: var(--muted);
+      transition: all .2s;
+      user-select: none;
+    }
+
+    .panel-tab.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    }
+
+    #mobile-panel-balance {
+      display: none;
+    }
+
+    #mobile-panel-balance.panel-active {
+      display: grid;
+    }
+
+    #mobile-panel-list.panel-hidden {
+      display: none;
+    }
+  }
 </style>
 {% endblock %}
 
@@ -773,25 +818,21 @@
     </div>
   </div>
   <div class="acc-filter-body" id="acc-filter-body">
-  <div class="acc-filter-all-row">
-    <button class="btn-filter active" id="acc-filter-all" data-id="all" onclick="toggleAllFilter(this)">全部</button>
-  </div>
-  {% set specific_types = ['現金', '銀行', '儲值支付', '其他', '信用卡'] %}
-  {% set icon_type_map = {'💵': '現金', '🏦': '銀行', '🪙': '儲值支付', '💳': '信用卡', '👝': '其他'} %}
-  {% for type_key in specific_types %}
+    <div class="acc-filter-all-row">
+      <button class="btn-filter active" id="acc-filter-all" data-id="all" onclick="toggleAllFilter(this)">全部</button>
+    </div>
+    {% set specific_types = ['現金', '銀行', '預付儲值', '投資', '保單', '其他', '信用卡', '借貸'] %}
+    {% set icon_type_map = {'💵': '現金', '🏦': '銀行', '🪙': '預付儲值', '💳': '信用卡', '👝': '其他'} %}
+    {% set sub_type_norm = {'負債其他': '其他'} %}
+    {% for type_key in specific_types %}
     {% set type_accs = [] %}
     {% set ns = namespace() %}
     {% for a in all_accounts %}
-      {% if a.get('is_asset', 1) %}
-        {% if a.type in specific_types %}
-          {% set ns.eff = a.type %}
-        {% else %}
-          {% set ns.eff = icon_type_map.get(a.icon, '其他') %}
-        {% endif %}
-        {% if ns.eff == type_key %}
-          {% if type_accs.append(a) %}{% endif %}
-        {% endif %}
-      {% endif %}
+    {% set raw_sub = a.get('sub_type') or icon_type_map.get(a.icon, '其他') %}
+    {% set ns.eff = sub_type_norm.get(raw_sub, raw_sub) %}
+    {% if ns.eff == type_key %}
+    {% if type_accs.append(a) %}{% endif %}
+    {% endif %}
     {% endfor %}
     {% if type_accs %}
     <div class="acc-type-group">
@@ -799,22 +840,37 @@
       <div class="acc-type-buttons">
         {% for a in type_accs %}
         <button class="btn-filter filter-locked" data-id="{{ a.id }}" data-bal="{{ account_balances.get(a.id, 0) }}"
-          onclick="toggleAccFilter(this)">
+          data-bal-twd="{{ account_balances_twd.get(a.id, 0) }}" data-cur="{{ a.get('currency', 'TWD') }}"
+          data-name="{{ a.icon }} {{ a.name }}" onclick="toggleAccFilter(this)">
           {{ a.icon }} {{ a.name }}{% if a.get('currency', 'TWD') != 'TWD' %} · {{ a.currency }}{% endif %}
         </button>
         {% endfor %}
       </div>
     </div>
     {% endif %}
-  {% endfor %}
+    {% endfor %}
   </div><!-- /acc-filter-body -->
 </div>
 
+<!-- Mobile Panel Nav -->
+<div class="panel-nav" id="panel-nav">
+  <div class="panel-tab" id="panel-tab-0" onclick="panelGo(0)">所選資產餘額</div>
+  <div class="panel-tab active" id="panel-tab-1" onclick="panelGo(1)">記帳明細</div>
+</div>
+
 <!-- Stats -->
-<div class="stats">
+<div class="stats" id="mobile-panel-balance">
   <div class="stat-card">
-    <div class="label">所選資產總額</div>
+    <div class="total-header">
+      <div class="label">所選資產總額</div>
+      <button class="btn-correct" onclick="openCorrect()" title="餘額校正">校正</button>
+    </div>
     <div class="value green" id="stat-total">NT$ {{ "%.0f" | format(total_balance) }}</div>
+    <!-- Proportion bar -->
+    <div id="proportion-wrap" style="display:none;margin-top:16px;">
+      <div class="prop-bar" id="prop-bar"></div>
+      <div class="prop-legend" id="prop-legend"></div>
+    </div>
   </div>
 </div>
 
@@ -873,16 +929,22 @@
         <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}</option>
         {% endfor %}
       </select>
+      <div id="f-cc-transfer-hint"
+        style="display:none;align-items:center;gap:8px;margin-top:8px;padding:8px 12px;background:rgba(200,240,74,.08);border:1px solid rgba(200,240,74,.25);border-radius:8px;font-size:.8rem;color:var(--accent);">
+        <span style="flex:1;">信用卡還款請至「負債區」操作</span>
+        <button type="button" onclick="window.parent.switchTab('debts')"
+          style="background:var(--accent);color:#111;border:none;border-radius:6px;padding:4px 10px;font-size:.75rem;font-family:inherit;cursor:pointer;white-space:nowrap;">前往負債區</button>
+      </div>
     </div>
-    <div class="field">
+    <div class="field" id="f-date-field">
       <label>日期</label>
       <input type="date" id="f-date" />
     </div>
-    <div class="field">
+    <div class="field" id="f-note-field">
       <label>備註（選填）</label>
       <input type="text" id="f-note" placeholder="..." autocomplete="off" />
     </div>
-    <div style="display:flex;gap:8px">
+    <div id="f-add-buttons" style="display:flex;gap:8px">
       <button class="btn btn-primary" style="flex:1" onclick="addExpense()">新增</button>
       <button class="btn btn-primary"
         style="flex:1;background:var(--surface);border:1px solid var(--accent);color:var(--accent)"
@@ -893,7 +955,7 @@
 
 
   <!-- List -->
-  <div style="min-width: 0;">
+  <div id="mobile-panel-list" style="min-width: 0;">
     <div class="list-header">
       <h2>記帳明細</h2>
     </div>
@@ -901,7 +963,6 @@
     <!-- Budget Section -->
     <div class="budget-section">
       <div id="budget-bars"></div>
-      <a href="/settings?tab=budget" style="font-size:.78rem;color:var(--accent);text-decoration:none;">預算設定</a>
     </div>
 
     <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
@@ -917,7 +978,8 @@
     <div class="month-nav" id="month-nav">
       <div class="month-nav-controls">
         <button class="month-btn" onclick="changeMonth(-1)">&#8249;</button>
-        <span id="month-display"></span>
+        <span id="month-display" onclick="openMonthPicker()" style="cursor:pointer;user-select:none"
+          title="點擊跳轉"></span>
         <button class="month-btn" onclick="changeMonth(1)">&#8250;</button>
       </div>
       <button class="btn-filter" id="custom-range-btn" onclick="toggleDateRange()">自訂區間</button>
@@ -954,13 +1016,15 @@
         </div>
         <div class="item-amount {{ e.type }}">
           {% if e.type == 'transfer' and e.to_amount %}
-            {% set from_acc = account_map.get(e.account_id) %}
-            {% set to_acc = account_map.get(e.to_account_id) %}
-            {{ "%.0f" | format(e.amount) }} {{ from_acc.get('currency', 'TWD') if from_acc else 'TWD' }} → {{ "%.0f" | format(e.to_amount) }} {{ to_acc.get('currency', 'TWD') if to_acc else 'TWD' }}
+          {% set from_acc = account_map.get(e.account_id) %}
+          {% set to_acc = account_map.get(e.to_account_id) %}
+          {{ "%.0f" | format(e.amount) }} {{ from_acc.get('currency', 'TWD') if from_acc else 'TWD' }} → {{ "%.0f" |
+          format(e.to_amount) }} {{ to_acc.get('currency', 'TWD') if to_acc else 'TWD' }}
           {% else %}
-            {% set acc = account_map.get(e.account_id) %}
-            {% set cur = acc.get('currency', 'TWD') if acc else 'TWD' %}
-            {% if e.type == 'income' %}+{% elif e.type == 'expense' %}-{% endif %}{% if cur == 'TWD' %}NT$ {% else %}{{ cur }} {% endif %}{{ "%.0f" | format(e.amount) }}
+          {% set acc = account_map.get(e.account_id) %}
+          {% set cur = acc.get('currency', 'TWD') if acc else 'TWD' %}
+          {% if e.type == 'income' %}+{% elif e.type == 'expense' %}-{% endif %}{% if cur == 'TWD' %}NT$ {% else %}{{
+          cur }} {% endif %}{{ "%.0f" | format(e.amount) }}
           {% endif %}
         </div>
         <div class="item-actions">
@@ -1039,17 +1103,23 @@
           <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}</option>
           {% endfor %}
         </select>
+        <div id="m-cc-transfer-hint"
+          style="display:none;align-items:center;gap:8px;margin-top:8px;padding:8px 12px;background:rgba(200,240,74,.08);border:1px solid rgba(200,240,74,.25);border-radius:8px;font-size:.8rem;color:var(--accent);">
+          <span style="flex:1;">信用卡還款請至「負債區」操作</span>
+          <button type="button" onclick="window.parent.switchTab('debts')"
+            style="background:var(--accent);color:#111;border:none;border-radius:6px;padding:4px 10px;font-size:.75rem;font-family:inherit;cursor:pointer;white-space:nowrap;">前往負債區</button>
+        </div>
       </div>
-      <div class="field full">
+      <div class="field full" id="m-date-field">
         <label>日期</label>
         <input type="date" id="m-date" />
       </div>
-      <div class="field full">
+      <div class="field full" id="m-note-field">
         <label>備註（選填）</label>
         <input type="text" id="m-note" placeholder="..." autocomplete="off" />
       </div>
     </div>
-    <div class="modal-actions">
+    <div class="modal-actions" id="m-modal-actions">
       <button class="btn-ghost" onclick="closeMobileAdd()">取消</button>
       <button class="btn btn-primary" style="flex:2" onclick="addExpenseFrom('m', true)">再記一筆</button>
       <button class="btn btn-primary" style="flex:2" onclick="addExpenseFrom('m', false)">新增</button>
@@ -1074,7 +1144,8 @@
         </div>
       </div>
       <div class="field" id="e-title-field"><label>名稱</label><input type="text" id="e-title" autocomplete="off" /></div>
-      <div class="field"><label id="e-amount-label">金額</label><input type="number" id="e-amount" step="any" autocomplete="off" /></div>
+      <div class="field"><label id="e-amount-label">金額</label><input type="number" id="e-amount" step="any"
+          autocomplete="off" /></div>
       <div class="field" id="e-to-amount-field" style="display:none">
         <label id="e-to-amount-label">轉入金額</label>
         <input type="number" id="e-to-amount" step="any" autocomplete="off" />
@@ -1108,11 +1179,17 @@
           <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}</option>
           {% endfor %}
         </select>
+        <div id="e-cc-transfer-hint"
+          style="display:none;align-items:center;gap:8px;margin-top:8px;padding:8px 12px;background:rgba(200,240,74,.08);border:1px solid rgba(200,240,74,.25);border-radius:8px;font-size:.8rem;color:var(--accent);">
+          <span style="flex:1;">信用卡還款請至「負債區」操作</span>
+          <button type="button" onclick="window.parent.switchTab('debts')"
+            style="background:var(--accent);color:#111;border:none;border-radius:6px;padding:4px 10px;font-size:.75rem;font-family:inherit;cursor:pointer;white-space:nowrap;">前往負債區</button>
+        </div>
       </div>
-      <div class="field"><label>日期</label><input type="date" id="e-date" /></div>
-      <div class="field"><label>備註</label><input type="text" id="e-note" autocomplete="off" /></div>
+      <div class="field" id="e-date-field"><label>日期</label><input type="date" id="e-date" /></div>
+      <div class="field" id="e-note-field"><label>備註</label><input type="text" id="e-note" autocomplete="off" /></div>
     </div>
-    <div class="modal-actions">
+    <div class="modal-actions" id="e-modal-actions">
       <button class="btn-ghost" onclick="closeEdit()">取消</button>
       <button class="btn btn-primary" style="flex:1" onclick="saveEdit()">儲存</button>
     </div>
@@ -1133,12 +1210,103 @@
   </div>
 </div>
 
+<!-- Balance Correction Modal -->
+<div class="overlay" id="correct-overlay">
+  <div class="modal">
+    <h3>餘額校正</h3>
+
+    <!-- Step 1: reminder -->
+    <div id="correct-step1">
+      <p style="color:var(--text);font-size:.9rem;line-height:1.7;margin-bottom:12px;">
+        數字對不上嗎？校正前請先確認：
+      </p>
+      <ul style="color:var(--muted);font-size:.85rem;line-height:1.8;padding-left:20px;margin-bottom:16px;">
+        <li>是否有記帳<b style="color:var(--accent);">提前</b>（尚未實際入帳的收支）？</li>
+        <li>是否有記帳<b style="color:var(--accent);">延遲</b>（已發生但還沒記的收支）？</li>
+        <li>是否有轉帳、信用卡款項尚未沖銷？</li>
+      </ul>
+      <p style="color:var(--muted);font-size:.82rem;line-height:1.6;margin-bottom:20px;">
+        若上述情況存在，建議先補正記帳，而非直接校正餘額。確認無誤後再進行校正，差額將直接調整帳戶期初餘額，<b style="color:var(--text);">不計入收支</b>。
+      </p>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closeCorrect()">取消</button>
+        <button class="btn btn-primary" style="flex:1" onclick="correctGoStep2()">開始校正</button>
+      </div>
+    </div>
+
+    <!-- Step 2: adjust -->
+    <div id="correct-step2" style="display:none;">
+      <div class="field">
+        <label>選擇帳戶</label>
+        <select id="correct-account" onchange="onCorrectAccountChange()">
+          {% for a in all_accounts %}
+          <option value="{{ a.id }}" data-cur="{{ a.get('currency', 'TWD') }}">{{ a.icon }} {{ a.name }}{% if
+            a.get('currency', 'TWD') != 'TWD' %} · {{ a.currency }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>目前記錄餘額</label>
+        <input type="text" id="correct-current" readonly
+          style="background:var(--surface);color:var(--muted);cursor:default;" />
+      </div>
+      <div class="field">
+        <label id="correct-actual-label">實際餘額</label>
+        <input type="number" id="correct-actual" step="any" placeholder="輸入實際餘額" autocomplete="off"
+          oninput="updateCorrectDiff()" />
+      </div>
+      <div id="correct-diff-hint"
+        style="display:none;font-size:.82rem;padding:10px 12px;border-radius:8px;margin-bottom:16px;line-height:1.6;">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="correctBackStep1()">上一步</button>
+        <button class="btn btn-primary" style="flex:1" onclick="doCorrect()">套用校正</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Month Picker Modal -->
+<div class="overlay" id="month-picker-overlay">
+  <div class="modal" style="max-width:260px">
+    <h3>跳轉至</h3>
+    <div class="modal-form">
+      <div class="field">
+        <label>年份</label>
+        <select class="form-select" id="picker-year" style="width:100%"></select>
+      </div>
+      <div class="field">
+        <label>月份</label>
+        <select class="form-select" id="picker-month" style="width:100%">
+          <option value="0">1月</option>
+          <option value="1">2月</option>
+          <option value="2">3月</option>
+          <option value="3">4月</option>
+          <option value="4">5月</option>
+          <option value="5">6月</option>
+          <option value="6">7月</option>
+          <option value="7">8月</option>
+          <option value="8">9月</option>
+          <option value="9">10月</option>
+          <option value="10">11月</option>
+          <option value="11">12月</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost"
+        onclick="document.getElementById('month-picker-overlay').classList.remove('open')">取消</button>
+      <button class="btn btn-primary" style="flex:1" onclick="applyMonthPicker()">確認</button>
+    </div>
+  </div>
+</div>
+
 <!-- Day Detail Modal (calendar click) -->
 <div class="overlay" id="day-overlay">
   <div class="modal">
     <h3 id="day-modal-title"></h3>
-    <div id="day-modal-content" style="max-height:55vh;overflow-y:auto;margin-top:8px"></div>
-    <div class="modal-actions" style="margin-top:16px">
+    <div id="day-modal-content" style="margin-top:8px"></div>
+    <div class="modal-actions">
       <button class="btn-ghost" onclick="document.getElementById('day-overlay').classList.remove('open')">關閉</button>
     </div>
   </div>
@@ -1156,6 +1324,20 @@
   const allExpenses = {{ expenses | tojson | safe }};
   const accountMapData = {{ account_map | tojson | safe }};
   const allCategories = {{ categories | tojson | safe }};
+  const CC_ACCOUNT_IDS = new Set({{ cc_account_ids | tojson | safe }});
+  const RATES = {{ rates | tojson | safe }};
+  const ACCOUNT_BALANCES = {{ account_balances | tojson | safe }};
+  const LOAN_LEND_NET = {{ lend_net | default(0) | tojson }};
+  const LOAN_BORROW_NET = {{ borrow_net | default(0) | tojson }};
+
+  // Cool palette for asset segments.
+  const PROP_COLORS = ['#c8f04a', '#5bc0de', '#4ad9c8', '#a78bfa', '#7a9cf0',
+    '#8ad04a', '#5bd0a0', '#6ab0f0', '#b0e04a', '#4ac8d9'];
+  // Warm palette for liability segments.
+  const PROP_COLORS_WARM = ['#ff5f5f', '#ff8a4a', '#ffab40', '#f06aa0', '#ff7050',
+    '#e0704a', '#ffca28', '#f0904a', '#ff6f91', '#d9884a'];
+
+  function fmtTWD(n) { return 'NT$ ' + Math.round(n).toLocaleString(); }
 
   // Build currency lookup from account data
   const accCurrencyMap = {};
@@ -1194,6 +1376,22 @@
     }
   }
 
+  // ── Credit-card transfer guidance ──
+  function checkCCTransfer(prefix) {
+    const toId = parseInt(document.getElementById(`${prefix}-to-account`).value) || 0;
+    const hint = document.getElementById(`${prefix}-cc-transfer-hint`);
+    if (!hint) return;
+    const isCC = CC_ACCOUNT_IDS.has(toId);
+    hint.style.display = isCC ? 'flex' : 'none';
+    const hide = isCC ? 'none' : '';
+    [`${prefix}-date-field`, `${prefix}-note-field`].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = hide;
+    });
+    const actionsEl = document.getElementById(prefix === 'f' ? 'f-add-buttons' : `${prefix}-modal-actions`);
+    if (actionsEl) actionsEl.style.display = hide;
+  }
+
   // ── Type change ──
   function onTypeChange(type, prefix) {
     if (type === 'transfer') {
@@ -1203,7 +1401,8 @@
       document.getElementById(prefix + '-account-label').innerHTML = `轉出帳戶 <a href="/settings?tab=accounts" style="font-size:0.625rem;float:right;cursor:pointer;color:var(--accent);text-decoration:none;">管理</a>`;
       document.getElementById(prefix + '-title').value = '轉帳';
       document.getElementById(`${prefix}-account`).onchange = () => updateTransferAmountFields(prefix);
-      document.getElementById(`${prefix}-to-account`).onchange = () => updateTransferAmountFields(prefix);
+      document.getElementById(`${prefix}-to-account`).onchange = () => { updateTransferAmountFields(prefix); checkCCTransfer(prefix); };
+      checkCCTransfer(prefix);
       updateTransferAmountFields(prefix);
     } else {
       document.getElementById(prefix + '-title-field').style.display = 'block';
@@ -1213,6 +1412,14 @@
       document.getElementById(prefix + '-account-label').innerHTML = `帳戶 <a href="/settings?tab=accounts" style="font-size:0.625rem;float:right;cursor:pointer;color:var(--accent);text-decoration:none;">管理</a>`;
       document.getElementById(`${prefix}-account`).onchange = () => updateAmountLabel(prefix);
       document.getElementById(`${prefix}-to-account`).onchange = null;
+      const hint = document.getElementById(`${prefix}-cc-transfer-hint`);
+      if (hint) hint.style.display = 'none';
+      [`${prefix}-date-field`, `${prefix}-note-field`].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = '';
+      });
+      const actionsEl = document.getElementById(prefix === 'f' ? 'f-add-buttons' : `${prefix}-modal-actions`);
+      if (actionsEl) actionsEl.style.display = '';
       filterCategories(type, prefix + '-category');
       if (document.getElementById(prefix + '-title').value === '轉帳') document.getElementById(prefix + '-title').value = '';
       updateAmountLabel(prefix);
@@ -1235,20 +1442,34 @@
   function filterCategories(type, selectId) {
     const select = document.getElementById(selectId);
     if (!select) return;
-    let firstValid = null;
-    Array.from(select.options).forEach(opt => {
-      if (opt.dataset.type === type) {
-        opt.style.display = '';
-        if (!firstValid) firstValid = opt.value;
-      } else {
-        opt.style.display = 'none';
-      }
+    const prevValue = select.value;
+    select.innerHTML = '';
+
+    const groups = new Map();
+    allCategories.forEach(cat => {
+      if (cat.type !== type) return;
+      const g = cat.group_name || '未分類';
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(cat);
     });
-    Array.from(select.querySelectorAll('optgroup')).forEach(grp => {
-      const hasVisible = Array.from(grp.querySelectorAll('option')).some(o => o.style.display !== 'none');
-      grp.style.display = hasVisible ? '' : 'none';
+
+    let firstValue = null;
+    groups.forEach((cats, gname) => {
+      const og = document.createElement('optgroup');
+      og.label = gname;
+      cats.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat.name;
+        opt.textContent = cat.name;
+        opt.dataset.type = cat.type;
+        if (!firstValue) firstValue = cat.name;
+        og.appendChild(opt);
+      });
+      select.appendChild(og);
     });
-    if (firstValid) select.value = firstValid;
+
+    const stillValid = Array.from(select.options).some(o => o.value === prevValue);
+    select.value = stillValid ? prevValue : (firstValue || '');
   }
 
   onTypeChange('expense', 'f');
@@ -1299,7 +1520,7 @@
         try {
           const res = await fetch(`/api/budget?year=${currentYear}&month=${currentMonth + 1}`);
           if (res.ok) _budgetCache[cacheKey] = await res.json();
-        } catch (e) {}
+        } catch (e) { }
       }
       const bdata = _budgetCache[cacheKey];
       if (bdata) {
@@ -1535,6 +1756,36 @@
     if (calendar) calendar.gotoDate(new Date(currentYear, currentMonth, 1));
   }
 
+  function openMonthPicker() {
+    const years = [...new Set(allExpenses.map(e => {
+      const d = new Date(e.date + 'T00:00:00'); return d.getFullYear();
+    }))];
+    const nowYear = new Date().getFullYear();
+    if (!years.includes(nowYear)) years.push(nowYear);
+    years.sort((a, b) => b - a);
+    const sel = document.getElementById('picker-year');
+    sel.innerHTML = years.map(y => `<option value="${y}">${y}年</option>`).join('');
+    sel.value = String(currentYear);
+    document.getElementById('picker-month').value = String(currentMonth);
+    document.getElementById('month-picker-overlay').classList.add('open');
+  }
+
+  function applyMonthPicker() {
+    const y = parseInt(document.getElementById('picker-year').value);
+    const m = parseInt(document.getElementById('picker-month').value);
+    currentYear = y;
+    currentMonth = m;
+    isCustomRange = false;
+    rangeStart = null;
+    rangeEnd = null;
+    document.getElementById('date-range-bar').style.display = 'none';
+    document.getElementById('custom-range-btn').classList.remove('active');
+    updateMonthDisplay();
+    applyFilters();
+    if (calendar) calendar.gotoDate(new Date(currentYear, currentMonth, 1));
+    document.getElementById('month-picker-overlay').classList.remove('open');
+  }
+
   function toggleDateRange() {
     const bar = document.getElementById('date-range-bar');
     const btn = document.getElementById('custom-range-btn');
@@ -1570,6 +1821,7 @@
     applyFilters();
   }
 
+
   function dateMatchesFilter(dateStr) {
     if (!dateStr) return false;
     if (isCustomRange && rangeStart && rangeEnd) return dateStr >= rangeStart && dateStr <= rangeEnd;
@@ -1583,13 +1835,38 @@
     const activeIds = allActive ? null : getActiveAccountIds();
 
     let totalBal = 0;
+    const selectedAccounts = [];
     document.querySelectorAll('.btn-filter[data-id]:not([data-id="all"])').forEach(b => {
-      if (allActive || b.classList.contains('active')) totalBal += parseFloat(b.dataset.bal || 0);
+      if (allActive || b.classList.contains('active')) {
+        const twd = parseFloat(b.dataset.balTwd || 0);
+        totalBal += twd;
+        selectedAccounts.push({
+          id: b.dataset.id,
+          name: b.dataset.name || '',
+          cur: b.dataset.cur || 'TWD',
+          native: parseFloat(b.dataset.bal || 0),
+          twd: twd,
+        });
+      }
     });
+    // Inject loan net into total and proportion bar (only when all accounts selected)
+    if (allActive) {
+      if (LOAN_LEND_NET > 0) {
+        totalBal += LOAN_LEND_NET;
+        selectedAccounts.push({ id: 'loan-lend', name: '借出應收', cur: 'TWD', native: LOAN_LEND_NET, twd: LOAN_LEND_NET });
+      }
+      if (LOAN_BORROW_NET > 0) {
+        totalBal -= LOAN_BORROW_NET;
+        selectedAccounts.push({ id: 'loan-borrow', name: '借入未還', cur: 'TWD', native: -LOAN_BORROW_NET, twd: -LOAN_BORROW_NET });
+      }
+    }
+
     const valEl = document.getElementById("stat-total");
-    valEl.textContent = "NT$ " + totalBal.toFixed(0);
+    valEl.textContent = fmtTWD(totalBal);
     if (totalBal >= 0) { valEl.classList.remove('red'); valEl.classList.add('green'); }
     else { valEl.classList.remove('green'); valEl.classList.add('red'); }
+
+    renderProportionBar(selectedAccounts);
 
     document.querySelectorAll('.expense-item').forEach(el => {
       const s1 = el.getAttribute('data-acc-id');
@@ -1607,6 +1884,117 @@
   }
 
   function updateDisplayedBalance() { applyFilters(); }
+
+  // ── Asset / liability proportion bar (single combined bar) ──
+  function renderProportionBar(accounts) {
+    const wrap = document.getElementById('proportion-wrap');
+    const bar = document.getElementById('prop-bar');
+    const legend = document.getElementById('prop-legend');
+    if (!wrap || !bar || !legend) return;
+
+    // Assets (positive, cool) first, then liabilities (negative, warm), each by magnitude.
+    const assets = accounts.filter(a => a.twd > 0)
+      .map((a, i) => ({ ...a, mag: a.twd, liab: false, color: PROP_COLORS[i % PROP_COLORS.length] }))
+      .sort((x, y) => y.mag - x.mag);
+    const liabs = accounts.filter(a => a.twd < 0)
+      .map((a, i) => ({ ...a, mag: -a.twd, liab: true, color: PROP_COLORS_WARM[i % PROP_COLORS_WARM.length] }))
+      .sort((x, y) => y.mag - x.mag);
+    const rows = assets.concat(liabs);
+
+    const total = rows.reduce((s, a) => s + a.mag, 0);
+    if (rows.length === 0 || total <= 0) {
+      wrap.style.display = 'none';
+      bar.innerHTML = '';
+      legend.innerHTML = '';
+      return;
+    }
+    wrap.style.display = 'block';
+
+    bar.innerHTML = rows.map(a => {
+      const pct = a.mag / total * 100;
+      return `<div class="prop-seg" style="width:${pct}%;background:${a.color};" title="${a.name} ${pct.toFixed(1)}%"></div>`;
+    }).join('');
+
+    legend.innerHTML = rows.map(a => {
+      const pct = a.mag / total * 100;
+      const nativeStr = a.cur !== 'TWD'
+        ? `<span class="prop-legend-native">${Math.round(Math.abs(a.native)).toLocaleString()} ${a.cur}</span>`
+        : '';
+      const amtStr = a.liab ? `-${fmtTWD(a.mag)}` : fmtTWD(a.mag);
+      return `<div class="prop-legend-item">
+        <span class="prop-dot" style="background:${a.color};"></span>
+        <span class="prop-legend-name">${a.name}</span>
+        <span class="prop-legend-pct">${pct.toFixed(1)}%</span>
+        <span class="prop-legend-amt">${amtStr}</span>
+        ${nativeStr}
+      </div>`;
+    }).join('');
+  }
+
+  // ── Balance correction ──
+  function openCorrect() {
+    document.getElementById('correct-step1').style.display = 'block';
+    document.getElementById('correct-step2').style.display = 'none';
+    document.getElementById('correct-overlay').classList.add('open');
+  }
+  function closeCorrect() { document.getElementById('correct-overlay').classList.remove('open'); }
+  function correctGoStep2() {
+    document.getElementById('correct-step1').style.display = 'none';
+    document.getElementById('correct-step2').style.display = 'block';
+    document.getElementById('correct-actual').value = '';
+    document.getElementById('correct-diff-hint').style.display = 'none';
+    onCorrectAccountChange();
+  }
+  function correctBackStep1() {
+    document.getElementById('correct-step2').style.display = 'none';
+    document.getElementById('correct-step1').style.display = 'block';
+  }
+  function correctCurrentBalance() {
+    const sel = document.getElementById('correct-account');
+    const id = sel.value;
+    return { bal: parseFloat(ACCOUNT_BALANCES[id] || 0), cur: sel.selectedOptions[0].dataset.cur || 'TWD' };
+  }
+  function onCorrectAccountChange() {
+    const { bal, cur } = correctCurrentBalance();
+    const curLabel = cur === 'TWD' ? 'NT$' : cur;
+    document.getElementById('correct-current').value = `${curLabel} ${Math.round(bal).toLocaleString()}`;
+    document.getElementById('correct-actual-label').textContent = `實際餘額（${curLabel}）`;
+    document.getElementById('correct-actual').value = '';
+    document.getElementById('correct-diff-hint').style.display = 'none';
+  }
+  function updateCorrectDiff() {
+    const { bal, cur } = correctCurrentBalance();
+    const actualRaw = document.getElementById('correct-actual').value;
+    const hint = document.getElementById('correct-diff-hint');
+    if (actualRaw === '' || isNaN(parseFloat(actualRaw))) { hint.style.display = 'none'; return; }
+    const diff = parseFloat(actualRaw) - bal;
+    const curLabel = cur === 'TWD' ? 'NT$' : cur;
+    hint.style.display = 'block';
+    if (Math.abs(diff) < 0.005) {
+      hint.style.background = 'var(--surface)';
+      hint.style.color = 'var(--muted)';
+      hint.innerHTML = '餘額一致，無需校正。';
+    } else {
+      const up = diff > 0;
+      hint.style.background = up ? 'var(--accent-dim)' : 'var(--danger-dim)';
+      hint.style.color = up ? 'var(--accent)' : 'var(--danger)';
+      hint.innerHTML = `差額 ${up ? '+' : '-'}${curLabel} ${Math.round(Math.abs(diff)).toLocaleString()}
+        將調整至帳戶期初餘額（不計入收支）。`;
+    }
+  }
+  async function doCorrect() {
+    const id = document.getElementById('correct-account').value;
+    const actualRaw = document.getElementById('correct-actual').value;
+    if (actualRaw === '' || isNaN(parseFloat(actualRaw))) { toast('請輸入實際餘額'); return; }
+    const res = await fetch(`/api/accounts/${id}/adjust-balance`, {
+      method: 'POST', body: JSON.stringify({ target: parseFloat(actualRaw) })
+    });
+    if (res.ok) { toast('校正成功'); location.reload(); }
+    else {
+      const err = await res.json().catch(() => ({}));
+      toast(err.error || '校正失敗');
+    }
+  }
 
   // ── View switch + Calendar ──
   let calendar = null;
@@ -1662,7 +2050,7 @@
         currentYear = info.view.currentStart.getFullYear();
         currentMonth = info.view.currentStart.getMonth();
         if (!isCustomRange) updateMonthDisplay();
-        updateBudgetDisplay();
+        if (document.getElementById('calendar-view').style.display !== 'none') updateBudgetDisplay();
       },
       dateClick: function (info) { openDayModal(info.dateStr); },
       eventClick: function (info) {
@@ -1708,6 +2096,12 @@
           const curPrefix = cur === 'TWD' ? 'NT$' : cur;
           amountStr = `${sign}${curPrefix} ${Math.round(e.amount)}`;
         }
+        const isSystemManaged = !!(e.stock_transaction_id || e.loan_id || e.loan_payment_id);
+        const actionsHtml = isSystemManaged ? '' :
+          `<div style="display:flex;gap:6px;flex-shrink:0;">
+            <button class="icon-btn" onclick="closeDayAndEdit('${e.id}')">✎</button>
+            <button class="icon-btn del" onclick="closeDayAndDelete('${e.id}')">✕</button>
+          </div>`;
         return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
           <span class="cat-badge ${badgeCls}">${badgeText}</span>
           <div style="flex:1;min-width:0">
@@ -1715,16 +2109,59 @@
             <div class="item-date">${e.note ? e.note + ' ' : ''}${accTag}${toAccTag}</div>
           </div>
           <div class="item-amount ${e.type}">${amountStr}</div>
+          ${actionsHtml}
         </div>`;
       }).join('');
     }
     document.getElementById('day-overlay').classList.add('open');
   }
 
+  // Opportunistically sync live FX rates when online. Renders with local rates
+  // first; if the fresh rates differ, reload once so the page reflects them.
+  async function syncRates() {
+    if (sessionStorage.getItem('rates_synced')) return;
+    sessionStorage.setItem('rates_synced', '1');
+    try {
+      const res = await fetch('/api/rates/refresh', { method: 'POST' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.updated || !data.rates) return;
+      const changed = Object.keys(data.rates).some(
+        c => Math.abs((data.rates[c] || 0) - (RATES[c] || 0)) > 1e-6);
+      if (changed) location.reload();
+    } catch (e) { /* offline — keep local rates */ }
+  }
+
+  // ── Mobile panel nav ──
+  let currentPanel = 1;
+
+  function panelGo(idx) {
+    currentPanel = idx;
+    const balPanel = document.getElementById('mobile-panel-balance');
+    const listPanel = document.getElementById('mobile-panel-list');
+    balPanel.classList.toggle('panel-active', idx === 0);
+    listPanel.classList.toggle('panel-hidden', idx !== 1);
+    document.querySelectorAll('.panel-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+  }
+
+  // ── Day modal: close + open edit/delete ──
+  function closeDayAndEdit(id) {
+    document.getElementById('day-overlay').classList.remove('open');
+    openEditById(id);
+  }
+
+  function closeDayAndDelete(id) {
+    document.getElementById('day-overlay').classList.remove('open');
+    confirmDelete(id);
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     updateMonthDisplay();
     applyFilters();
     updateAccFilterSummary();
+    syncRates();
+    // Init mobile panels: default to list (panel 1)
+    if (window.innerWidth <= 768) panelGo(1);
   });
 </script>
 {% endblock %}

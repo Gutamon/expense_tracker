@@ -12,6 +12,7 @@ except ImportError:
 
 stock_bp = Blueprint("stock", __name__)
 stock_model = StockModel()
+account_model = AccountModel()
 
 
 @stock_bp.route("/stocks")
@@ -45,9 +46,34 @@ def api_create_position():
     if not re.match(r"^[A-Z0-9.]+$", symbol):
         abort(400, "代號只能包含大寫英文字母、數字與點")
 
+    if _YF_AVAILABLE:
+        candidates = ([symbol + ".TW", symbol + ".TWO", symbol]
+                      if symbol.replace(".", "").isdigit() else [symbol])
+        found = False
+        for candidate in candidates:
+            try:
+                info = yf.Ticker(candidate).fast_info
+                if float(info.last_price or 0) > 0:
+                    found = True
+                    break
+            except Exception:
+                continue
+        if not found:
+            abort(400, f"查無此股票代號：{symbol}")
+
     new_id = stock_model.create_position(symbol, name, int(account_id))
     if not new_id:
         abort(400, "該股票倉位已存在")
+
+    linked_acc_id = account_model.create(name=name, icon="📈", type="asset",
+                                         sub_type="投資", is_asset=1, currency="TWD")
+    rows = csv_store.read_csv("stocks.csv")
+    for r in rows:
+        if str(r.get("id")) == str(new_id):
+            r["linked_account_id"] = int(linked_acc_id)
+            break
+    csv_store.write_csv("stocks.csv", rows, csv_store.SCHEMA["stocks.csv"])
+
     return jsonify({"success": True, "id": new_id}), 201
 
 
@@ -60,22 +86,32 @@ def api_update_all_prices():
     if not stocks:
         return jsonify({"updated": 0, "failed": []})
 
+    def _fetch_price(symbol):
+        """Try symbol as-is; for pure-digit TW symbols also try .TW / .TWO suffixes."""
+        candidates = [symbol]
+        if symbol.replace(".", "").isdigit():
+            candidates = [symbol + ".TW", symbol + ".TWO", symbol]
+        for candidate in candidates:
+            try:
+                info = yf.Ticker(candidate).fast_info
+                price = float(info.last_price or 0)
+                if price > 0:
+                    return price
+            except Exception:
+                continue
+        return None
+
     updated = 0
     failed = []
     for s in stocks:
         symbol = s.get("symbol", "")
         if not symbol:
             continue
-        try:
-            ticker = yf.Ticker(symbol)
-            info = ticker.fast_info
-            price = float(info.last_price or 0)
-            if price > 0:
-                stock_model.update_price(s["id"], price)
-                updated += 1
-            else:
-                failed.append(symbol)
-        except Exception:
+        price = _fetch_price(symbol)
+        if price:
+            stock_model.update_price(s["id"], price)
+            updated += 1
+        else:
             failed.append(symbol)
 
     return jsonify({"updated": updated, "failed": failed})
@@ -118,6 +154,9 @@ def api_update_stock_name(stock_id):
         if str(r.get("id")) == str(stock_id):
             r["name"] = name
             csv_store.write_csv("stocks.csv", rows, csv_store.SCHEMA["stocks.csv"])
+            linked = int(r.get("linked_account_id") or 0)
+            if linked:
+                account_model.update(linked, {"name": name})
             return jsonify({"success": True})
     abort(404, "找不到該倉位")
 

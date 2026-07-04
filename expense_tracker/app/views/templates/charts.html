@@ -18,31 +18,50 @@
     margin-left: 12px;
   }
 
-  .tabs {
+
+  .time-filter-bar {
     display: flex;
-    gap: 12px;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 24px;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 12px;
+    flex-wrap: wrap;
   }
 
-  .tab {
-    background: transparent;
-    border: none;
+  .time-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
     color: var(--muted);
     font-family: inherit;
-    font-size: 1rem;
+    font-size: .82rem;
     cursor: pointer;
-    padding: 8px 16px;
-    border-radius: 8px;
+    padding: 5px 12px;
+    border-radius: 6px;
     transition: all .2s;
   }
 
-  .tab.active {
-    color: #111;
-    background: var(--accent);
-    font-weight: 500;
+  .time-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
   }
+
+  .time-picker {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .time-select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: .82rem;
+    padding: 5px 8px;
+    outline: none;
+    cursor: pointer;
+  }
+
 
   .charts-grid {
     display: grid;
@@ -93,10 +112,6 @@
   }
 
   .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 28px;
     overflow: hidden;
     min-width: 0;
   }
@@ -189,10 +204,28 @@
   </div>
 </div>
 
-<div class="tabs">
-  <button class="tab active" onclick="switchTab('balance')">收支</button>
-  <button class="tab" onclick="switchTab('expense')">支出</button>
-  <button class="tab" onclick="switchTab('income')">收入</button>
+<div class="page-tabs">
+  <button class="page-tab active" onclick="switchTab('balance')">收支</button>
+  <button class="page-tab" onclick="switchTab('expense')">支出</button>
+  <button class="page-tab" onclick="switchTab('income')">收入</button>
+</div>
+
+<div class="time-filter-bar">
+  <button class="time-btn active" onclick="setTimeFilter('all')">全部</button>
+  <button class="time-btn" onclick="setTimeFilter('year')">依年</button>
+  <button class="time-btn" onclick="setTimeFilter('month')">依月</button>
+  <div class="time-picker" id="time-year-picker" style="display:none">
+    <select class="time-select" id="time-year-select" onchange="applyTimeFilter()"></select>
+  </div>
+  <div class="time-picker" id="time-month-picker" style="display:none">
+    <select class="time-select" id="time-month-year-select" onchange="applyTimeFilter()"></select>
+    <select class="time-select" id="time-month-select" onchange="applyTimeFilter()">
+      <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option>
+      <option value="4">4月</option><option value="5">5月</option><option value="6">6月</option>
+      <option value="7">7月</option><option value="8">8月</option><option value="9">9月</option>
+      <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+    </select>
+  </div>
 </div>
 
 <div class="charts-grid">

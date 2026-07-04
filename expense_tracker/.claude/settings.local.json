@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c \"from app.views import create_app; app = create_app\\(\\); print\\('OK'\\)\")"
+      "Bash(python -c \"from app.views import create_app; app = create_app\\(\\); print\\('OK'\\)\")",
+      "Bash(python -m py_compile app/models/csv_store.py app/models/account.py app/models/debt.py app/models/importer.py app/models/expense.py app/controllers/debt_routes.py app/controllers/category_routes.py)"
     ]
   }
 }

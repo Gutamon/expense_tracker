@@ -68,11 +68,13 @@ class ExpenseModel:
         expense_id = str(expense_id)
         return next((r for r in rows if str(r.get("id")) == expense_id), None)
 
+    _SKIP_CATS = frozenset({"股票交易", "期初餘額"})
+
     def get_monthly_summary(self) -> list:
-        rows = read_csv("expenses.csv")
         agg = defaultdict(float)
-        for r in rows:
-            if r.get("category") == "股票交易":
+
+        for r in read_csv("expenses.csv"):
+            if r.get("category") in self._SKIP_CATS:
                 continue
             date = r.get("date", "")
             if len(date) < 7:
@@ -87,24 +89,66 @@ class ExpenseModel:
                 agg[key] += float(r.get("amount") or 0)
             except ValueError:
                 pass
-        result = [{"year": k[0], "month": k[1], "type": k[2], "total": v}
-                  for k, v in sorted(agg.items())]
-        return result
 
-    def get_category_summary(self) -> list:
-        rows = read_csv("expenses.csv")
-        agg = defaultdict(float)
-        for r in rows:
-            if r.get("category") == "股票交易":
+        for h in read_csv("monthly_history.csv"):
+            t = h.get("type", "")
+            if t not in ("income", "expense"):
                 continue
+            try:
+                key = (int(h["year"]), int(h["month"]), t)
+                agg[key] += float(h.get("amount") or 0)
+            except (ValueError, KeyError):
+                pass
+
+        return [{"year": k[0], "month": k[1], "type": k[2], "total": v}
+                for k, v in sorted(agg.items())]
+
+    def get_category_summary(self, year: int = None, month: int = None) -> list:
+        agg = defaultdict(float)
+
+        for r in read_csv("expenses.csv"):
+            if r.get("category") in self._SKIP_CATS:
+                continue
+            if year is not None or month is not None:
+                date = r.get("date", "")
+                if len(date) < 7:
+                    continue
+                try:
+                    d_year = int(date[:4])
+                    d_month = int(date[5:7])
+                except ValueError:
+                    continue
+                if year is not None and d_year != year:
+                    continue
+                if month is not None and d_month != month:
+                    continue
             key = (r.get("category", ""), r.get("type", ""))
             try:
                 agg[key] += float(r.get("amount") or 0)
             except ValueError:
                 pass
-        result = [{"category": k[0], "type": k[1], "total": v}
-                  for k, v in sorted(agg.items(), key=lambda x: -x[1])]
-        return result
+
+        for h in read_csv("monthly_history.csv"):
+            t = h.get("type", "")
+            if t not in ("income", "expense"):
+                continue
+            try:
+                h_year = int(h["year"])
+                h_month = int(h["month"])
+            except (ValueError, KeyError):
+                continue
+            if year is not None and h_year != year:
+                continue
+            if month is not None and h_month != month:
+                continue
+            key = (h.get("category", ""), t)
+            try:
+                agg[key] += float(h.get("amount") or 0)
+            except ValueError:
+                pass
+
+        return [{"category": k[0], "type": k[1], "total": v}
+                for k, v in sorted(agg.items(), key=lambda x: -x[1])]
 
     def update(self, expense_id: str, data: dict) -> bool:
         rows = read_csv("expenses.csv")

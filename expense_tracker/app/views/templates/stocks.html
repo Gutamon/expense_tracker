@@ -335,10 +335,13 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 100;
+    z-index: 50;
     opacity: 0;
     pointer-events: none;
     transition: opacity .2s;
+    padding: 24px 20px;
+    padding-top: calc(24px + env(safe-area-inset-top));
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
   }
 
   .modal-overlay.open {
@@ -350,9 +353,13 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    width: 400px;
-    padding: 32px;
+    width: 100%;
+    max-width: 400px;
+    padding: 32px 32px 0;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .modal h3 {
@@ -363,6 +370,7 @@
 
   .field {
     margin-bottom: 16px;
+    min-width: 0;
   }
 
   .field label {
@@ -392,32 +400,18 @@
   .modal-actions {
     display: flex;
     gap: 12px;
-    margin-top: 24px;
+    position: sticky;
+    bottom: 0;
+    margin: 0 -32px;
+    padding: 16px 32px 32px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
   }
 
   .modal-actions button {
     flex: 1;
   }
 
-  #toast {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: var(--accent);
-    color: #111;
-    border-radius: 8px;
-    padding: 12px 20px;
-    font-size: .85rem;
-    font-weight: 500;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity .3s;
-    z-index: 200;
-  }
-
-  #toast.show {
-    opacity: 1;
-  }
 
   .account-row {
     display: flex;
@@ -551,8 +545,16 @@
     }
 
     .modal {
-      width: 92%;
-      padding: 24px;
+      padding: 24px 20px 0;
+    }
+
+    .modal-actions {
+      margin: 0 -20px;
+      padding: 14px 20px 24px;
+    }
+
+    #toast {
+      bottom: calc(76px + env(safe-area-inset-bottom) + 16px);
     }
   }
 </style>
@@ -607,7 +609,7 @@
           <span class="account-label">交割戶</span>
           <select class="account-select" data-stock-id="{{ s.id }}" onchange="changeStockAccount(this)">
             {% for a in accounts if a.icon == '🏦' %}
-            <option value="{{ a.id }}" {% if a.id == s.account_id %}selected{% endif %}>{{ a.icon }} {{ a.name }}</option>
+            <option value="{{ a.id }}" {% if a.id==s.account_id %}selected{% endif %}>{{ a.icon }} {{ a.name }}</option>
             {% endfor %}
           </select>
         </div>
@@ -619,7 +621,7 @@
         </div>
         <div class="stat-item">
           <span class="stat-label">均價 / 現價</span>
-          <span class="stat-value">${{ "%.2f" | format(s.avg_price) }} / <input type="number" step="0.01" min="0" value="{{ "%.2f" | format(s.current_price) }}" style="width:6rem;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:inherit;text-align:right;padding:0 2px;" onblur="updateStockPrice({{ s.id }}, this)" onkeydown="if(event.key==='Enter')this.blur()"></span>
+          <span class="stat-value">${{ "%.2f" | format(s.avg_price) }} / ${{ "%.2f" | format(s.current_price) }}</span>
         </div>
         <div class="stat-item">
           <span class="stat-label">損益</span>
@@ -704,7 +706,7 @@
           <span class="account-label">交割戶</span>
           <select class="account-select" data-stock-id="{{ s.id }}" onchange="changeStockAccount(this)">
             {% for a in accounts if a.icon == '🏦' %}
-            <option value="{{ a.id }}" {% if a.id == s.account_id %}selected{% endif %}>{{ a.icon }} {{ a.name }}</option>
+            <option value="{{ a.id }}" {% if a.id==s.account_id %}selected{% endif %}>{{ a.icon }} {{ a.name }}</option>
             {% endfor %}
           </select>
         </div>
@@ -716,7 +718,7 @@
         </div>
         <div class="stat-item">
           <span class="stat-label">均價 / 現價</span>
-          <span class="stat-value">${{ "%.2f" | format(s.avg_price) }} / <input type="number" step="0.01" min="0" value="{{ "%.2f" | format(s.current_price) }}" style="width:6rem;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:inherit;text-align:right;padding:0 2px;" onblur="updateStockPrice({{ s.id }}, this)" onkeydown="if(event.key==='Enter')this.blur()"></span>
+          <span class="stat-value">${{ "%.2f" | format(s.avg_price) }} / ${{ "%.2f" | format(s.current_price) }}</span>
         </div>
         <div class="stat-item">
           <span class="stat-label">損益</span>
@@ -780,7 +782,7 @@
 <div class="stock-list">
   <div
     style="text-align:center;color:var(--muted);padding:60px 0;background:var(--surface);border-radius:var(--radius);">
-    尚未建立任何倉位，請點擊「新增倉位」開始記錄。
+    尚無股票倉位
   </div>
 </div>
 {% endif %}
@@ -815,7 +817,7 @@
 
 <!-- Confirm Modal -->
 <div class="modal-overlay" id="confirm-modal">
-  <div class="modal" style="width:360px;text-align:center;">
+  <div class="modal" style="max-width:360px;text-align:center;">
     <p id="confirm-msg"
       style="font-size:1rem;line-height:1.6;margin-bottom:28px;color:var(--text);white-space:pre-wrap"></p>
     <div style="display:flex;gap:12px;justify-content:center;">
@@ -870,15 +872,15 @@
       const res = await fetch('/api/stocks/update-prices', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) {
-        toast(data.error || '無法連線，請手動輸入現價');
+        toast(data.error || '無法連線，請確認網路後重試');
       } else {
         let msg = `已更新 ${data.updated} 支`;
         if (data.failed && data.failed.length) msg += `，查詢失敗: ${data.failed.join(', ')}`;
         toast(msg);
-        if (data.updated > 0) setTimeout(() => location.reload(), 800);
+        if (data.updated > 0) { _reloadTabs('home'); setTimeout(() => location.reload(), 800); }
       }
     } catch (e) {
-      toast('無法連線，請確認網路或手動輸入現價');
+      toast('無法連線，請確認網路後重試');
     }
     btn.textContent = '↻ 更新現價';
     btn.disabled = false;
@@ -903,6 +905,10 @@
       document.getElementById('confirm-cancel-btn').addEventListener('click', onCancel);
       overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); }, { once: true });
     });
+  }
+
+  function _reloadTabs(...tabs) {
+    tabs.forEach(t => { try { window.parent.reloadTab(t); } catch (e) { } });
   }
 
   function toast(msg) {
@@ -931,7 +937,7 @@
         method: "PUT",
         body: JSON.stringify({ name: newName })
       });
-      if (res.ok) { this.dataset.original = newName; toast("名稱已更新"); }
+      if (res.ok) { this.dataset.original = newName; toast("名稱已更新"); _reloadTabs('settings', 'home'); }
       else { this.value = original; toast("名稱更新失敗"); }
     });
   });
@@ -953,7 +959,7 @@
       method: "POST",
       body: JSON.stringify({ symbol, name, account_id })
     });
-    if (res.ok) { toast("倉位建立成功"); setTimeout(() => location.reload(), 500); }
+    if (res.ok) { toast("倉位建立成功"); _reloadTabs('settings', 'home'); setTimeout(() => location.reload(), 500); }
     else { const err = await res.json(); toast(err.error || "建立失敗"); }
   }
 
@@ -1021,7 +1027,7 @@
   async function deleteTx(id) {
     if (!await showConfirm('確定要刪除這筆交易？只能刪除最新一筆交易。')) return;
     const res = await fetch(`/api/stocks/transactions/${id}`, { method: 'DELETE' });
-    if (res.ok) { toast('已刪除'); setTimeout(() => location.reload(), 500); }
+    if (res.ok) { toast('已刪除'); _reloadTabs('home'); setTimeout(() => location.reload(), 500); }
     else { const err = await res.json(); toast('錯誤: ' + (err.error || '刪除失敗')); }
   }
 
@@ -1042,19 +1048,8 @@
       ? await fetch(`/api/stocks/transactions/${editId}`, { method: "PUT", body: JSON.stringify(body) })
       : await fetch("/api/stocks/transactions", { method: "POST", body: JSON.stringify(body) });
 
-    if (res.ok) { toast(editId ? "交易已更新" : "交易已記錄"); setTimeout(() => location.reload(), 500); }
+    if (res.ok) { toast(editId ? "交易已更新" : "交易已記錄"); _reloadTabs('home'); setTimeout(() => location.reload(), 500); }
     else { const err = await res.json(); toast("錯誤: " + (err.error || (editId ? "更新失敗" : "新增失敗"))); }
-  }
-
-  async function updateStockPrice(stockId, input) {
-    const price = parseFloat(input.value);
-    if (isNaN(price) || price < 0) { toast("請輸入有效的現價"); input.focus(); return; }
-    const res = await fetch(`/api/stocks/${stockId}/price`, {
-      method: "PUT", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ price })
-    });
-    if (res.ok) { toast("現價已更新"); setTimeout(() => location.reload(), 500); }
-    else toast("更新失敗");
   }
 
   function toggleZeroSection() {
@@ -1080,7 +1075,7 @@
   async function deletePosition(stockId, symbol) {
     if (!await showConfirm(`確定刪除「${symbol}」？\n此操作無法復原。`)) return;
     const res = await fetch(`/api/stocks/${stockId}`, { method: 'DELETE' });
-    if (res.ok) { toast('倉位已刪除'); setTimeout(() => location.reload(), 500); }
+    if (res.ok) { toast('倉位已刪除'); _reloadTabs('settings', 'home'); setTimeout(() => location.reload(), 500); }
     else { const err = await res.json(); toast('錯誤: ' + (err.error || '刪除失敗')); }
   }
 </script>

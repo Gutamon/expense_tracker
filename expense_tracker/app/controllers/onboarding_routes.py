@@ -20,4 +20,5 @@ def onboarding():
 def api_onboarding_fresh():
     category_model.create_defaults()
     account_model.ensure_defaults()
+    csv_store.set_setting("onboarded", "true")
     return jsonify({"success": True})

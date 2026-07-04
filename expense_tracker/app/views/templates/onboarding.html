@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -9,10 +10,17 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0f0f11">
   <style>
-    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1.5rem; }
+    body {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem 1.5rem;
+    }
 
     .ob-wrap {
-      width: 100%; max-width: 520px;
+      width: 100%;
+      max-width: 520px;
     }
 
     .ob-logo {
@@ -22,7 +30,10 @@
       letter-spacing: .06rem;
       margin-bottom: 0.5rem;
     }
-    .ob-logo span { color: var(--accent); }
+
+    .ob-logo span {
+      color: var(--accent);
+    }
 
     .ob-subtitle {
       text-align: center;
@@ -38,15 +49,21 @@
       padding: 1.5rem;
       margin-bottom: 1rem;
     }
+
     .ob-card h3 {
       font-size: 1rem;
       font-weight: 600;
       margin-bottom: 0.4rem;
     }
+
     .ob-card p {
       font-size: 0.85rem;
       color: var(--muted);
       margin-bottom: 1rem;
+    }
+
+    .ob-card p:last-child {
+      margin-bottom: 0;
     }
 
     .btn {
@@ -62,9 +79,54 @@
       border: none;
       transition: opacity .15s;
     }
-    .btn:active { opacity: .75; }
-    .btn-accent { background: var(--accent); color: #111; width: 100%; }
-    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); width: 100%; }
+
+    .btn:active {
+      opacity: .75;
+    }
+
+    .btn-accent {
+      background: var(--accent);
+      color: #111;
+      width: 100%;
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 100%;
+    }
+
+    .step {
+      display: none;
+    }
+
+    .step.active {
+      display: block;
+    }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .step-back {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 0.2rem 0.4rem;
+      border-radius: 6px;
+      line-height: 1;
+    }
+
+    .step-back:hover {
+      color: var(--text);
+      background: var(--border);
+    }
 
     .file-label {
       display: block;
@@ -75,48 +137,356 @@
       font-size: 0.85rem;
       color: var(--muted);
       cursor: pointer;
-      margin-bottom: 0.75rem;
       transition: border-color .2s;
+      flex: 1;
     }
-    .file-label:hover { border-color: var(--accent); color: var(--accent); }
 
-    input[type="file"] { display: none; }
+    .file-label:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
 
     .toast {
-      position: fixed; bottom: 1.5rem; right: 1.5rem;
-      background: var(--surface); border: 1px solid var(--border);
-      padding: 0.75rem 1.2rem; border-radius: 10px;
-      font-size: 0.85rem; opacity: 0; transition: opacity .3s;
-      pointer-events: none; max-width: 280px;
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 0.75rem 1.2rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: opacity .3s;
+      pointer-events: none;
+      max-width: 280px;
     }
-    .toast.show { opacity: 1; }
-    .toast.error { border-color: var(--danger); color: var(--danger); }
-    .toast.success { border-color: var(--accent); color: var(--accent); }
+
+    .toast.show {
+      opacity: 1;
+    }
+
+    .toast.error {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .toast.success {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
 
     .spinner {
-      display: inline-block; width: 14px; height: 14px;
-      border: 2px solid rgba(0,0,0,0.2); border-top-color: #111;
-      border-radius: 50%; animation: spin .6s linear infinite;
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(0, 0, 0, 0.2);
+      border-top-color: #111;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #2a2a30;
+      transition: .3s;
+      border-radius: 24px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: var(--muted);
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    .toggle-switch input:checked+.toggle-slider {
+      background-color: var(--accent);
+      opacity: 0.8;
+    }
+
+    .toggle-switch input:checked+.toggle-slider:before {
+      transform: translateX(20px);
+      background-color: #000;
+    }
+
+    .acc-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      margin-bottom: 0.65rem;
+    }
+
+    .acc-card:last-child {
+      margin-bottom: 0;
+    }
+
+    .acc-card.done {
+      background: rgba(200, 240, 74, 0.06);
+      border-color: rgba(200, 240, 74, 0.35);
+    }
+
+    .acc-card-name {
+      font-size: 0.92rem;
+      font-weight: 600;
+      margin-bottom: 0.65rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .acc-card-fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem 0.7rem;
+    }
+
+    .acc-field>label {
+      display: block;
+      font-size: 0.73rem;
+      color: var(--muted);
+      margin-bottom: 0.2rem;
+    }
+
+    .acc-field-full {
+      grid-column: 1 / -1;
+    }
+
+    .cat-sec-lbl {
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin: 0 0 0.4rem;
+    }
+
+    .cat-sec-lbl.expense {
+      color: var(--danger);
+    }
+
+    .cat-sec-lbl.income {
+      color: var(--accent);
+    }
+
+    .merge-rule-row {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-bottom: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .merge-rule-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .acc-invest-warn {
+      display: none;
+      margin-top: 0.6rem;
+      padding: 0.5rem 0.65rem;
+      background: rgba(255, 95, 95, 0.07);
+      border: 1px solid rgba(255, 95, 95, 0.25);
+      border-radius: 6px;
+      font-size: 0.77rem;
+      color: var(--danger);
+      line-height: 1.5;
+    }
   </style>
 </head>
+
 <body>
   <div class="ob-wrap">
     <div class="ob-logo">帳 <span>·</span> 本</div>
-    <p class="ob-subtitle">請選擇您的使用方式</p>
 
-    <!-- Fresh Start -->
-    <div class="ob-card">
-      <h3>✦ 開始使用</h3>
-      <p>建立預設帳戶與類別，馬上開始記帳。進入應用程式後可在「設定管理」匯入舊有記帳資料。</p>
-      <button class="btn btn-accent" id="btn-fresh">開始使用</button>
+    <!-- ── Step 1: Choose ─────────────────────────────────────────────────── -->
+    <div class="step active" id="step-choose">
+      <p class="ob-subtitle">請選擇您的使用方式</p>
+
+      <div class="ob-card">
+        <h3>✦ 全新開始</h3>
+        <p>建立預設帳戶與類別，馬上開始記帳。</p>
+        <button class="btn btn-accent" id="btn-fresh">開始使用</button>
+      </div>
+
+      <div class="ob-card">
+        <h3>↑ 匯入 / 還原資料</h3>
+        <p>從其他記帳 App 的 CSV / TXT 匯入帳戶與類別設定，或從本應用程式備份 ZIP 完整還原。</p>
+        <button class="btn btn-outline" onclick="goStep('step-import')">選擇檔案並匯入</button>
+      </div>
+    </div>
+
+    <!-- ── Step 2: Import wizard ──────────────────────────────────────────── -->
+    <div class="step" id="step-import">
+      <div class="step-header">
+        <button class="step-back" onclick="goStep('step-choose')" title="返回">←</button>
+        <p class="ob-subtitle" style="margin:0;">匯入 / 還原資料</p>
+      </div>
+
+      <!-- File picker -->
+      <div class="ob-card">
+        <p style="margin-bottom:0.75rem;">支援 CSV / TXT（其他記帳 App 匯出）或 ZIP（本應用程式備份）。</p>
+        <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;">
+          <label class="file-label">
+            <span id="ob-chosen-name">點選選擇 CSV / TXT / ZIP</span>
+            <input type="file" id="ob-import-file" accept=".csv,.txt,.zip" onchange="obFileChosen(this)">
+          </label>
+          <button id="btn-ob-analyze" onclick="obAnalyze()" disabled
+            style="padding:0.6rem 1rem;border:none;border-radius:8px;background:var(--accent);color:#111;font-size:0.88rem;font-weight:500;cursor:pointer;opacity:0.4;white-space:nowrap;">分析檔案</button>
+        </div>
+      </div>
+
+      <!-- Backup restore panel -->
+      <div id="ob-backup-panel" style="display:none;" class="ob-card">
+        <p style="color:var(--accent);font-size:0.9rem;font-weight:600;margin-bottom:0.35rem;">✓ 偵測到本應用程式的備份檔案</p>
+        <p>還原將覆蓋現有全部資料。</p>
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+          <button id="btn-ob-restore" onclick="obDoRestore()"
+            style="padding:0.6rem 1.1rem;border:none;border-radius:8px;background:var(--accent);color:#111;font-size:0.88rem;font-weight:500;cursor:pointer;">還原備份</button>
+          <button onclick="obImportReset()"
+            style="padding:0.6rem 1.1rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-size:0.88rem;cursor:pointer;">取消</button>
+        </div>
+      </div>
+
+      <!-- Column mapping panel -->
+      <div id="ob-mapping-panel" style="display:none;" class="ob-card">
+        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.75rem;">
+          <p style="font-size:0.85rem;margin:0;">將您 CSV 的欄位對應到本應用程式的欄位：</p>
+          <span id="ob-ai-badge"
+            style="display:none;background:rgba(200,240,74,.15);color:var(--accent);border:1px solid rgba(200,240,74,.3);border-radius:4px;padding:2px 8px;font-size:0.72rem;font-weight:600;white-space:nowrap;">✦
+            AI 建議</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+            <thead>
+              <tr>
+                <th
+                  style="text-align:left;padding:0.4rem 0.5rem;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500;white-space:nowrap;">
+                  欄位</th>
+                <th
+                  style="text-align:left;padding:0.4rem 0.5rem;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500;">
+                  CSV 欄位</th>
+              </tr>
+            </thead>
+            <tbody id="ob-map-rows"></tbody>
+          </table>
+        </div>
+        <div id="ob-type-section" style="display:none;margin-top:1rem;">
+          <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.5rem;">「收支類型」的正確選項為使下方左側出現「支」和「收」字眼（「收支」不算）的選項。
+          </p>
+          <div id="ob-type-rows"></div>
+        </div>
+        <div
+          style="overflow-x:auto;max-height:160px;overflow-y:auto;margin:1rem 0;border:1px solid var(--border);border-radius:6px;">
+          <table id="ob-preview-tbl" style="border-collapse:collapse;font-size:0.78rem;min-width:100%;"></table>
+        </div>
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+          <button id="btn-ob-next-review" onclick="obGoReview()"
+            style="padding:0.6rem 1.1rem;border:none;border-radius:8px;background:var(--accent);color:#111;font-size:0.88rem;font-weight:500;cursor:pointer;">下一步：確認設定</button>
+          <button onclick="obImportReset()"
+            style="padding:0.6rem 1.1rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-size:0.88rem;cursor:pointer;">取消</button>
+        </div>
+      </div>
+
+      <!-- Review & configure panel -->
+      <div id="ob-review-panel" style="display:none;" class="ob-card">
+        <!-- Accounts -->
+        <div id="ob-review-accs-wrap" style="display:none;margin-bottom:1.25rem;">
+          <p style="font-size:0.85rem;font-weight:600;margin-bottom:0.25rem;">帳戶設定</p>
+          <p style="font-size:0.78rem;color:var(--muted);margin-bottom:0.75rem;">
+            確認每個帳戶的類型與期初餘額（所有欄位必填；信用卡請輸入目前欠款金額）。設定完成後可至設定頁調整。</p>
+          <div id="ob-accs-cards"></div>
+        </div>
+
+        <!-- Categories -->
+        <div id="ob-review-cats-wrap" style="display:none;margin-bottom:1.25rem;">
+          <p style="font-size:0.85rem;font-weight:600;margin-bottom:0.75rem;">類別設定</p>
+          <div id="ob-cats-expense-sec" style="display:none;margin-bottom:0.85rem;">
+            <p class="cat-sec-lbl expense">支出類別</p>
+            <div id="ob-review-cats-expense" style="display:flex;flex-wrap:wrap;gap:0.4rem;"></div>
+          </div>
+          <div id="ob-cats-income-sec" style="display:none;margin-bottom:0.5rem;">
+            <p class="cat-sec-lbl income">收入類別</p>
+            <div id="ob-review-cats-income" style="display:flex;flex-wrap:wrap;gap:0.4rem;"></div>
+          </div>
+          <!-- Merge rules -->
+          <div id="ob-merge-section"
+            style="display:none;margin-top:0.85rem;padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;">
+              <p style="font-size:0.8rem;font-weight:500;margin:0;">類別合併（選填）</p>
+              <button onclick="addMergeRule()"
+                style="padding:0.2rem 0.6rem;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);font-size:0.75rem;cursor:pointer;">+
+                新增</button>
+            </div>
+            <p style="font-size:0.73rem;color:var(--muted);margin-bottom:0.5rem;">將相似或少用的類別歷史資料歸入另一個類別，收/支必須相同。</p>
+            <div id="ob-merge-rules"></div>
+          </div>
+        </div>
+
+        <!-- Monthly history toggle -->
+        <div id="ob-review-history-wrap"
+          style="display:none;margin-bottom:1.25rem;padding:0.75rem;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:0.85rem;">
+            <span class="toggle-switch">
+              <input type="checkbox" id="ob-history-toggle" checked>
+              <span class="toggle-slider"></span>
+            </span>
+            <span id="ob-history-label">匯入歷史月統計</span>
+          </label>
+          <p style="font-size:0.78rem;color:var(--muted);margin:6px 0 0 54px;">匯入後圖表將顯示歷史收支趨勢</p>
+        </div>
+
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+          <button id="btn-ob-do-import" onclick="obDoImport()"
+            style="padding:0.6rem 1.1rem;border:none;border-radius:8px;background:var(--accent);color:#111;font-size:0.88rem;font-weight:500;cursor:pointer;">確認匯入</button>
+          <button onclick="obGoMapping()"
+            style="padding:0.6rem 1.1rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-size:0.88rem;cursor:pointer;">上一步</button>
+          <button onclick="obImportReset()"
+            style="padding:0.6rem 1.1rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-size:0.88rem;cursor:pointer;">取消</button>
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="toast" id="toast"></div>
 
   <script>
+    // ── Navigation ─────────────────────────────────────────────────────────────
+    function goStep(id) {
+      document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
     function toast(msg, type = '') {
       const el = document.getElementById('toast');
       el.textContent = msg;
@@ -125,18 +495,533 @@
       el._t = setTimeout(() => el.classList.remove('show'), 3000);
     }
 
+    // ── Fresh Start ────────────────────────────────────────────────────────────
     document.getElementById('btn-fresh').addEventListener('click', async () => {
       const btn = document.getElementById('btn-fresh');
       btn.innerHTML = '<span class="spinner"></span> 建立中...';
       btn.disabled = true;
       const res = await fetch('/api/onboarding/fresh', { method: 'POST' });
-      if (res.ok) window.location.href = '/';
+      if (res.ok) window.location.replace('/');
       else { toast('建立失敗，請重試', 'error'); btn.textContent = '開始使用'; btn.disabled = false; }
     });
+
+    // ── Import wizard ──────────────────────────────────────────────────────────
+    const IMPORT_FIELDS = [
+      { k: 'date', label: '日期', req: true },
+      { k: 'amount', label: '金額', req: true },
+      { k: 'category', label: '類別', req: false },
+      { k: 'account', label: '帳戶', req: false },
+      { k: 'type', label: '收支類型', req: false },
+    ];
+    const ACC_SUBTYPES = ['現金', '銀行', '預付儲值', '投資', '保單', '其他', '信用卡', '借貸', '負債其他'];
+    const CURRENCIES = ['TWD', 'USD', 'JPY', 'KRW', 'CNY', 'EUR', 'GBP', 'HKD', 'AUD'];
+
+    let _obCols = [], _obPreview = [], _obTmp = '', _obRestoreFile = null;
+    let _obMapping = {}, _obTypeMapping = {}, _obColValues = {};
+    let _obAiEnhanced = false, _obAiTypeValues = {};
+    let _obRestoreConfirming = false;
+    let _obAllCats = [], _obMergeRules = [];
+
+    function obFileChosen(input) {
+      const file = input.files[0];
+      document.getElementById('ob-chosen-name').textContent = file ? file.name : '點選選擇 CSV / TXT / ZIP';
+      const btn = document.getElementById('btn-ob-analyze');
+      btn.disabled = !file; btn.style.opacity = file ? '1' : '0.4';
+      obImportReset(true);
+    }
+
+    function obImportReset(keepFile) {
+      ['ob-backup-panel', 'ob-mapping-panel', 'ob-review-panel'].forEach(id => {
+        document.getElementById(id).style.display = 'none';
+      });
+      _obCols = []; _obPreview = []; _obTmp = ''; _obRestoreFile = null;
+      _obMapping = {}; _obTypeMapping = {}; _obColValues = {};
+      _obAiEnhanced = false; _obAiTypeValues = {};
+      _obRestoreConfirming = false;
+      if (!keepFile) {
+        document.getElementById('ob-import-file').value = '';
+        document.getElementById('ob-chosen-name').textContent = '點選選擇 CSV / TXT / ZIP';
+        const btn = document.getElementById('btn-ob-analyze');
+        btn.disabled = true; btn.style.opacity = '0.4';
+      }
+    }
+
+    async function obAnalyze() {
+      const file = document.getElementById('ob-import-file').files[0];
+      if (!file) return;
+      const btn = document.getElementById('btn-ob-analyze');
+      btn.textContent = '分析中...'; btn.disabled = true; btn.style.opacity = '0.6';
+      const fd = new FormData(); fd.append('file', file);
+      try {
+        const res = await fetch('/api/import/preview', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) { toast(data.error || data.description || '分析失敗', 'error'); return; }
+        if (data.type === 'backup') {
+          _obRestoreFile = file;
+          document.getElementById('ob-backup-panel').style.display = 'block';
+        } else {
+          _obCols = data.columns; _obPreview = data.preview; _obTmp = data.tmp_filename;
+          _obColValues = data.column_values || {};
+          _obAiEnhanced = data.ai_enhanced || false;
+          _obAiTypeValues = data.ai_type_values || {};
+          obRenderMapping(data.suggested_mapping);
+          document.getElementById('ob-mapping-panel').style.display = 'block';
+        }
+      } catch (e) { toast('分析失敗：' + e.message, 'error'); }
+      finally { btn.textContent = '分析檔案'; btn.disabled = false; btn.style.opacity = '1'; }
+    }
+
+    function _selStyle() {
+      return 'width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.3rem 0.5rem;font-size:0.82rem;';
+    }
+    function _cellStyle(last) {
+      return `padding:0.4rem 0.5rem;border-bottom:${last ? 'none' : '1px solid var(--border)'};`;
+    }
+
+    function obRenderMapping(suggested) {
+      document.getElementById('ob-ai-badge').style.display = _obAiEnhanced ? 'inline-flex' : 'none';
+      const tbody = document.getElementById('ob-map-rows');
+      tbody.innerHTML = '';
+      const opts = '<option value="">（略過）</option>' + _obCols.map(c => `<option value="${c}">${c}</option>`).join('');
+      IMPORT_FIELDS.forEach(({ k, label, req }, idx) => {
+        const sel = document.createElement('select');
+        sel.id = 'obimap-' + k; sel.innerHTML = opts; sel.style.cssText = _selStyle();
+        if (suggested[k]) sel.value = suggested[k];
+        if (k === 'type') sel.addEventListener('change', obRenderTypeMapping);
+        const last = idx === IMPORT_FIELDS.length - 1;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td style="${_cellStyle(last)}white-space:nowrap;">${label}${req ? ' <span style="color:var(--danger)">*</span>' : ''}</td><td style="${_cellStyle(last)}"></td>`;
+        tr.cells[1].appendChild(sel);
+        tbody.appendChild(tr);
+      });
+      obRenderTypeMapping();
+      obRenderPreview();
+    }
+
+    function obRenderTypeMapping() {
+      const typeCol = document.getElementById('obimap-type')?.value;
+      const sec = document.getElementById('ob-type-section');
+      if (!typeCol) { sec.style.display = 'none'; return; }
+      const vals = (_obColValues[typeCol] && _obColValues[typeCol].length)
+        ? _obColValues[typeCol]
+        : [...new Set(_obPreview.map(r => r[typeCol]).filter(Boolean))];
+      if (!vals.length) { sec.style.display = 'none'; return; }
+      sec.style.display = 'block';
+      const container = document.getElementById('ob-type-rows');
+      container.innerHTML = '';
+      for (const v of vals) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;font-size:0.85rem;';
+        row.innerHTML = `<span style="flex:1;color:var(--muted);">${v}</span><span>→</span>
+          <select id="obtypemap-${encodeURIComponent(v)}" style="flex:1;${_selStyle()}">
+            <option value="expense">支出</option>
+            <option value="income">收入</option>
+            <option value="transfer">轉帳</option>
+          </select>`;
+        container.appendChild(row);
+        const lower = v.toLowerCase();
+        const sel = row.querySelector('select');
+        if (lower.includes('收入') || lower === 'income' || lower === 'in') sel.value = 'income';
+        else if (lower.includes('轉') || lower === 'transfer') sel.value = 'transfer';
+        if (_obAiTypeValues[v]) sel.value = _obAiTypeValues[v];
+      }
+    }
+
+    function obRenderPreview() {
+      if (!_obPreview.length) return;
+      const tbl = document.getElementById('ob-preview-tbl');
+      const cols = _obCols.slice(0, 8);
+      const th = s => `<th style="background:var(--surface);color:var(--muted);padding:0.3rem 0.5rem;border:1px solid var(--border);white-space:nowrap;">${s}</th>`;
+      const td = s => `<td style="padding:0.3rem 0.5rem;border:1px solid var(--border);white-space:nowrap;">${s}</td>`;
+      tbl.innerHTML = '<thead><tr>' + cols.map(th).join('') + '</tr></thead>'
+        + '<tbody>' + _obPreview.map(r => '<tr>' + cols.map(c => td(r[c] || '')).join('') + '</tr>').join('') + '</tbody>';
+    }
+
+    function _obCollectMapping() {
+      const mapping = {}, typeMapping = {};
+      for (const { k } of IMPORT_FIELDS) {
+        const sel = document.getElementById('obimap-' + k);
+        if (sel && sel.value) mapping[k] = sel.value;
+      }
+      const typeCol = mapping.type;
+      if (typeCol) {
+        const vals = (_obColValues[typeCol] && _obColValues[typeCol].length)
+          ? _obColValues[typeCol]
+          : [...new Set(_obPreview.map(r => r[typeCol]).filter(Boolean))];
+        for (const v of vals) {
+          const sel = document.getElementById(`obtypemap-${encodeURIComponent(v)}`);
+          if (sel) typeMapping[v] = sel.value;
+        }
+      }
+      return { mapping, typeMapping };
+    }
+
+    function _saveReviewState() {
+      const accs = {};
+      document.querySelectorAll('[id^="obiacc-sub-"]').forEach(sel => {
+        const key = sel.id.replace('obiacc-sub-', '');
+        accs[decodeURIComponent(key)] = {
+          sub_type: sel.value,
+          currency: document.getElementById('obiacc-cur-' + key)?.value ?? '',
+          opening_balance: document.getElementById('obiacc-bal-' + key)?.value ?? '',
+        };
+      });
+      return {
+        accs,
+        mergeRules: _obMergeRules.map(r => ({ ...r })),
+        historyOn: document.getElementById('ob-history-toggle')?.checked ?? true,
+      };
+    }
+
+    function _restoreReviewState(saved) {
+      for (const [name, s] of Object.entries(saved.accs)) {
+        const key = encodeURIComponent(name);
+        const subSel = document.getElementById('obiacc-sub-' + key);
+        if (!subSel) continue;
+        if (s.sub_type) { subSel.value = s.sub_type; onAccSubTypeChange(subSel); }
+        const curSel = document.getElementById('obiacc-cur-' + key);
+        if (curSel && !curSel.disabled && s.currency) curSel.value = s.currency;
+        const balInput = document.getElementById('obiacc-bal-' + key);
+        if (balInput && !balInput.disabled && s.opening_balance !== '') balInput.value = s.opening_balance;
+        checkAccCardDone(key);
+      }
+      for (const rule of saved.mergeRules) {
+        if (!rule.from) continue;
+        addMergeRule();
+        const newId = _obMergeRules[_obMergeRules.length - 1].id;
+        const fromSel = document.getElementById('obmerge-from-' + newId);
+        if (!fromSel) continue;
+        fromSel.value = rule.from;
+        onMergeFromChange(newId);
+        _obMergeRules[_obMergeRules.length - 1].from = rule.from;
+        if (rule.to) {
+          const toSel = document.getElementById('obmerge-to-' + newId);
+          if (toSel) { toSel.value = rule.to; _obMergeRules[_obMergeRules.length - 1].to = rule.to; }
+        }
+      }
+      const tog = document.getElementById('ob-history-toggle');
+      if (tog) tog.checked = saved.historyOn;
+    }
+
+    async function obGoReview() {
+      const { mapping, typeMapping } = _obCollectMapping();
+      if (!mapping.date) { toast('請先設定「日期」欄位', 'error'); return; }
+      if (!mapping.amount) { toast('請先設定「金額」欄位', 'error'); return; }
+      _obMapping = mapping; _obTypeMapping = typeMapping;
+
+      const btn = document.getElementById('btn-ob-next-review');
+      btn.textContent = '載入中...'; btn.disabled = true;
+      try {
+        const res = await fetch('/api/import/analyze', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tmp_filename: _obTmp, mapping, type_mapping: typeMapping })
+        });
+        const data = await res.json();
+        if (!res.ok) { toast(data.description || '分析失敗', 'error'); return; }
+        const prevState = _saveReviewState();
+        obRenderReview(data);
+        _restoreReviewState(prevState);
+        document.getElementById('ob-mapping-panel').style.display = 'none';
+        document.getElementById('ob-review-panel').style.display = 'block';
+      } catch (e) { toast('載入失敗：' + e.message, 'error'); }
+      finally { btn.textContent = '下一步：確認設定'; btn.disabled = false; }
+    }
+
+    function obGoMapping() {
+      document.getElementById('ob-review-panel').style.display = 'none';
+      document.getElementById('ob-mapping-panel').style.display = 'block';
+    }
+
+    function catChipHtml(c) {
+      const color = c.type === 'income' ? 'var(--accent)' : 'var(--danger)';
+      const safeName = c.name.replace(/"/g, '&quot;');
+      return `<span data-cat-name="${safeName}" data-cat-type="${c.type}"
+        style="padding:0.25rem 0.6rem;border-radius:6px;border:1px solid ${color};color:${color};font-size:0.78rem;user-select:none;">${c.name}</span>`;
+    }
+
+    function obRenderReview(data) {
+      // ── Accounts (cards) ──────────────────────────────────────────────────
+      const accsWrap = document.getElementById('ob-review-accs-wrap');
+      const accsCards = document.getElementById('ob-accs-cards');
+      if (data.accounts && data.accounts.length) {
+        const subOpts = `<option value="" disabled selected>請選擇類型</option>` + ACC_SUBTYPES.map(s => `<option value="${s}">${s}</option>`).join('');
+        const ss = _selStyle();
+        accsCards.innerHTML = data.accounts.map(a => {
+          const safeKey = encodeURIComponent(a.name);
+          const curSel = `<option value="" disabled selected>請選擇幣別</option>` + CURRENCIES.map(c => `<option value="${c}">${c}</option>`).join('');
+          return `<div class="acc-card" id="obiacc-card-${safeKey}">
+            <div class="acc-card-name">
+              ${a.name}
+              <span id="obiacc-skip-lbl-${safeKey}" style="display:none;margin-left:0.5rem;font-size:0.7rem;font-weight:400;color:var(--danger);border:1px solid rgba(255,95,95,0.4);border-radius:4px;padding:0.06rem 0.35rem;vertical-align:middle;">略過匯入</span>
+            </div>
+            <div class="acc-card-fields">
+              <div class="acc-field">
+                <label>帳戶類型 <span style="color:var(--danger)">*</span></label>
+                <select id="obiacc-sub-${safeKey}" onchange="onAccSubTypeChange(this)" style="${ss}">${subOpts}</select>
+              </div>
+              <div class="acc-field">
+                <label>幣別 <span style="color:var(--danger)">*</span></label>
+                <select id="obiacc-cur-${safeKey}" onchange="checkAccCardDone('${safeKey}')" style="${ss}">${curSel}</select>
+              </div>
+              <div class="acc-field acc-field-full">
+                <label>期初餘額 <span style="color:var(--danger)">*</span></label>
+                <input type="number" id="obiacc-bal-${safeKey}" placeholder="請輸入金額（可為 0）" step="0.01"
+                  oninput="checkAccCardDone('${safeKey}')"
+                  style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);color:#fff;padding:0.35rem 0.5rem;border-radius:6px;font-family:inherit;font-size:0.85rem;">
+              </div>
+            </div>
+            <div id="obiacc-invest-warn-${safeKey}" class="acc-invest-warn">
+              ⚠ 投資帳戶不支援自動匯入，此帳戶及其相關記錄將會被略過。如需記錄投資，請在匯入完成後至股票頁面手動新增。
+            </div>
+          </div>`;
+        }).join('');
+        accsWrap.style.display = 'block';
+      } else {
+        accsWrap.style.display = 'none';
+      }
+
+      // ── Categories (grouped, no toggle) ───────────────────────────────────
+      _obAllCats = data.categories || [];
+      const catsWrap = document.getElementById('ob-review-cats-wrap');
+      if (_obAllCats.length) {
+        const expCats = _obAllCats.filter(c => c.type === 'expense');
+        const incCats = _obAllCats.filter(c => c.type === 'income');
+        const expSec = document.getElementById('ob-cats-expense-sec');
+        const incSec = document.getElementById('ob-cats-income-sec');
+        if (expCats.length) {
+          document.getElementById('ob-review-cats-expense').innerHTML = expCats.map(catChipHtml).join('');
+          expSec.style.display = 'block';
+        } else { expSec.style.display = 'none'; }
+        if (incCats.length) {
+          document.getElementById('ob-review-cats-income').innerHTML = incCats.map(catChipHtml).join('');
+          incSec.style.display = 'block';
+        } else { incSec.style.display = 'none'; }
+        document.getElementById('ob-merge-section').style.display = _obAllCats.length > 1 ? 'block' : 'none';
+        _obMergeRules = [];
+        document.getElementById('ob-merge-rules').innerHTML = '';
+        catsWrap.style.display = 'block';
+      } else {
+        catsWrap.style.display = 'none';
+      }
+
+      // ── Monthly history ───────────────────────────────────────────────────
+      const histWrap = document.getElementById('ob-review-history-wrap');
+      if (data.months_count > 0) {
+        document.getElementById('ob-history-label').textContent =
+          `帶入每月收支（共 ${data.months_count} 個月，${data.date_from} ～ ${data.date_to}）`;
+        histWrap.style.display = 'block';
+      } else {
+        histWrap.style.display = 'none';
+      }
+    }
+
+    // ── Merge rules ───────────────────────────────────────────────────────────
+    let _mergeRuleIdCounter = 0;
+
+    function addMergeRule() {
+      const id = ++_mergeRuleIdCounter;
+      const fromOpts = _obAllCats.map(c =>
+        `<option value="${c.name}" data-type="${c.type}">${c.name}（${c.type === 'income' ? '收入' : '支出'}）</option>`
+      ).join('');
+      const row = document.createElement('div');
+      row.className = 'merge-rule-row';
+      row.dataset.ruleId = id;
+      row.innerHTML = `
+        <select id="obmerge-from-${id}" onchange="onMergeFromChange(${id})" style="${_selStyle()}flex:1;min-width:0;">
+          <option value="">來源類別</option>${fromOpts}
+        </select>
+        <span style="color:var(--muted);font-size:0.8rem;flex-shrink:0;">→</span>
+        <select id="obmerge-to-${id}" style="${_selStyle()}flex:1;min-width:0;opacity:0.45;" disabled>
+          <option value="">目標類別</option>
+        </select>
+        <button onclick="removeMergeRule(${id})" style="padding:0.2rem 0.45rem;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);font-size:0.78rem;cursor:pointer;flex-shrink:0;">✕</button>`;
+      document.getElementById('ob-merge-rules').appendChild(row);
+      _obMergeRules.push({ id, from: '', to: '' });
+    }
+
+    function onMergeFromChange(id) {
+      const fromSel = document.getElementById(`obmerge-from-${id}`);
+      const toSel = document.getElementById(`obmerge-to-${id}`);
+      const fromName = fromSel.value;
+      const fromCat = _obAllCats.find(c => c.name === fromName);
+      const rule = _obMergeRules.find(r => r.id === id);
+      if (rule) { rule.from = fromName; rule.to = ''; }
+      if (!fromCat) {
+        toSel.innerHTML = '<option value="">目標類別</option>';
+        toSel.disabled = true; toSel.style.opacity = '0.45';
+        return;
+      }
+      const sameType = _obAllCats.filter(c => c.type === fromCat.type && c.name !== fromName);
+      toSel.innerHTML = '<option value="">目標類別</option>' +
+        sameType.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+      toSel.disabled = false; toSel.style.opacity = '1';
+      toSel.onchange = () => { if (rule) rule.to = toSel.value; };
+    }
+
+    function removeMergeRule(id) {
+      document.querySelector(`[data-rule-id="${id}"]`)?.remove();
+      _obMergeRules = _obMergeRules.filter(r => r.id !== id);
+    }
+
+    // ── Account card completion indicator ────────────────────────────────────
+    function checkAccCardDone(key) {
+      const card = document.getElementById('obiacc-card-' + key);
+      if (!card) return;
+      const sub = document.getElementById('obiacc-sub-' + key)?.value || '';
+      let done = false;
+      if (sub === '投資') {
+        done = true;
+      } else if (sub) {
+        const cur = document.getElementById('obiacc-cur-' + key)?.value || '';
+        const bal = document.getElementById('obiacc-bal-' + key)?.value ?? '';
+        done = !!(cur && bal !== '');
+      }
+      card.classList.toggle('done', done);
+    }
+
+    // ── Investment account warning ─────────────────────────────────────────────
+    function onAccSubTypeChange(sel) {
+      const key = sel.id.replace('obiacc-sub-', '');
+      const isInvest = sel.value === '投資';
+      const warn = document.getElementById('obiacc-invest-warn-' + key);
+      const skipLbl = document.getElementById('obiacc-skip-lbl-' + key);
+      const curSel = document.getElementById('obiacc-cur-' + key);
+      const balInput = document.getElementById('obiacc-bal-' + key);
+      if (warn) warn.style.display = isInvest ? 'block' : 'none';
+      if (skipLbl) skipLbl.style.display = isInvest ? 'inline' : 'none';
+      if (curSel) { curSel.disabled = isInvest; curSel.style.opacity = isInvest ? '0.35' : '1'; }
+      if (balInput) {
+        balInput.disabled = isInvest; balInput.style.opacity = isInvest ? '0.35' : '1';
+        if (isInvest) balInput.style.borderColor = '';
+      }
+      checkAccCardDone(key);
+    }
+
+    async function obDoRestore() {
+      const btn = document.getElementById('btn-ob-restore');
+      if (!_obRestoreConfirming) {
+        _obRestoreConfirming = true;
+        btn.textContent = '確認覆蓋？再按一次確認';
+        btn.style.background = 'var(--danger)';
+        setTimeout(() => {
+          if (_obRestoreConfirming) {
+            _obRestoreConfirming = false;
+            btn.textContent = '還原備份'; btn.style.background = '';
+          }
+        }, 4000);
+        return;
+      }
+      _obRestoreConfirming = false;
+      btn.textContent = '還原中...'; btn.disabled = true;
+      const fd = new FormData(); fd.append('file', _obRestoreFile);
+      const res = await fetch('/api/import/restore', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (res.ok) {
+        toast('還原成功', 'success');
+        setTimeout(() => window.location.replace('/'), 1000);
+      } else {
+        toast(data.error || data.description || '還原失敗', 'error');
+        btn.textContent = '還原備份'; btn.style.background = ''; btn.disabled = false;
+      }
+    }
+
+    async function obDoImport() {
+      // ── Accounts: validate required fields ────────────────────────────────
+      const accounts_config = [];
+      let accsValid = true;
+      document.querySelectorAll('[id^="obiacc-sub-"]').forEach(sel => {
+        if (!accsValid) return;
+        const key = sel.id.replace('obiacc-sub-', '');
+        const name = decodeURIComponent(key);
+        const sub_type = sel.value;
+        if (!sub_type) {
+          toast(`請為帳戶「${name}」選擇帳戶類型`, 'error');
+          sel.style.borderColor = 'var(--danger)';
+          accsValid = false;
+          return;
+        }
+        if (sub_type === '投資') return; // skipped entirely
+        const curSel = document.getElementById('obiacc-cur-' + key);
+        const currency = curSel?.value || '';
+        if (!currency) {
+          toast(`請為帳戶「${name}」選擇幣別`, 'error');
+          if (curSel) curSel.style.borderColor = 'var(--danger)';
+          accsValid = false;
+          return;
+        }
+        const balInput = document.getElementById('obiacc-bal-' + key);
+        if (!balInput || balInput.value === '') {
+          toast(`請為帳戶「${name}」輸入期初餘額（可填 0）`, 'error');
+          if (balInput) balInput.style.borderColor = 'var(--danger)';
+          accsValid = false;
+          return;
+        }
+        const bal = parseFloat(balInput.value) || 0;
+        const is_liab = ['信用卡', '借貸', '負債其他'].includes(sub_type);
+        accounts_config.push({ name, sub_type, currency, is_asset: is_liab ? 0 : 1, opening_balance: bal });
+      });
+      if (!accsValid) return;
+
+      // ── Categories ────────────────────────────────────────────────────────
+      const categories_config = [];
+      document.querySelectorAll('[data-cat-name]').forEach(el => {
+        categories_config.push({ name: el.dataset.catName, type: el.dataset.catType });
+      });
+
+      // ── Skipped (investment) accounts ─────────────────────────────────────
+      const skipped_accounts = [];
+      document.querySelectorAll('[id^="obiacc-sub-"]').forEach(sel => {
+        if (sel.value === '投資') skipped_accounts.push(decodeURIComponent(sel.id.replace('obiacc-sub-', '')));
+      });
+
+      // ── Merge rules ───────────────────────────────────────────────────────
+      const categories_merge = {};
+      for (const rule of _obMergeRules) {
+        if (rule.from && rule.to && rule.from !== rule.to) {
+          categories_merge[rule.from] = rule.to;
+        }
+      }
+
+      const import_history = document.getElementById('ob-history-toggle')?.checked ?? true;
+
+      const btn = document.getElementById('btn-ob-do-import');
+      btn.textContent = '匯入中...'; btn.disabled = true;
+      try {
+        const res = await fetch('/api/import/settings', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tmp_filename: _obTmp,
+            mapping: _obMapping,
+            type_mapping: _obTypeMapping,
+            accounts_config,
+            categories_config,
+            categories_merge,
+            skipped_accounts,
+            import_history,
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          const parts = [];
+          if (data.accounts_created) parts.push(`${data.accounts_created} 個帳戶`);
+          if (data.categories_created) parts.push(`${data.categories_created} 個類別`);
+          if (data.history_months) parts.push(`${data.history_months} 個月統計`);
+          toast('已匯入：' + (parts.join('、') || '設定完成'), 'success');
+          setTimeout(() => window.location.replace('/'), 1200);
+        } else {
+          toast(data.error || data.description || '匯入失敗', 'error');
+          btn.textContent = '確認匯入'; btn.disabled = false;
+        }
+      } catch (e) {
+        toast('匯入失敗：' + e.message, 'error');
+        btn.textContent = '確認匯入'; btn.disabled = false;
+      }
+    }
 
     document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
     var _lt = 0;
     document.addEventListener('touchend', e => { var n = Date.now(); if (n - _lt < 300) e.preventDefault(); _lt = n; }, { passive: false });
   </script>
 </body>
+
 </html>

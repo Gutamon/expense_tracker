@@ -1,0 +1,7 @@
+﻿id,name,icon,sort_order,type,sub_type,is_asset,billing_start_day,currency,credit_limit,payment_due_day,min_payment_pct,min_payment_floor,apr,opening_balance
+1,錢包,💵,80,asset,現金,1,1,TWD,0.0,0,10.0,1000.0,0.0,100.0
+2,Bankee,🏦,81,asset,銀行,1,1,TWD,0.0,0,10.0,1000.0,0.0,1000.0
+3,BT21,💳,82,liability,信用卡,0,1,TWD,0.0,0,10.0,1000.0,0.0,-200.0
+4,中信,🏦,83,asset,銀行,1,1,TWD,0.0,0,10.0,1000.0,0.0,200.0
+5,台積,📈,0,asset,投資,1,1,TWD,0.0,0,10.0,1000.0,0.0,0.0
+6,手機,🤝,0,liability,借貸,1,1,TWD,0.0,0,10.0,1000.0,0.0,0.0

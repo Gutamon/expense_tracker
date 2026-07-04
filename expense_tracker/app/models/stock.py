@@ -1,6 +1,7 @@
 from datetime import datetime
 from app.models.csv_store import read_csv, write_csv, next_id, SCHEMA
 from app.models.expense import ExpenseModel
+from app.models.account import AccountModel
 
 expense_model = ExpenseModel()
 
@@ -218,8 +219,12 @@ class StockModel:
         if any(str(t.get("stock_id")) == stock_id for t in tx_rows):
             return False
         rows = read_csv("stocks.csv")
-        new_rows = [r for r in rows if str(r.get("id")) != stock_id]
-        if len(new_rows) == len(rows):
+        target = next((r for r in rows if str(r.get("id")) == stock_id), None)
+        if not target:
             return False
+        new_rows = [r for r in rows if str(r.get("id")) != stock_id]
         write_csv("stocks.csv", new_rows, SCHEMA["stocks.csv"])
+        linked = int(target.get("linked_account_id") or 0)
+        if linked:
+            AccountModel().delete(linked)
         return True

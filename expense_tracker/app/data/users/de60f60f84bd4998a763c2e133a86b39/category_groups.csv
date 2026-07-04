@@ -1,0 +1,4 @@
+﻿id,name,sort_order,type
+1,匯入（支出）,90,expense
+2,匯入（收入）,91,income
+3,初始設定,99,income

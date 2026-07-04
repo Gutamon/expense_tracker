@@ -1,6 +1,6 @@
 import os
-from flask import Flask
-from app.models import csv_store
+from flask import Flask, g, request
+from app.models import csv_store, user
 
 def create_app():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -15,14 +15,42 @@ def create_app():
     from config import Config
     app.config.from_object(Config)
 
-    csv_store.set_data_dir(app.config["DATA_DIR"])
+    root_dir = app.config["DATA_DIR"]
+    csv_store.set_data_dir(root_dir)
     csv_store.init_data_dir()
+
+    @app.before_request
+    def bind_device():
+        # Static assets don't touch per-device data.
+        if request.endpoint == "static":
+            return
+        device_id = user.resolve_device_id(request)
+        new_device = device_id is None
+        if new_device:
+            device_id = user.adopt_or_create(root_dir)
+            g.new_device = device_id
+        g.device_id = device_id
+        g.data_dir = user.user_data_dir(root_dir, device_id)
+        # Seed + migrate the folder for new devices (and re-seed if it went missing).
+        if new_device or not os.path.isdir(g.data_dir):
+            csv_store.init_current_user()
 
     @app.after_request
     def add_header(response):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+        new_device = g.get("new_device")
+        if new_device:
+            response.set_cookie(
+                user.COOKIE_NAME,
+                user.sign(new_device),
+                max_age=app.config["DEVICE_COOKIE_MAX_AGE"],
+                httponly=True,
+                samesite="Lax",
+                secure=False,
+                path="/",
+            )
         return response
 
     from app.controllers.main_routes import main_bp

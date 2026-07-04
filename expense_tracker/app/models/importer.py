@@ -1,4 +1,5 @@
 import csv
+import json
 import os
 import zipfile
 import tempfile
@@ -12,18 +13,28 @@ FIELD_HINTS = {
     "date":     ["日期", "date", "交易日期", "time", "時間"],
     "amount":   ["金額", "amount", "數量", "price", "費用"],
     "type":     ["類型", "type", "收支", "收支類型", "交易類型", "方向"],
-    "title":    ["標題", "摘要", "說明", "description", "title", "名稱"],
     "category": ["類別", "category", "分類", "子類別"],
     "account":  ["帳戶", "account", "帳戶1", "帳戶名稱"],
-    "note":     ["備注", "備註", "note", "remark", "附言"],
-    "currency": ["幣別", "currency", "貨幣", "幣種"],
 }
 
-# Values that clearly indicate a type column
 _TYPE_VALUE_HINTS = frozenset({
     "支出", "收入", "轉帳", "轉入", "轉出",
     "expense", "income", "transfer", "debit", "credit",
 })
+
+_INCOME_HINTS = frozenset({
+    "薪水", "工資", "獎金", "股息", "利息", "存款利息",
+    "退款", "退費", "回饋", "現金回饋", "紅利", "返現",
+    "他人還款", "理賠", "補助", "津貼",
+    "股票盈利", "盈利", "獲利", "入帳",
+    "salary", "bonus", "dividend", "interest", "refund", "cashback",
+})
+
+ICON_MAP = {
+    "現金": "💵", "銀行": "🏦", "預付儲值": "🪙", "投資": "📈",
+    "保單": "🛡️", "其他": "👝", "信用卡": "💳", "借貸": "🤝", "負債其他": "👝",
+}
+LIABILITY_SUBTYPES = frozenset({"信用卡", "借貸", "負債其他"})
 
 
 def _parse_date(value: str) -> str:
@@ -54,26 +65,12 @@ def _detect_delimiter(file_path: str) -> str:
         return ","
 
 
-# Substrings in category/title that strongly signal income
-_INCOME_HINTS = frozenset({
-    "薪水", "工資", "獎金", "股息", "利息", "存款利息",
-    "退款", "退費", "回饋", "現金回饋", "紅利", "返現",
-    "他人還款", "理賠", "補助", "津貼", "天下掉下來",
-    "股票盈利", "盈利", "獲利", "入帳",
-    "salary", "bonus", "dividend", "interest", "refund", "cashback",
-})
-
-
 def _resolve_type(raw_type: str, type_mapping: dict,
-                  raw_category: str = "", raw_title: str = "",
-                  raw_note: str = "", raw_amount: str = "") -> str:
-    """Determine expense/income/transfer using all available row context."""
-    # 1. Explicit user type_mapping
+                  raw_category: str = "", raw_amount: str = "") -> str:
     mapped = type_mapping.get(raw_type, "").lower()
     if mapped in ("expense", "income", "transfer"):
         return mapped
 
-    # 2. Recognise common type-column values directly
     if raw_type:
         t = raw_type.lower()
         if "收入" in t or t in ("income", "credit", "in"):
@@ -83,12 +80,9 @@ def _resolve_type(raw_type: str, type_mapping: dict,
         if "支出" in t or "費用" in t or t in ("expense", "debit", "out"):
             return "expense"
 
-    # 3. Income keywords in category or title/note
-    combined = raw_category + " " + raw_title + " " + raw_note
-    if any(hint in combined for hint in _INCOME_HINTS):
+    if any(hint in raw_category for hint in _INCOME_HINTS):
         return "income"
 
-    # 4. Negative sign in raw amount (bank-statement format: negative = debit)
     if raw_amount:
         try:
             v = float(str(raw_amount).replace(",", "").replace("$", "")
@@ -109,7 +103,6 @@ def _guess_mapping(columns: list, column_values: dict = None) -> dict:
             if hint.lower() in lower_cols:
                 mapping[field] = lower_cols[hint.lower()]
                 break
-    # If type column not found by name, detect by values
     if "type" not in mapping and column_values:
         for col in columns:
             vals = [v for v in column_values.get(col, []) if v]
@@ -119,21 +112,60 @@ def _guess_mapping(columns: list, column_values: dict = None) -> dict:
     return mapping
 
 
-def _read_rows(file_path: str):
-    """Return (header, rows_iter) with auto-detected delimiter."""
-    delimiter = _detect_delimiter(file_path)
-    f = open(file_path, "r", encoding="utf-8-sig", errors="replace", newline="")
-    reader = csv.reader(f, delimiter=delimiter)
-    header = next(reader, None)
-    if not header:
-        f.close()
-        return [], iter([]), f
-    header = [c.strip() for c in header]
-    return header, reader, f
+def ai_suggest_mapping(headers: list, sample_rows: list) -> dict | None:
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return None
+    try:
+        import anthropic
+    except ImportError:
+        return None
+
+    system = (
+        "You are a financial data analyst. Map CSV columns to expense tracker fields: "
+        "date, amount, category, account, type. "
+        "Only include confident mappings. Respond ONLY with valid JSON, no markdown."
+    )
+    user = (
+        f"CSV headers and sample rows:\n"
+        f"{json.dumps({'headers': headers, 'sample_rows': sample_rows}, ensure_ascii=False)}\n\n"
+        "Return JSON with:\n"
+        "- \"mapping\": {field_key: exact_csv_column_name}\n"
+        "- \"type_values\": {raw_value: \"expense\"|\"income\"|\"transfer\"} "
+        "(empty {} if no type column)"
+    )
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=512,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+        )
+        raw = msg.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        result = json.loads(raw.strip())
+        return result if isinstance(result, dict) and "mapping" in result else None
+    except Exception:
+        return None
+
+
+def _merge_mappings(rule_based: dict, ai_result: dict | None, valid_columns: set) -> tuple:
+    merged = dict(rule_based)
+    type_values = {}
+    if ai_result is None:
+        return merged, type_values
+    for field, col in ai_result.get("mapping", {}).items():
+        if col in valid_columns:
+            merged[field] = col
+    type_values = ai_result.get("type_values", {})
+    return merged, type_values
 
 
 def extract_from_zip(zip_path: str) -> str:
-    """Extract the first usable CSV/TXT from a ZIP into a temp file. Returns temp path."""
     with zipfile.ZipFile(zip_path, "r") as zf:
         names = zf.namelist()
         target = None
@@ -194,12 +226,11 @@ def preview_file(file_path: str) -> dict:
     }
 
 
-# Keep old name as alias
 preview_csv = preview_file
 
 
-def analyze_import(file_path: str, mapping: dict, type_mapping: dict = None) -> dict:
-    """Dry-run: return new categories and accounts that would be created, without writing."""
+def analyze_settings_import(file_path: str, mapping: dict, type_mapping: dict = None) -> dict:
+    """Dry-run: extract accounts, categories, and monthly summaries from CSV."""
     if type_mapping is None:
         type_mapping = {}
 
@@ -207,225 +238,244 @@ def analyze_import(file_path: str, mapping: dict, type_mapping: dict = None) -> 
     existing_cats = {r["name"] for r in read_csv("categories.csv")}
     existing_accs = {r["name"] for r in read_csv("accounts.csv")}
 
-    new_cats = {}   # name -> guessed type
-    new_accs = {}   # name -> guessed currency
-    total = 0
+    new_cats = {}    # name -> inferred type
+    new_accs = {}    # name -> currency
+    monthly_agg = {}  # (year, month, category, type) -> amount
+    date_range = []
 
     with open(file_path, "r", encoding="utf-8-sig", errors="replace", newline="") as f:
         reader = csv.reader(f, delimiter=delimiter)
         header = next(reader, None)
         if not header:
-            return {"total": 0, "new_categories": [], "new_accounts": []}
+            return {"accounts": [], "categories": [], "monthly_summary": [], "months_count": 0}
         header = [c.strip() for c in header]
 
         for raw_row in reader:
             if not any(cell.strip() for cell in raw_row):
                 continue
-            total += 1
             row = {header[j]: raw_row[j].strip() if j < len(raw_row) else "" for j in range(len(header))}
 
-            raw_type  = row.get(mapping.get("type",     ""), "").strip()
-            raw_cat   = row.get(mapping.get("category", ""), "").strip()
-            raw_title = row.get(mapping.get("title",    ""), "").strip()
-            raw_note  = row.get(mapping.get("note",     ""), "").strip()
-            raw_amt   = row.get(mapping.get("amount",   ""), "0").strip()
-            mapped_type = _resolve_type(raw_type, type_mapping, raw_cat, raw_title, raw_note, raw_amt)
+            raw_date   = row.get(mapping.get("date",     ""), "").strip()
+            raw_amount = row.get(mapping.get("amount",   ""), "0").strip()
+            raw_type   = row.get(mapping.get("type",     ""), "").strip()
+            raw_cat    = row.get(mapping.get("category", ""), "").strip()
+            raw_acc    = row.get(mapping.get("account",  ""), "").strip()
+
+            amount = _parse_amount(raw_amount)
+            if amount == 0:
+                continue
+
+            mapped_type = _resolve_type(raw_type, type_mapping, raw_cat, raw_amount)
+
+            # Skip transfers entirely — transfer accounts are not proposed as new
+            if mapped_type == "transfer":
+                continue
 
             if raw_cat and raw_cat not in existing_cats and raw_cat not in new_cats:
                 new_cats[raw_cat] = mapped_type
 
-            raw_acc = row.get(mapping.get("account", ""), "").strip()
             if raw_acc and raw_acc not in existing_accs and raw_acc not in new_accs:
-                raw_cur = row.get(mapping.get("currency", ""), "").strip() or "TWD"
-                new_accs[raw_acc] = raw_cur
+                new_accs[raw_acc] = "TWD"
+
+            if raw_date:
+                date = _parse_date(raw_date)
+                if len(date) >= 7:
+                    try:
+                        year = int(date[:4])
+                        month = int(date[5:7])
+                        cat_key = raw_cat or "未分類"
+                        key = (year, month, cat_key, mapped_type)
+                        monthly_agg[key] = monthly_agg.get(key, 0) + amount
+                        date_range.append((year, month))
+                    except ValueError:
+                        pass
+
+    monthly_summary = [
+        {"year": k[0], "month": k[1], "category": k[2], "type": k[3], "amount": round(v, 2)}
+        for k, v in sorted(monthly_agg.items())
+    ]
+    months_set = sorted({(k[0], k[1]) for k in monthly_agg})
+    months_count = len(months_set)
+    date_from = f"{months_set[0][0]}/{months_set[0][1]:02d}" if months_set else ""
+    date_to   = f"{months_set[-1][0]}/{months_set[-1][1]:02d}" if months_set else ""
 
     return {
-        "total": total,
-        "new_categories": [{"name": k, "type": v} for k, v in new_cats.items()],
-        "new_accounts":   [{"name": k, "currency": v} for k, v in new_accs.items()],
+        "accounts":       [{"name": k, "currency": v} for k, v in new_accs.items()],
+        "categories":     [{"name": k, "type": v} for k, v in new_cats.items()],
+        "monthly_summary": monthly_summary,
+        "months_count":   months_count,
+        "date_from":      date_from,
+        "date_to":        date_to,
     }
 
 
-def import_csv(file_path: str, mapping: dict, type_mapping: dict = None,
-               account_currencies: dict = None, account_types: dict = None,
-               category_type_overrides: dict = None) -> dict:
+def import_settings(file_path: str, mapping: dict, type_mapping: dict,
+                    accounts_config: list, categories_config: list,
+                    import_history: bool = True,
+                    categories_merge: dict = None,
+                    skipped_accounts: list = None) -> dict:
     """
-    mapping: {field: csv_column}
-    type_mapping: {csv_type_value: "expense"/"income"/"transfer"}
-    account_currencies: {account_name: currency} for new accounts
-    account_types: {account_name: "asset"/"liability"} for new accounts
-    category_type_overrides: {category_name: "expense"/"income"/"transfer"} user overrides
+    Import settings from CSV:
+    - Creates category groups + categories
+    - Creates accounts with opening balance expenses
+    - Optionally stores monthly history in monthly_history.csv
+
+    accounts_config: [{name, sub_type, currency, is_asset, opening_balance, ...}]
+    categories_config: [{name, type}]
+    categories_merge: {source_name: target_name} — merged categories are not
+        created; their history amounts are attributed to the target instead.
+    skipped_accounts: account names to exclude entirely (e.g. investment accounts).
     """
-    if type_mapping is None:
-        type_mapping = {}
-    if account_currencies is None:
-        account_currencies = {}
-    if account_types is None:
-        account_types = {}
-    if category_type_overrides is None:
-        category_type_overrides = {}
+    if categories_merge is None:
+        categories_merge = {}
+    _skipped_accounts: set = set(skipped_accounts) if skipped_accounts else set()
+    # ── 1. Category groups ───────────────────────────────────────────────────
+    grp_rows = read_csv("category_groups.csv")
+    existing_grp_names = {r["name"] for r in grp_rows}
+    groups_created = 0
+    for grp_name, grp_type in [("匯入（支出）", "expense"), ("匯入（收入）", "income")]:
+        if grp_name not in existing_grp_names:
+            grp_rows.append({
+                "id": next_id(grp_rows),
+                "name": grp_name,
+                "sort_order": 90 + groups_created,
+                "type": grp_type,
+            })
+            groups_created += 1
+    if groups_created:
+        write_csv("category_groups.csv", grp_rows, SCHEMA["category_groups.csv"])
 
-    delimiter = _detect_delimiter(file_path)
+    # ── 2. Categories ────────────────────────────────────────────────────────
+    cat_rows = read_csv("categories.csv")
+    existing_cat_names = {r["name"] for r in cat_rows}
+    cats_created = 0
+    for cfg in categories_config:
+        name = cfg.get("name", "").strip()
+        cat_type = cfg.get("type", "expense")
+        if not name or name in existing_cat_names:
+            continue
+        if name in categories_merge:  # merged into another category — don't create
+            continue
+        group_name = "匯入（收入）" if cat_type == "income" else "匯入（支出）"
+        cat_rows.append({
+            "id": next_id(cat_rows),
+            "name": name,
+            "type": cat_type,
+            "is_asset": 1,
+            "in_budget": 1,
+            "group_name": group_name,
+            "sort_order": 90 + cats_created,
+            "monthly_budget": 0,
+        })
+        existing_cat_names.add(name)
+        cats_created += 1
+    if cats_created:
+        write_csv("categories.csv", cat_rows, SCHEMA["categories.csv"])
 
-    existing_expenses = read_csv("expenses.csv")
+    # ── 4. Accounts + opening balances ───────────────────────────────────────
+    acc_rows = read_csv("accounts.csv")
+    existing_acc_names = {r["name"] for r in acc_rows}
+    accs_created = 0
 
-    categories_rows = read_csv("categories.csv")
-    known_cats = {r["name"]: r for r in categories_rows}
-    new_cats = {}
+    for cfg in accounts_config:
+        name = cfg.get("name", "").strip()
+        if not name or name in existing_acc_names:
+            continue
 
-    accounts_rows = read_csv("accounts.csv")
-    known_accs = {r["name"]: r for r in accounts_rows}
-    new_accs = {}
+        sub_type  = cfg.get("sub_type", "其他")
+        is_liab   = sub_type in LIABILITY_SUBTYPES
+        acc_type  = "liability" if is_liab else "asset"
+        currency  = cfg.get("currency", "TWD")
+        is_asset  = int(cfg.get("is_asset", 1))
+        icon      = ICON_MAP.get(sub_type, "👝")
+        balance   = float(cfg.get("opening_balance") or 0)
+        # Store signed: positive = asset funds, negative = liability debt
+        opening_balance = -balance if is_liab else balance
 
-    imported = 0
-    errors = []
-    new_expenses = []
+        new_acc_id = next_id(acc_rows)
+        acc_rows.append({
+            "id": new_acc_id,
+            "name": name,
+            "icon": icon,
+            "sort_order": 80 + accs_created,
+            "type": acc_type,
+            "sub_type": sub_type,
+            "is_asset": is_asset,
+            "billing_start_day": int(cfg.get("billing_start_day") or 1),
+            "currency": currency,
+            "credit_limit": float(cfg.get("credit_limit") or 0),
+            "payment_due_day": int(cfg.get("payment_due_day") or 0),
+            "min_payment_pct": float(cfg.get("min_payment_pct") or 10),
+            "min_payment_floor": float(cfg.get("min_payment_floor") or 1000),
+            "apr": float(cfg.get("apr") or 0),
+            "opening_balance": opening_balance,
+        })
+        existing_acc_names.add(name)
+        accs_created += 1
 
-    with open(file_path, "r", encoding="utf-8-sig", errors="replace", newline="") as f:
-        reader = csv.reader(f, delimiter=delimiter)
-        header = next(reader, None)
-        if not header:
-            return {"imported": 0, "errors": ["檔案沒有標頭列"]}
-        header = [c.strip() for c in header]
+    if accs_created:
+        write_csv("accounts.csv", acc_rows, SCHEMA["accounts.csv"])
 
-        for i, raw_row in enumerate(reader):
-            if not any(cell.strip() for cell in raw_row):
-                continue  # skip blank lines
-            try:
-                row = {header[j]: raw_row[j].strip() if j < len(raw_row) else "" for j in range(len(header))}
+    # ── 5. Monthly history ───────────────────────────────────────────────────
+    history_months = 0
+    if import_history and file_path and os.path.exists(file_path):
+        # Re-aggregate from CSV
+        delimiter = _detect_delimiter(file_path)
+        monthly_agg = {}
+        with open(file_path, "r", encoding="utf-8-sig", errors="replace", newline="") as f:
+            reader = csv.reader(f, delimiter=delimiter)
+            header = next(reader, None)
+            if header:
+                header = [c.strip() for c in header]
+                for raw_row in reader:
+                    if not any(cell.strip() for cell in raw_row):
+                        continue
+                    row = {header[j]: raw_row[j].strip() if j < len(raw_row) else "" for j in range(len(header))}
+                    raw_date   = row.get(mapping.get("date",     ""), "").strip()
+                    raw_amount = row.get(mapping.get("amount",   ""), "0").strip()
+                    raw_type   = row.get(mapping.get("type",     ""), "").strip()
+                    raw_cat    = row.get(mapping.get("category", ""), "").strip()
+                    raw_acc    = row.get(mapping.get("account",  ""), "").strip()
 
-                raw_date     = row.get(mapping.get("date",     ""), "").strip()
-                raw_amount   = row.get(mapping.get("amount",   ""), "0").strip()
-                raw_type     = row.get(mapping.get("type",     ""), "").strip()
-                raw_title    = row.get(mapping.get("title",    ""), "").strip()
-                raw_category = row.get(mapping.get("category", ""), "").strip()
-                raw_account  = row.get(mapping.get("account",  ""), "").strip()
-                raw_note     = row.get(mapping.get("note",     ""), "").strip()
+                    if _skipped_accounts and raw_acc in _skipped_accounts:
+                        continue
+                    amount = _parse_amount(raw_amount)
+                    if amount == 0:
+                        continue
+                    mapped_type = _resolve_type(raw_type, type_mapping, raw_cat, raw_amount)
+                    if mapped_type not in ("income", "expense"):
+                        continue
+                    if not raw_date:
+                        continue
+                    date = _parse_date(raw_date)
+                    if len(date) < 7:
+                        continue
+                    try:
+                        year = int(date[:4])
+                        month = int(date[5:7])
+                        cat_key_raw = raw_cat or "未分類"
+                        cat_key = categories_merge.get(cat_key_raw, cat_key_raw)
+                        key = (year, month, cat_key, mapped_type)
+                        monthly_agg[key] = monthly_agg.get(key, 0) + amount
+                    except ValueError:
+                        pass
 
-                date   = _parse_date(raw_date) if raw_date else datetime.now().strftime("%Y-%m-%d")
-                amount = _parse_amount(raw_amount)
-                if amount == 0:
-                    continue  # skip genuinely empty/zero-amount rows
-
-                mapped_type = _resolve_type(raw_type, type_mapping,
-                                           raw_category, raw_title, raw_note, raw_amount)
-
-                title    = raw_title or raw_note or raw_category or "匯入"
-                note     = raw_note if raw_note != title else ""
-                category = raw_category or "未分類"
-
-                # Auto-create missing category
-                if category not in known_cats and category not in new_cats:
-                    new_cats[category] = {
-                        "id": next_id(categories_rows) + len(new_cats),
-                        "name": category,
-                        "type": category_type_overrides.get(category, mapped_type),
-                        "is_asset": 1,
-                        "in_budget": 1,
-                        "group_name": "匯入",
-                        "sort_order": 99,
-                        "monthly_budget": 0,
-                    }
-
-                # Resolve / auto-create account
-                account_id = 0
-                if raw_account:
-                    if raw_account in known_accs:
-                        account_id = int(known_accs[raw_account]["id"])
-                    elif raw_account in new_accs:
-                        account_id = new_accs[raw_account]["id"]
-                    else:
-                        currency = account_currencies.get(raw_account, "TWD")
-                        acc_type = account_types.get(raw_account, "asset")
-                        new_acc_id = next_id(accounts_rows) + len(new_accs)
-                        new_accs[raw_account] = {
-                            "id": new_acc_id,
-                            "name": raw_account,
-                            "icon": "💰",
-                            "sort_order": 90 + len(new_accs),
-                            "type": acc_type,
-                            "is_asset": 1,
-                            "billing_start_day": 1,
-                            "currency": currency,
-                            "credit_limit": 0,
-                        }
-                        account_id = new_acc_id
-
-                new_id_val = next_id(existing_expenses) + len(new_expenses)
-                new_expenses.append({
-                    "id": new_id_val,
-                    "title": title,
-                    "amount": amount,
+        if monthly_agg:
+            hist_rows = read_csv("monthly_history.csv")
+            for (year, month, category, t), amount in monthly_agg.items():
+                hist_rows.append({
+                    "id": next_id(hist_rows),
+                    "year": year,
+                    "month": month,
                     "category": category,
-                    "date": date,
-                    "note": note,
-                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "type": mapped_type,
-                    "account_id": account_id,
-                    "to_account_id": 0,
-                    "to_amount": "",
-                    "stock_transaction_id": "",
-                    "loan_id": "",
-                    "loan_payment_id": "",
+                    "type": t,
+                    "amount": round(amount, 2),
                 })
-                imported += 1
-            except Exception as e:
-                errors.append(f"第 {i+2} 行：{str(e)}")
+            write_csv("monthly_history.csv", hist_rows, SCHEMA["monthly_history.csv"])
+            history_months = len({(k[0], k[1]) for k in monthly_agg})
 
-    # Save new categories
-    if new_cats:
-        grp_rows = read_csv("category_groups.csv")
-        if not any(r.get("name") == "匯入" for r in grp_rows):
-            grp_rows.append({"id": next_id(grp_rows), "name": "匯入", "sort_order": 99, "type": "expense"})
-            write_csv("category_groups.csv", grp_rows, SCHEMA["category_groups.csv"])
-        for cat in new_cats.values():
-            categories_rows.append(cat)
-        write_csv("categories.csv", categories_rows, SCHEMA["categories.csv"])
-
-    # Save new accounts
-    if new_accs:
-        for acc in new_accs.values():
-            accounts_rows.append(acc)
-        write_csv("accounts.csv", accounts_rows, SCHEMA["accounts.csv"])
-
-    # Save new expenses
-    if new_expenses:
-        write_csv("expenses.csv", existing_expenses + new_expenses, SCHEMA["expenses.csv"])
-
-    if imported > 0:
-        _clean_defaults_after_import()
-
-    return {"imported": imported, "errors": errors}
-
-
-def _clean_defaults_after_import():
-    """Delete default categories/groups/accounts that are unused after an import."""
-    DEFAULT_CATEGORY_NAMES = {"餐飲", "交通", "娛樂", "購物", "醫療", "住宿", "教育", "薪水", "獎金", "其他"}
-    DEFAULT_GROUP_NAMES    = {"生活", "休閒", "健康", "學習", "主要收入", "額外收入", "其他"}
-    DEFAULT_ACCOUNT_NAMES  = {"現金", "銀行", "儲值支付", "信用卡", "其他"}
-
-    expenses  = read_csv("expenses.csv")
-    used_cats = {e.get("category", "") for e in expenses}
-    used_acc_ids = (
-        {str(e.get("account_id", "")) for e in expenses} |
-        {str(e.get("to_account_id", "")) for e in expenses}
-    )
-
-    # Remove unused default categories
-    cats = read_csv("categories.csv")
-    cats_after = [c for c in cats if c["name"] not in DEFAULT_CATEGORY_NAMES or c["name"] in used_cats]
-    if len(cats_after) != len(cats):
-        write_csv("categories.csv", cats_after, SCHEMA["categories.csv"])
-
-    # Remove default groups that have no remaining categories
-    remaining_groups = {c.get("group_name", "") for c in cats_after}
-    groups = read_csv("category_groups.csv")
-    groups_after = [g for g in groups if g["name"] not in DEFAULT_GROUP_NAMES or g["name"] in remaining_groups]
-    if len(groups_after) != len(groups):
-        write_csv("category_groups.csv", groups_after, SCHEMA["category_groups.csv"])
-
-    # Remove unused default accounts
-    accs = read_csv("accounts.csv")
-    accs_after = [a for a in accs if a["name"] not in DEFAULT_ACCOUNT_NAMES or str(a["id"]) in used_acc_ids]
-    if len(accs_after) != len(accs):
-        write_csv("accounts.csv", accs_after, SCHEMA["accounts.csv"])
+    return {
+        "accounts_created": accs_created,
+        "categories_created": cats_created,
+        "history_months": history_months,
+    }

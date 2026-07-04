@@ -18,54 +18,117 @@ Chart.defaults.font.family = "'Noto Sans TC', sans-serif";
 let monthlyChartInstance = null;
 let categoryChartInstance = null;
 let rawMonthlyData = [];
-let rawCategoryData = [];
-let currentTab = 'balance'; // balance, expense, income
+// NavState accessor (defined in base.html; inline fallback for safety)
+var _NS = window.NavState || {
+  get: function(ns, k, d) { try { var v = sessionStorage.getItem('navstate_'+ns+'_'+k); return v !== null ? JSON.parse(v) : d; } catch(e) { return d; } },
+  set: function(ns, k, v) { try { sessionStorage.setItem('navstate_'+ns+'_'+k, JSON.stringify(v)); } catch(e) {} }
+};
 
-async function fetchChartData() {
-  const [resM, resC] = await Promise.all([
-    fetch("/api/charts/monthly"),
-    fetch("/api/charts/category")
-  ]);
-  rawMonthlyData = await resM.json();
-  rawCategoryData = await resC.json();
-  
-  renderCharts();
+let currentTab = _NS.get('charts', 'tab', 'balance'); // balance, expense, income
+
+// ── Time filter state ─────────────────────────────────────────────────────────
+let timeMode = _NS.get('charts', 'time_mode', 'all'); // 'all' | 'year' | 'month'
+
+function getAvailableYears() {
+  const years = [...new Set(rawMonthlyData.map(d => d.year))].sort((a, b) => b - a);
+  if (!years.length) {
+    const y = new Date().getFullYear();
+    return [y];
+  }
+  return years;
+}
+
+function populateYearSelects() {
+  const years = getAvailableYears();
+  const nowYear = new Date().getFullYear();
+  const nowMonth = new Date().getMonth() + 1;
+
+  ['time-year-select', 'time-month-year-select'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = years.map(y => `<option value="${y}">${y}年</option>`).join('');
+    sel.value = years.includes(parseInt(prev)) ? prev : String(nowYear);
+  });
+
+  const mSel = document.getElementById('time-month-select');
+  if (mSel && !mSel.value) mSel.value = String(nowMonth);
+}
+
+function setTimeFilter(mode) {
+  timeMode = mode;
+  _NS.set('charts', 'time_mode', mode);
+  document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.time-btn[onclick="setTimeFilter('${mode}')"]`).classList.add('active');
+  document.getElementById('time-year-picker').style.display = mode === 'year' ? 'flex' : 'none';
+  document.getElementById('time-month-picker').style.display = mode === 'month' ? 'flex' : 'none';
+  applyTimeFilter();
+}
+
+function applyTimeFilter() {
+  renderMonthly();
+  fetchAndRenderCategory();
+}
+
+function getTimeParams() {
+  if (timeMode === 'year') {
+    const y = parseInt(document.getElementById('time-year-select').value);
+    return { year: y, month: null };
+  }
+  if (timeMode === 'month') {
+    const y = parseInt(document.getElementById('time-month-year-select').value);
+    const m = parseInt(document.getElementById('time-month-select').value);
+    return { year: y, month: m };
+  }
+  return { year: null, month: null };
+}
+
+// ── Fetch ─────────────────────────────────────────────────────────────────────
+
+
+async function fetchAndRenderCategory() {
+  const { year, month } = getTimeParams();
+  let url = "/api/charts/category";
+  const params = [];
+  if (year) params.push(`year=${year}`);
+  if (month) params.push(`month=${month}`);
+  if (params.length) url += '?' + params.join('&');
+  const res = await fetch(url);
+  const data = await res.json();
+  renderCategory(data);
 }
 
 function switchTab(tab) {
   currentTab = tab;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
-  
+  _NS.set('charts', 'tab', tab);
+  document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.page-tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+
   const titleCategory = document.getElementById('chart-title-category');
   if (tab === 'balance') {
     titleCategory.textContent = '收支佔比 (資產)';
-    document.getElementById('card-category').style.display = 'block';
-    document.getElementById('card-table').style.display = 'block';
   } else if (tab === 'expense') {
     titleCategory.textContent = '支出類別佔比';
-    document.getElementById('card-category').style.display = 'block';
-    document.getElementById('card-table').style.display = 'block';
   } else {
     titleCategory.textContent = '收入來源佔比';
-    document.getElementById('card-category').style.display = 'block';
-    document.getElementById('card-table').style.display = 'block';
   }
 
-  renderCharts();
-}
-
-function renderCharts() {
   renderMonthly();
-  renderCategory();
+  fetchAndRenderCategory();
 }
 
 // ── Monthly Chart ─────────────────────────────────────────────────────────────
 
 function renderMonthly() {
-  // Aggregate data by month
+  const { year, month } = getTimeParams();
+
+  // Filter raw data by time selection
+  let filtered = rawMonthlyData;
+  if (year !== null) filtered = filtered.filter(d => d.year === year);
+  if (month !== null) filtered = filtered.filter(d => d.month === month);
+
   const map = new Map();
-  rawMonthlyData.forEach(d => {
+  filtered.forEach(d => {
     const key = `${d.year}/${String(d.month).padStart(2, "0")}`;
     if (!map.has(key)) map.set(key, { expense: 0, income: 0 });
     const entry = map.get(key);
@@ -86,7 +149,7 @@ function renderMonthly() {
       borderRadius: 6,
     });
   }
-  
+
   if (currentTab === 'balance' || currentTab === 'income') {
     datasets.push({
       label: "收入 (NT$)",
@@ -122,11 +185,10 @@ function renderMonthly() {
 
 // ── Category Donut Chart ──────────────────────────────────────────────────────
 
-function renderCategory() {
+function renderCategory(rawCategoryData) {
   let filteredData = [];
-  
+
   if (currentTab === 'balance') {
-    // For balance, just show total Income vs total Expense
     let totalInc = 0, totalExp = 0;
     rawCategoryData.forEach(d => {
       if (d.type === 'income') totalInc += d.total;
@@ -149,7 +211,6 @@ function renderCategory() {
   const colors = filteredData.map(d => d.color);
   const total = values.reduce((a, b) => a + b, 0);
 
-  // Donut chart
   const ctx = document.getElementById("category-chart").getContext("2d");
   if (categoryChartInstance) categoryChartInstance.destroy();
 
@@ -183,7 +244,6 @@ function renderCategory() {
     },
   });
 
-  // Table
   const tbody = document.getElementById("cat-tbody");
   tbody.innerHTML = '';
   filteredData.forEach(d => {
@@ -200,4 +260,18 @@ function renderCategory() {
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
-fetchChartData();
+async function initCharts() {
+  const resM = await fetch("/api/charts/monthly");
+  rawMonthlyData = await resM.json();
+  populateYearSelects();
+
+  // Restore saved tab (calls renderMonthly + fetchAndRenderCategory)
+  switchTab(currentTab);
+
+  // Restore saved time mode (re-renders after tab is set)
+  if (timeMode !== 'all') {
+    setTimeFilter(timeMode);
+  }
+}
+
+initCharts();
