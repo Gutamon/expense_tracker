@@ -62,7 +62,7 @@ class StockModel:
             t_type = t.get("type")
             t_shares = float(t.get("shares") or 0)
             t_price = float(t.get("price") or 0)
-            if t_type == "buy":
+            if t_type in ("buy", "opening"):
                 shares += t_shares
                 total_cost += t_shares * t_price
             elif t_type == "sell":
@@ -129,6 +129,8 @@ class StockModel:
             amount = price
             exp_type = "income"
             title = f"{symbol} 股利"
+        # "opening" (期初持股) writes no expense — the shares existed before
+        # tracking started, so no money moves through any account.
 
         if amount > 0 and exp_type:
             expense_model.create_with_links(

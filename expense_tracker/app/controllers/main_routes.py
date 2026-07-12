@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, request, jsonify, abort, redirect
+import os
+from flask import Blueprint, render_template, request, jsonify, abort, redirect, current_app, g
 from app.models.expense import ExpenseModel
-from app.models.category import CategoryModel
+from app.models.category import CategoryModel, CategoryGroupModel
 from app.models.account import AccountModel
 from app.models.debt import DebtModel
-from app.models import csv_store
+from app.models import csv_store, user
 from app.models import rates as rates_model
 from datetime import datetime
 
@@ -17,10 +18,42 @@ debt_model = DebtModel()
 @main_bp.route("/")
 def shell():
     if csv_store.is_first_run():
-        # Render directly — avoid a redirect that would create a second device
-        # before the browser stores the cookie from the first response.
+        # Render the 全新開始 / 匯入還原 chooser directly — a redirect here would create
+        # a second device before the browser stores the cookie from the first response.
         return render_template("onboarding.html")
-    return render_template("shell.html")
+    # Hand the device's rescue code to the shell so it can be mirrored into
+    # localStorage — the iOS home-screen PWA drops the httponly cookie between cold
+    # launches, and this lets the onboarding screen silently re-attach on next open.
+    rescue_code = user.ensure_rescue_code(csv_store.root_dir(), g.device_id)
+    return render_template("shell.html", rescue_code=rescue_code)
+
+
+def _assets_version() -> str:
+    """Latest mtime across templates/static, so any code change yields a new value.
+
+    Embedding this in sw.js means the file's bytes change whenever the app changes —
+    the browser detects that as a new service worker, installs it, and its activate
+    handler wipes every older cache. No manual cache-version bump needed on deploy.
+    """
+    latest = 0
+    for folder in (current_app.template_folder, current_app.static_folder):
+        for dirpath, _, filenames in os.walk(folder):
+            for name in filenames:
+                try:
+                    latest = max(latest, int(os.path.getmtime(os.path.join(dirpath, name))))
+                except OSError:
+                    pass
+    return str(latest)
+
+
+@main_bp.route("/sw.js")
+def service_worker():
+    # Served from root so its scope covers the whole app (a /static/ path could only
+    # control /static/). Service-Worker-Allowed relaxes the scope restriction.
+    body = render_template("sw.js", version=_assets_version())
+    resp = current_app.response_class(body, mimetype="application/javascript")
+    resp.headers["Service-Worker-Allowed"] = "/"
+    return resp
 
 
 @main_bp.route("/home")
@@ -131,6 +164,17 @@ def index():
     if "未分類" in grouped_categories and grouped_categories["未分類"]:
         filtered_grouped_categories["未分類"] = grouped_categories["未分類"]
 
+    # 股票現值（原本顯示在圖表頁頂部，移到記帳頁的資產餘額區）
+    stock_items = []
+    for r in csv_store.read_csv("stocks.csv"):
+        shares = float(r.get("shares") or 0)
+        value = shares * float(r.get("current_price") or 0)
+        if shares > 0 and value:
+            stock_items.append({"name": r.get("name") or r.get("symbol") or "", "value": round(value, 2)})
+    stock_value = round(sum(s["value"] for s in stock_items), 2)
+
+    groups = CategoryGroupModel().get_all()
+
     return render_template(
         "index.html",
         expenses=expenses,
@@ -149,6 +193,9 @@ def index():
         cc_account_ids=cc_account_ids,
         lend_net=lend_net,
         borrow_net=borrow_net,
+        stock_items=stock_items,
+        stock_value=stock_value,
+        groups=groups,
         username="",
     )
 
@@ -157,43 +204,16 @@ def index():
 def charts():
     expenses = expense_model.get_all()
     categories = category_model.get_all()
-    cat_dict = {c["name"]: c for c in categories}
-
     accounts = account_model.get_all()
-    account_map = {a["id"]: a for a in accounts}
 
-    account_balances = {}
-    for acc in accounts:
-        ob = float(acc.get("opening_balance") or 0)
-        if ob:
-            account_balances[acc["id"]] = ob
-
-    for e in expenses:
-        cat_info = cat_dict.get(e["category"], {})
-        is_asset = int(cat_info.get("is_asset", 1) or 1)
-        if is_asset:
-            acc_id = e.get("account_id", 0)
-            if acc_id not in account_balances: account_balances[acc_id] = 0
-            if e["type"] == "income":   account_balances[acc_id] += float(e.get("amount") or 0)
-            elif e["type"] == "expense": account_balances[acc_id] -= float(e.get("amount") or 0)
-            elif e["type"] == "transfer":
-                account_balances[acc_id] -= float(e.get("amount") or 0)
-                to_acc_id = e.get("to_account_id", 0)
-                if to_acc_id not in account_balances: account_balances[to_acc_id] = 0
-                account_balances[to_acc_id] += float(e.get("to_amount") or e.get("amount") or 0)
-
-    cash = 0
-    liabilities = 0
-    for acc_id, balance in account_balances.items():
-        if acc_id in account_map and account_map[acc_id].get("type") == "liability":
-            liabilities += balance
-        else:
-            cash += balance
-
-    stock_rows = csv_store.read_csv("stocks.csv")
-    stock_value = sum(float(r.get("shares") or 0) * float(r.get("current_price") or 0) for r in stock_rows)
-
-    return render_template("charts.html", username="", cash=cash, liabilities=liabilities, stock_value=stock_value)
+    # 原始資料直接注入模板，聚合與篩選（帳戶／群組／類別）全部在前端進行
+    groups = CategoryGroupModel().get_all()
+    history = csv_store.read_csv("monthly_history.csv")
+    return render_template(
+        "charts.html", username="",
+        expenses=expenses, categories=categories, groups=groups,
+        accounts=accounts, history=history,
+    )
 
 
 @main_bp.route("/api/user/budget", methods=["POST"])
@@ -318,6 +338,22 @@ def api_delete(expense_id):
     return jsonify({"success": True})
 
 
+def _ym_key(r):
+    return int(r.get("year") or 0) * 12 + int(r.get("month") or 0)
+
+
+def _latest_amount_before_or_at(rows, key_field, key_value, year, month):
+    """Among rows matching key_field==key_value with (year,month) <= target, return the
+    amount from the most recent one that is non-zero. Used to carry a budget forward to
+    months that were never explicitly set."""
+    target = year * 12 + month
+    candidates = [r for r in rows if str(r.get(key_field)) == str(key_value) and _ym_key(r) <= target and float(r.get("amount") or 0) != 0]
+    if not candidates:
+        return 0.0
+    latest = max(candidates, key=_ym_key)
+    return float(latest.get("amount") or 0)
+
+
 @main_bp.route("/api/budget")
 def api_get_budget():
     now = datetime.now()
@@ -326,15 +362,29 @@ def api_get_budget():
 
     mb_rows = csv_store.read_csv("monthly_budgets.csv")
     row = next((r for r in mb_rows if int(r.get("year") or 0) == year and int(r.get("month") or 0) == month), None)
-    total = float(row["amount"]) if row else 0.0
+    if row:
+        total = float(row["amount"])
+    else:
+        candidates = [r for r in mb_rows if _ym_key(r) <= year * 12 + month and float(r.get("amount") or 0) != 0]
+        total = float(max(candidates, key=_ym_key)["amount"]) if candidates else 0.0
 
     cat_rows = csv_store.read_csv("cat_monthly_budgets.csv")
-    cats = [
-        {"id": r["category_id"], "amount": float(r.get("amount") or 0)}
-        for r in cat_rows
-        if int(r.get("year") or 0) == year and int(r.get("month") or 0) == month
-    ]
-    return jsonify({"total_budget": total, "categories": cats})
+    cat_ids = {str(r["category_id"]) for r in cat_rows}
+    cats = []
+    for cid in cat_ids:
+        exact = next((r for r in cat_rows if str(r.get("category_id")) == cid and int(r.get("year") or 0) == year and int(r.get("month") or 0) == month), None)
+        amount = float(exact["amount"]) if exact else _latest_amount_before_or_at(cat_rows, "category_id", cid, year, month)
+        cats.append({"id": cid, "amount": amount})
+
+    grp_rows = csv_store.read_csv("group_monthly_budgets.csv")
+    grp_ids = {str(r["group_id"]) for r in grp_rows}
+    groups = []
+    for gid in grp_ids:
+        exact = next((r for r in grp_rows if str(r.get("group_id")) == gid and int(r.get("year") or 0) == year and int(r.get("month") or 0) == month), None)
+        amount = float(exact["amount"]) if exact else _latest_amount_before_or_at(grp_rows, "group_id", gid, year, month)
+        groups.append({"id": gid, "amount": amount})
+
+    return jsonify({"total_budget": total, "categories": cats, "groups": groups})
 
 
 @main_bp.route("/api/budget", methods=["POST"])
@@ -345,6 +395,7 @@ def api_save_budget():
     month = int(data.get("month", now.month))
     total = float(data.get("total_budget", 0))
     cats = data.get("categories", [])
+    groups = data.get("groups", [])
 
     mb_rows = csv_store.read_csv("monthly_budgets.csv")
     existing = next((r for r in mb_rows if int(r.get("year") or 0) == year and int(r.get("month") or 0) == month), None)
@@ -373,6 +424,50 @@ def api_save_budget():
                 "amount": float(cat.get("amount", 0)),
             })
     csv_store.write_csv("cat_monthly_budgets.csv", cmb_rows, csv_store.SCHEMA["cat_monthly_budgets.csv"])
+
+    gmb_rows = csv_store.read_csv("group_monthly_budgets.csv")
+    for grp in groups:
+        group_id = str(grp["id"])
+        existing_grp = next(
+            (r for r in gmb_rows
+             if str(r.get("group_id")) == group_id and int(r.get("year") or 0) == year and int(r.get("month") or 0) == month),
+            None
+        )
+        if existing_grp:
+            existing_grp["amount"] = float(grp.get("amount", 0))
+        else:
+            gmb_rows.append({
+                "id": csv_store.next_id(gmb_rows),
+                "group_id": group_id,
+                "year": year,
+                "month": month,
+                "amount": float(grp.get("amount", 0)),
+            })
+    csv_store.write_csv("group_monthly_budgets.csv", gmb_rows, csv_store.SCHEMA["group_monthly_budgets.csv"])
+    return jsonify({"success": True})
+
+
+@main_bp.route("/api/budget/clear", methods=["POST"])
+def api_clear_budget():
+    """Remove this year-month's explicit budget rows (total/category/group) so the
+    carry-forward logic falls back to the most recent prior non-zero setting, or to
+    zero if none exists."""
+    data = request.get_json(force=True)
+    now = datetime.now()
+    year = int(data.get("year", now.year))
+    month = int(data.get("month", now.month))
+
+    mb_rows = csv_store.read_csv("monthly_budgets.csv")
+    mb_rows = [r for r in mb_rows if not (int(r.get("year") or 0) == year and int(r.get("month") or 0) == month)]
+    csv_store.write_csv("monthly_budgets.csv", mb_rows, csv_store.SCHEMA["monthly_budgets.csv"])
+
+    cmb_rows = csv_store.read_csv("cat_monthly_budgets.csv")
+    cmb_rows = [r for r in cmb_rows if not (int(r.get("year") or 0) == year and int(r.get("month") or 0) == month)]
+    csv_store.write_csv("cat_monthly_budgets.csv", cmb_rows, csv_store.SCHEMA["cat_monthly_budgets.csv"])
+
+    gmb_rows = csv_store.read_csv("group_monthly_budgets.csv")
+    gmb_rows = [r for r in gmb_rows if not (int(r.get("year") or 0) == year and int(r.get("month") or 0) == month)]
+    csv_store.write_csv("group_monthly_budgets.csv", gmb_rows, csv_store.SCHEMA["group_monthly_budgets.csv"])
     return jsonify({"success": True})
 
 

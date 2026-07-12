@@ -1,2 +1,0 @@
-﻿id,name,type,principal,remaining,interest_rate,start_date,due_date,account_id,linked_account_id,status,note,created_at
-1,23,borrow,1000.0,1000.0,2,2026-06-01,2026-07-04,1,6,active,,2026-07-04 22:40:51

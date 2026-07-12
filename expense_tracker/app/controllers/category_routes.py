@@ -3,15 +3,16 @@ import os
 import tempfile
 import zipfile
 from datetime import datetime
-from flask import Blueprint, render_template, request, jsonify, abort, send_file
+from flask import Blueprint, render_template, request, jsonify, abort, send_file, g
 from app.models.account import AccountModel
 from app.models.category import CategoryModel, CategoryGroupModel
 from app.models.expense import ExpenseModel
-from app.models import csv_store
+from app.models import csv_store, user
 from app.models.importer import (
     preview_file, extract_from_zip,
     ai_suggest_mapping, _merge_mappings,
     analyze_settings_import, import_settings,
+    normalize_files, CANONICAL_MAPPING, CANONICAL_TYPE_MAPPING,
 )
 
 settings_bp = Blueprint("settings", __name__)
@@ -35,9 +36,17 @@ def manage_settings():
         lid = int(r.get("linked_account_id") or 0)
         if lid:
             linked_account_ids.add(lid)
+    rescue_code = user.ensure_rescue_code(csv_store.root_dir(), g.device_id)
     return render_template("settings.html", categories=categories, groups=groups,
                            accounts=accounts, username="", monthly_budget=monthly_budget,
-                           linked_account_ids=linked_account_ids)
+                           linked_account_ids=linked_account_ids, device_id=g.device_id,
+                           rescue_code=rescue_code)
+
+
+@settings_bp.route("/api/rescue-code/regenerate", methods=["POST"])
+def api_regenerate_rescue_code():
+    code = user.regenerate_rescue_code(csv_store.root_dir(), g.device_id)
+    return jsonify({"code": code})
 
 
 # ── Category API ─────────────────────────────────────────────────────────────
@@ -283,6 +292,40 @@ def api_import_preview():
     return jsonify(result)
 
 
+@settings_bp.route("/api/import/normalize", methods=["POST"])
+def api_import_normalize():
+    """Merge the uploaded (already-mapped) files into the canonical CSV
+    (日期/類別/帳戶1/帳戶2/金額/收支), sorted by date. Later steps
+    (analyze / settings import) run against this single normalized file."""
+    data = request.get_json(force=True)
+    files = data.get("files", [])
+    if not files:
+        abort(400, description="缺少檔案")
+    specs = []
+    for f in files:
+        tmp_filename = os.path.basename(f.get("tmp_filename") or "")
+        if not tmp_filename:
+            abort(400, description="缺少 tmp_filename")
+        tmp_path = os.path.join(tempfile.gettempdir(), tmp_filename)
+        if not os.path.exists(tmp_path):
+            abort(400, description="暫存檔案不存在，請重新上傳")
+        specs.append({
+            "path": tmp_path,
+            "mapping": f.get("mapping", {}),
+            "type_mapping": f.get("type_mapping", {}),
+            "role": f.get("role", "single"),
+        })
+    try:
+        canonical_path = normalize_files(specs)
+    except Exception as e:
+        abort(500, description=str(e))
+    return jsonify({
+        "tmp_filename": os.path.basename(canonical_path),
+        "mapping": CANONICAL_MAPPING,
+        "type_mapping": CANONICAL_TYPE_MAPPING,
+    })
+
+
 @settings_bp.route("/api/import/analyze", methods=["POST"])
 def api_import_analyze():
     data = request.get_json(force=True)
@@ -336,6 +379,9 @@ def api_import_settings():
 def api_data_wipe():
     for filename, fieldnames in csv_store.SCHEMA.items():
         csv_store.write_csv(filename, [], fieldnames)
+    # Invalidate this device's rescue code too — otherwise the onboarding auto-recover
+    # would re-attach to the now-empty device and loop back to onboarding forever.
+    user.clear_rescue_code(csv_store.root_dir(), g.device_id)
     return jsonify({"success": True})
 
 

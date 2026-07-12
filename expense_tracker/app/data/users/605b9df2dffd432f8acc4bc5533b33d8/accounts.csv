@@ -1,0 +1,5 @@
+﻿id,name,icon,sort_order,type,sub_type,is_asset,billing_start_day,currency,credit_limit,payment_due_day,min_payment_pct,min_payment_floor,apr,opening_balance
+1,現金,💵,0,asset,現金,1,1,TWD,0,0,10,1000,0,
+2,銀行,🏦,1,asset,銀行,1,1,TWD,0,0,10,1000,0,
+3,預付儲值,🪙,2,asset,預付儲值,1,1,TWD,0,0,10,1000,0,
+4,其他,👝,3,asset,其他,1,1,TWD,0,0,10,1000,0,

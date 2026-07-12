@@ -1,2 +1,0 @@
-﻿id,name,type,principal,remaining,interest_rate,start_date,due_date,account_id,linked_account_id,status,note,created_at
-1,iPhone,borrow,10000.0,9900.0,1.0,2026-06-23,,1,8,active,,2026-06-28 00:57:18

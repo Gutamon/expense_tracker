@@ -5,20 +5,82 @@
 {% block head %}
 <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
 <style>
-  .page-title {
-    font-size: 1.4rem;
-    font-weight: 500;
-    margin-bottom: 24px;
+  /* ── Attribute filter dropdowns ── */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
   }
 
-  .page-title span {
+  .mfilter-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
     color: var(--muted);
-    font-size: .9rem;
-    font-weight: 300;
-    margin-left: 12px;
+    font-family: inherit;
+    font-size: .85rem;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 8px;
+    transition: all .2s;
   }
 
+  .mfilter-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
 
+  .mfilter-btn.filtered {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .mfilter-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 6px;
+    min-width: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+  }
+
+  .mfilter.open .mfilter-menu {
+    display: block;
+  }
+
+  .mfilter-sep {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 6px;
+  }
+
+  .mfilter-type-label {
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .08em;
+    padding: 8px 10px 4px;
+  }
+
+  .mfilter-type-label.expense {
+    color: var(--danger);
+  }
+
+  .mfilter-type-label.income {
+    color: var(--positive);
+  }
+
+  /* ── Time mode & window nav ── */
   .time-filter-bar {
     display: flex;
     align-items: center;
@@ -44,71 +106,61 @@
     color: var(--accent);
   }
 
-  .time-picker {
+  .win-nav {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    margin-left: auto;
   }
 
-  .time-select {
-    background: var(--bg);
+  .win-btn {
+    background: var(--surface);
     border: 1px solid var(--border);
+    color: var(--muted);
     border-radius: 6px;
-    color: var(--text);
-    font-family: inherit;
-    font-size: .82rem;
-    padding: 5px 8px;
-    outline: none;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
+    padding: 0;
+    transition: all .2s;
   }
 
+  .win-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
 
+  .win-btn:disabled {
+    opacity: .35;
+    cursor: default;
+  }
+
+  .win-btn svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .win-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .8rem;
+    color: var(--muted);
+    min-width: 130px;
+    text-align: center;
+  }
+
+  /* ── Cards ── */
   .charts-grid {
     display: grid;
     grid-template-columns: 1fr;
     gap: 24px;
-  }
-
-  /* ── Stats ── */
-  .stats {
-    margin-bottom: 24px;
-  }
-
-  .bar {
-    display: flex;
-    flex-direction: row;
-    gap: 16px;
-    width: 100%;
-  }
-
-  .stat-card {
-    flex: 1;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 24px;
-  }
-
-  .stat-card .label {
-    font-size: .75rem;
-    color: var(--muted);
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-  }
-
-  .stat-card .value {
-    font-family: 'DM Mono', monospace;
-    font-size: 1rem;
-    font-weight: 500;
-  }
-
-  .stat-card .value.green {
-    color: var(--accent);
-  }
-
-  .stat-card .value.red {
-    color: var(--danger);
   }
 
   .card {
@@ -116,49 +168,184 @@
     min-width: 0;
   }
 
-  .card.full {
-    grid-column: 1 / -1;
+  .card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
   }
 
-  .card h2 {
+  .card-head h2 {
     font-size: .8rem;
     font-weight: 500;
     letter-spacing: .08em;
     text-transform: uppercase;
     color: var(--muted);
-    margin-bottom: 24px;
+    margin: 0;
+  }
+
+  .card-head .scope {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .75rem;
+    color: var(--muted);
+  }
+
+  .swipe-area {
+    touch-action: pan-y;
   }
 
   canvas {
-    max-height: 300px;
+    max-height: 320px;
     max-width: 100%;
     display: block;
   }
 
-  /* Category legend table */
-  #cat-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 16px;
+  /* ── Ranking (主要收/支組成) ── */
+  .rank-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 28px;
   }
 
-  #cat-table th,
-  #cat-table td {
-    padding: 10px 12px;
-    text-align: left;
-    font-size: .83rem;
-    border-bottom: 1px solid var(--border);
+  .rank-grid.two-col {
+    grid-template-columns: 1fr 1fr;
   }
 
-  #cat-table th {
+  .rank-section-title {
+    font-size: .85rem;
+    font-weight: 500;
+    margin-bottom: 16px;
+  }
+
+  .rank-section-title.income {
+    color: var(--positive);
+  }
+
+  .rank-section-title.expense {
+    color: var(--danger);
+  }
+
+  .rank-group {
+    margin-bottom: 18px;
+  }
+
+  .rank-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: .85rem;
+  }
+
+  .rank-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rank-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .82rem;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    display: flex;
+    align-items: baseline;
+  }
+
+  .rank-val .amt-sign {
+    display: inline-block;
+    width: 32px;
     color: var(--muted);
-    font-weight: 400;
-    letter-spacing: .05em;
   }
 
-  #cat-table .amount {
-    font-family: 'DM Mono', monospace;
-    color: var(--accent);
+  .rank-val .amt-digits {
+    text-align: right;
+  }
+
+  .rank-val .pct {
+    color: var(--muted);
+    font-size: .75rem;
+    margin-left: 6px;
+  }
+
+  .rank-track {
+    height: 6px;
+    background: rgba(255, 255, 255, .06);
+    border-radius: 4px;
+    margin: 8px 0 6px;
+    overflow: hidden;
+  }
+
+  .rank-fill {
+    height: 100%;
+    border-radius: 4px;
+    min-width: 2px;
+  }
+
+  .rank-cats {
+    padding-left: 16px;
+  }
+
+  .rank-cat {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: .78rem;
+    color: var(--muted);
+    padding: 3px 0;
+  }
+
+  .rank-cat .amt {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    display: flex;
+    align-items: baseline;
+    min-width: 84px;
+  }
+
+  .rank-cat .amt .amt-sign {
+    display: inline-block;
+    width: 28px;
+    color: var(--muted);
+  }
+
+  .rank-cat .amt .amt-digits {
+    flex: 1;
+    text-align: right;
+  }
+
+  .rank-cat.rank-more {
+    cursor: pointer;
+    user-select: none;
+    transition: color .15s;
+  }
+
+  .rank-cat.rank-more:hover {
+    color: var(--text);
+  }
+
+  .rank-cat.rank-more .chev {
+    display: inline-block;
+    width: 12px;
+    font-size: .7rem;
+  }
+
+  .rank-rest .rank-cat {
+    padding-left: 4px;
+  }
+
+  .rank-empty {
+    font-size: .85rem;
+    color: var(--muted);
+    padding: 12px 0;
   }
 
   .dot {
@@ -166,99 +353,102 @@
     height: 8px;
     border-radius: 50%;
     display: inline-block;
-    margin-right: 8px;
-    vertical-align: middle;
+    flex-shrink: 0;
   }
 
   @media (max-width: 768px) {
-
-    nav {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
+    .rank-grid.two-col {
+      grid-template-columns: 1fr;
     }
 
-    nav span {
-      display: none;
+    .win-nav {
+      margin-left: 0;
+      width: 100%;
+      justify-content: center;
     }
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="stats">
-  <div class="bar">
-    <div class="stat-card">
-      <div class="label">現金</div>
-      <div class="value {% if cash >= 0 %}green{% else %}red{% endif %}">{{ "%.0f" | format(cash) }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">負債</div>
-      <div class="value {% if liabilities < 0 %}red{% else %}green{% endif %}">{{ "%.0f" | format(liabilities) }}
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="label">股票現值</div>
-      <div class="value green">{{ "%.2f" | format(stock_value) }}</div>
-    </div>
-  </div>
+<div class="page-tabs">
+  <button class="page-tab" data-tab="balance" onclick="switchTab('balance')">收支</button>
+  <button class="page-tab" data-tab="expense" onclick="switchTab('expense')">支出</button>
+  <button class="page-tab" data-tab="income" onclick="switchTab('income')">收入</button>
 </div>
 
-<div class="page-tabs">
-  <button class="page-tab active" onclick="switchTab('balance')">收支</button>
-  <button class="page-tab" onclick="switchTab('expense')">支出</button>
-  <button class="page-tab" onclick="switchTab('income')">收入</button>
+<!-- 篩選：每個屬性一顆按鈕，展開可複選的選單 -->
+<div class="filter-bar" id="filter-bar">
+  <div class="mfilter" data-kind="acc">
+    <button class="mfilter-btn" id="mf-btn-acc" onclick="toggleMenu(event,'acc')">
+      <span id="mf-label-acc">帳戶</span>
+      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div class="mfilter-menu" id="mf-menu-acc"></div>
+  </div>
+  <div class="mfilter" data-kind="grp">
+    <button class="mfilter-btn" id="mf-btn-grp" onclick="toggleMenu(event,'grp')">
+      <span id="mf-label-grp">群組</span>
+      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div class="mfilter-menu" id="mf-menu-grp"></div>
+  </div>
+  <div class="mfilter" data-kind="cat">
+    <button class="mfilter-btn" id="mf-btn-cat" onclick="toggleMenu(event,'cat')">
+      <span id="mf-label-cat">類別</span>
+      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div class="mfilter-menu" id="mf-menu-cat"></div>
+  </div>
 </div>
 
 <div class="time-filter-bar">
-  <button class="time-btn active" onclick="setTimeFilter('all')">全部</button>
-  <button class="time-btn" onclick="setTimeFilter('year')">依年</button>
-  <button class="time-btn" onclick="setTimeFilter('month')">依月</button>
-  <div class="time-picker" id="time-year-picker" style="display:none">
-    <select class="time-select" id="time-year-select" onchange="applyTimeFilter()"></select>
-  </div>
-  <div class="time-picker" id="time-month-picker" style="display:none">
-    <select class="time-select" id="time-month-year-select" onchange="applyTimeFilter()"></select>
-    <select class="time-select" id="time-month-select" onchange="applyTimeFilter()">
-      <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option>
-      <option value="4">4月</option><option value="5">5月</option><option value="6">6月</option>
-      <option value="7">7月</option><option value="8">8月</option><option value="9">9月</option>
-      <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
-    </select>
+  <button class="time-btn" data-mode="month" onclick="setTimeFilter('month')">近月</button>
+  <button class="time-btn" data-mode="year" onclick="setTimeFilter('year')">近年</button>
+  <div class="win-nav" id="win-nav" style="display:none">
+    <button class="win-btn" id="win-prev" onclick="shiftWindow(-1)" aria-label="較早">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <span class="win-label" id="win-label"></span>
+    <button class="win-btn" id="win-next" onclick="shiftWindow(1)" aria-label="較晚">
+      <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
   </div>
 </div>
 
 <div class="charts-grid">
 
-  <!-- Monthly Bar Chart -->
+  <!-- 收支趨勢 + 總資產趨勢線 -->
   <div class="card full">
-    <h2 id="chart-title-monthly">每月趨勢</h2>
-    <canvas id="monthly-chart"></canvas>
+    <div class="card-head">
+      <h2 id="chart-title">收支趨勢</h2>
+      <span class="scope" id="chart-scope"></span>
+    </div>
+    <div class="swipe-area" id="trend-swipe">
+      <canvas id="trend-chart"></canvas>
+    </div>
   </div>
 
-  <!-- Category Pie Chart -->
-  <div class="card" id="card-category">
-    <h2 id="chart-title-category">類別佔比</h2>
-    <canvas id="category-chart"></canvas>
-  </div>
-
-  <!-- Category Table -->
-  <div class="card" id="card-table">
-    <h2>類別明細</h2>
-    <table id="cat-table">
-      <thead>
-        <tr>
-          <th>類別</th>
-          <th>金額</th>
-          <th>佔比</th>
-        </tr>
-      </thead>
-      <tbody id="cat-tbody"></tbody>
-    </table>
+  <!-- 主要收/支組成（依群組） -->
+  <div class="card full">
+    <div class="card-head">
+      <h2 id="rank-title">主要收支</h2>
+      <span class="scope" id="rank-scope"></span>
+    </div>
+    <div class="rank-grid" id="rank-container"></div>
   </div>
 
 </div>
 
+<script>
+  window.CHART_DATA = {
+    expenses: {{ expenses | tojson }},
+    categories: {{ categories | tojson }},
+    groups: {{ groups | tojson }},
+    accounts: {{ accounts | tojson }},
+    history: {{ history | tojson }}
+  };
+</script>
 {% endblock %}
 
 {% block scripts %}

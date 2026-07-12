@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block title %}股票專區 · 記帳本{% endblock %}
 
@@ -36,7 +36,7 @@
   .s-value {
     font-size: 1.5rem;
     font-weight: 700;
-    font-family: 'DM Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
   }
 
   .profit {
@@ -90,7 +90,7 @@
   .stock-symbol {
     font-size: 1.3rem;
     font-weight: 700;
-    font-family: 'DM Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     color: var(--accent);
   }
 
@@ -137,7 +137,7 @@
   }
 
   .stat-value {
-    font-family: 'DM Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 1rem;
   }
 
@@ -227,7 +227,7 @@
   }
 
   .tx-amount {
-    font-family: 'DM Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: .85rem;
     text-align: right;
     flex-shrink: 0;
@@ -298,6 +298,11 @@
     color: #f04ac8;
   }
 
+  .badge.opening {
+    background: rgba(240, 168, 74, 0.12);
+    color: #f0a84a;
+  }
+
   .btn {
     padding: 10px 16px;
     border: none;
@@ -307,7 +312,7 @@
     font-weight: 500;
     cursor: pointer;
     background: var(--accent);
-    color: #111;
+    color: #fff;
   }
 
   .btn:hover {
@@ -646,13 +651,15 @@
       <div class="tx-item">
         <div class="tx-row">
           <div class="tx-meta">
-            <span class="badge {{ t.type }}">{{ t.type | upper }}</span>
+            <span class="badge {{ t.type }}">{% if t.type == 'opening' %}期初{% else %}{{ t.type | upper }}{% endif %}</span>
             <span class="tx-date">{{ t.date }}</span>
           </div>
           <div class="tx-amount">
             {% if t.type == 'buy' or t.type == 'sell' %}
             {{ "%.0f" | format(t.shares) }} 股 @ ${{ "%.2f" | format(t.price) }}
             <div class="tx-fee">手續費: ${{ t.fee }}</div>
+            {% elif t.type == 'opening' %}
+            {{ "%.0f" | format(t.shares) }} 股 @ ${{ "%.2f" | format(t.price) }}
             {% elif t.type == 'dividend' %}
             <span style="color:#4a8af0">+ ${{ "%.2f" | format(t.price) }}</span>
             {% elif t.type == 'split' %}
@@ -744,13 +751,15 @@
       <div class="tx-item">
         <div class="tx-row">
           <div class="tx-meta">
-            <span class="badge {{ t.type }}">{{ t.type | upper }}</span>
+            <span class="badge {{ t.type }}">{% if t.type == 'opening' %}期初{% else %}{{ t.type | upper }}{% endif %}</span>
             <span class="tx-date">{{ t.date }}</span>
           </div>
           <div class="tx-amount">
             {% if t.type == 'buy' or t.type == 'sell' %}
             {{ "%.0f" | format(t.shares) }} 股 @ ${{ "%.2f" | format(t.price) }}
             <div class="tx-fee">手續費: ${{ t.fee }}</div>
+            {% elif t.type == 'opening' %}
+            {{ "%.0f" | format(t.shares) }} 股 @ ${{ "%.2f" | format(t.price) }}
             {% elif t.type == 'dividend' %}
             <span style="color:#4a8af0">+ ${{ "%.2f" | format(t.price) }}</span>
             {% elif t.type == 'split' %}
@@ -808,6 +817,19 @@
         {% endfor %}
       </select>
     </div>
+    <div class="field">
+      <label>初始股數（選填，已持有的股票）</label>
+      <input type="number" id="pos-init-shares" step="1" min="0" placeholder="0" autocomplete="off"
+        oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+    </div>
+    <div class="field">
+      <label>初始總成本（選填）</label>
+      <input type="number" id="pos-init-cost" step="0.01" min="0" placeholder="0" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>取得日期（選填）</label>
+      <input type="date" id="pos-init-date" autocomplete="off">
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closePosModal()">取消</button>
       <button class="btn" onclick="submitPosition()">建立</button>
@@ -817,13 +839,13 @@
 
 <!-- Confirm Modal -->
 <div class="modal-overlay" id="confirm-modal">
-  <div class="modal" style="max-width:360px;text-align:center;">
-    <p id="confirm-msg"
-      style="font-size:1rem;line-height:1.6;margin-bottom:28px;color:var(--text);white-space:pre-wrap"></p>
-    <div style="display:flex;gap:12px;justify-content:center;">
-      <button class="btn-ghost" id="confirm-cancel-btn" style="flex:1;padding:10px 0;">取消</button>
-      <button id="confirm-ok-btn"
-        style="flex:1;padding:10px 0;border:none;border-radius:8px;background:var(--danger);color:#fff;font-size:.9rem;font-weight:600;cursor:pointer;">確定刪除</button>
+  <div class="modal confirm-modal">
+    <div class="confirm-icon danger">🗑</div>
+    <h3 id="confirm-title">確認刪除？</h3>
+    <p id="confirm-msg"></p>
+    <div class="confirm-actions">
+      <button class="btn-ghost" id="confirm-cancel">取消</button>
+      <button class="btn-danger" id="confirm-ok">刪除</button>
     </div>
   </div>
 </div>
@@ -890,20 +912,21 @@
 
   function showConfirm(msg) {
     return new Promise(resolve => {
-      document.getElementById('confirm-msg').textContent = msg;
-      const overlay = document.getElementById('confirm-modal');
-      overlay.classList.add('open');
-      function cleanup(result) {
-        overlay.classList.remove('open');
-        document.getElementById('confirm-ok-btn').removeEventListener('click', onOk);
-        document.getElementById('confirm-cancel-btn').removeEventListener('click', onCancel);
-        resolve(result);
-      }
-      function onOk() { cleanup(true); }
-      function onCancel() { cleanup(false); }
-      document.getElementById('confirm-ok-btn').addEventListener('click', onOk);
-      document.getElementById('confirm-cancel-btn').addEventListener('click', onCancel);
-      overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); }, { once: true });
+      // 訊息以換行拆成標題（第一行）與副說明（其餘）；只有一行時標題用預設「確認刪除？」
+      const lines = String(msg).split('\n');
+      const titleEl = document.getElementById('confirm-title');
+      if (lines.length > 1) { titleEl.textContent = lines[0]; document.getElementById('confirm-msg').textContent = lines.slice(1).join(' '); }
+      else { titleEl.textContent = '確認刪除？'; document.getElementById('confirm-msg').textContent = lines[0]; }
+      document.getElementById('confirm-modal').classList.add('open');
+      const ok = document.getElementById('confirm-ok');
+      const cancel = document.getElementById('confirm-cancel');
+      const cleanup = (val) => {
+        document.getElementById('confirm-modal').classList.remove('open');
+        ok.onclick = null; cancel.onclick = null;
+        resolve(val);
+      };
+      ok.onclick = () => cleanup(true);
+      cancel.onclick = () => cleanup(false);
     });
   }
 
@@ -943,7 +966,10 @@
   });
 
   // Position Modal
-  function openPosModal() { document.getElementById('pos-modal').classList.add('open'); }
+  function openPosModal() {
+    document.getElementById('pos-init-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('pos-modal').classList.add('open');
+  }
   function closePosModal() { document.getElementById('pos-modal').classList.remove('open'); }
 
   document.getElementById('pos-symbol').addEventListener('input', function (e) {
@@ -955,9 +981,13 @@
     const name = document.getElementById('pos-name').value;
     const account_id = document.getElementById('pos-account').value;
     if (!symbol || !name || !account_id) return toast("請填寫完整資訊");
+    const init_shares = parseInt(document.getElementById('pos-init-shares').value || 0, 10);
+    const init_cost = parseFloat(document.getElementById('pos-init-cost').value || 0);
+    const init_date = document.getElementById('pos-init-date').value;
+    if (init_cost > 0 && !init_shares) return toast("填寫初始總成本時，請一併填寫初始股數");
     const res = await fetch("/api/stocks", {
       method: "POST",
-      body: JSON.stringify({ symbol, name, account_id })
+      body: JSON.stringify({ symbol, name, account_id, init_shares, init_cost, init_date })
     });
     if (res.ok) { toast("倉位建立成功"); _reloadTabs('settings', 'home'); setTimeout(() => location.reload(), 500); }
     else { const err = await res.json(); toast(err.error || "建立失敗"); }
@@ -978,6 +1008,9 @@
     } else if (type === 'split') {
       wShares.style.display = 'none'; wFee.style.display = 'none';
       lPrice.textContent = '分割比例 (例: 1變2 輸入 2)';
+    } else if (type === 'opening') {
+      wFee.style.display = 'none';
+      lPrice.textContent = '每股成本';
     }
   }
 
@@ -1003,7 +1036,7 @@
     document.getElementById('tx-shares').value = shares;
     document.getElementById('tx-price').value = price;
     document.getElementById('tx-fee').value = fee;
-    const titles = { buy: '買入 (修改)', sell: '賣出 (修改)', dividend: '現金股利 (修改)', split: '股票分割 (修改)' };
+    const titles = { buy: '買入 (修改)', sell: '賣出 (修改)', dividend: '現金股利 (修改)', split: '股票分割 (修改)', opening: '期初持股 (修改)' };
     document.getElementById('tx-title').textContent = titles[type];
     _configureTxFields(type);
     document.getElementById('tx-modal').classList.add('open');
@@ -1042,7 +1075,8 @@
       price: parseFloat(document.getElementById('tx-price').value || 0),
       fee: parseFloat(document.getElementById('tx-fee').value || 0),
     };
-    if (!body.date || (!body.price && type !== 'split')) { toast("請填寫必要欄位"); return; }
+    if (!body.date || (!body.price && type !== 'split' && type !== 'opening')) { toast("請填寫必要欄位"); return; }
+    if (type === 'opening' && !body.shares) { toast("請填寫股數"); return; }
 
     const res = editId
       ? await fetch(`/api/stocks/transactions/${editId}`, { method: "PUT", body: JSON.stringify(body) })

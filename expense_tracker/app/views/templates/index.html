@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block title %}記帳本{% endblock %}
 
@@ -37,7 +37,7 @@
   }
 
   .stat-card .value {
-    font-family: 'DM Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 1.6rem;
     font-weight: 500;
   }
@@ -113,21 +113,6 @@
     min-width: 2px;
   }
 
-  .prop-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 18px;
-    margin-top: 14px;
-  }
-
-  .prop-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: .78rem;
-    min-width: 0;
-  }
-
   .prop-dot {
     width: 10px;
     height: 10px;
@@ -135,28 +120,96 @@
     flex-shrink: 0;
   }
 
-  .prop-legend-name {
-    color: var(--text);
-    white-space: nowrap;
+  /* ── 資產總覽（資產 / 負債 / 股票，垂直排列，無底框，純文字） ──
+     用 grid 讓「NT$」欄與「數字」欄在所有列之間共用同一欄寬，
+     才能讓符號真正貼齊、數字尾端真正對齊（各列 flex 各自獨立無法做到）。 */
+  .ov-grid {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    row-gap: 10px;
+    column-gap: 8px;
+  }
+
+  .ov-row {
+    display: contents;
+  }
+
+  .ov-label {
+    font-size: .8rem;
+    color: var(--muted);
+    letter-spacing: .06em;
+    align-self: baseline;
+  }
+
+  .ov-val {
+    display: contents;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.02rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ov-val .amt-sign,
+  .ov-val .amt-digits {
+    align-self: baseline;
+  }
+
+  .ov-val .amt-sign {
+    text-align: left;
+  }
+
+  .ov-val .amt-digits {
+    text-align: right;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .prop-legend-pct {
-    color: var(--muted);
-    font-family: 'DM Mono', monospace;
+  .ov-val.green {
+    color: var(--accent);
   }
 
-  .prop-legend-amt {
-    color: var(--muted);
-    font-family: 'DM Mono', monospace;
-    margin-left: 2px;
+  .ov-val.red {
+    color: var(--danger);
   }
 
-  .prop-legend-native {
-    color: #5bc0de;
-    font-family: 'DM Mono', monospace;
-    font-size: .72rem;
+  .ov-row-total .ov-label,
+  .ov-row-total .ov-val .amt-sign,
+  .ov-row-total .ov-val .amt-digits {
+    margin-top: 4px;
+    padding-top: 12px;
+  }
+
+  .ov-row-total .ov-label {
+    font-size: .82rem;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .ov-row-total .ov-val {
+    font-size: 1.4rem;
+  }
+
+  @media (max-width: 768px) {
+    .ov-grid {
+      gap: 8px;
+    }
+
+    .ov-val {
+      font-size: .9rem;
+    }
+
+    .ov-row-total .ov-val {
+      font-size: 1.2rem;
+    }
+
+    .bd-row-pct {
+      font-size: .68rem;
+    }
+
+    .bd-row-amt-sign,
+    .bd-row-amt-digits {
+      font-size: .76rem;
+    }
   }
 
   /* ── Two-column grid ── */
@@ -213,47 +266,22 @@
     color: var(--text);
   }
 
-  .segmented-control {
-    display: flex;
-    background: #0f0f11;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 4px;
-    margin-bottom: 16px;
-  }
-
-  .segmented-control label {
-    flex: 1;
-    text-align: center;
-    padding: 8px 0;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: .85rem;
-    font-weight: 500;
-    color: var(--muted);
-    transition: all .2s;
-  }
-
-  .segmented-control input[type="radio"] {
-    display: none;
-  }
-
-  .segmented-control input[type="radio"]:checked+label {
-    background: var(--surface);
-    color: var(--text);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-  }
-
-  .segmented-control input[type="radio"][value="income"]:checked+label {
-    color: var(--accent);
-  }
-
-  .segmented-control input[type="radio"][value="expense"]:checked+label {
+  .type-switch input[value="expense"]:checked+label {
+    background: var(--danger-dim);
     color: var(--danger);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
   }
 
-  .segmented-control input[type="radio"][value="transfer"]:checked+label {
-    color: #5bc0de;
+  .type-switch input[value="income"]:checked+label {
+    background: var(--positive-dim);
+    color: var(--positive);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+  }
+
+  .type-switch input[value="transfer"]:checked+label {
+    background: var(--accent-dim);
+    color: var(--accent);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
   }
 
   .btn {
@@ -274,28 +302,11 @@
 
   .btn-primary {
     background: var(--accent);
-    color: #111;
+    color: #fff;
   }
 
   .btn-primary:hover {
     opacity: .88;
-  }
-
-  /* ── Expense list ── */
-  .list-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-  }
-
-  .list-header h2 {
-    font-size: .9rem;
-    font-weight: 500;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-top: 20px;
   }
 
   .expense-item {
@@ -332,8 +343,8 @@
   }
 
   .cat-badge.transfer {
-    background: rgba(91, 192, 222, 0.12);
-    color: #5bc0de;
+    background: var(--info-dim);
+    color: var(--info);
   }
 
   .item-info {
@@ -367,10 +378,26 @@
   }
 
   .item-amount {
-    font-family: 'DM Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 1rem;
     font-weight: 600;
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    min-width: 118px;
+    text-align: left;
+  }
+
+  .item-amount .amt-sign {
+    display: inline-block;
+    width: 48px;
+  }
+
+  .item-amount .amt-digits {
+    text-align: right;
+    flex: 1;
   }
 
   .item-amount.income {
@@ -400,6 +427,12 @@
 
   .modal {
     animation: pop .25s ease;
+  }
+
+  /* Edit / delete overlays float above the day-detail overlay when both are open */
+  #edit-overlay,
+  #del-overlay {
+    z-index: 60;
   }
 
   @media (min-width: 768px) {
@@ -498,85 +531,6 @@
     color: #000;
   }
 
-  /* ── Account Filters ── */
-  .acc-filter-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-    user-select: none;
-    margin-bottom: 0;
-  }
-
-  .acc-filter-header:hover .acc-filter-toggle {
-    color: var(--text);
-  }
-
-  .acc-filter-toggle {
-    color: var(--muted);
-    font-size: .75rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: color .2s;
-  }
-
-  .acc-filter-toggle .arrow {
-    display: inline-block;
-    transition: transform .25s;
-    font-style: normal;
-    transform: rotate(0deg);
-  }
-
-  .acc-filter-toggle .arrow.open {
-    transform: rotate(180deg);
-  }
-
-  .acc-filter-body {
-    overflow: hidden;
-    max-height: 0;
-    transition: max-height .3s ease, margin-top .3s ease;
-    margin-top: 0;
-  }
-
-  .acc-filter-body.open {
-    max-height: 600px;
-    margin-top: 14px;
-  }
-
-  .acc-filter-all-row {
-    margin-bottom: 10px;
-  }
-
-  .acc-type-group {
-    margin-bottom: 10px;
-  }
-
-  .acc-type-label {
-    font-size: .7rem;
-    color: var(--muted);
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    display: block;
-    margin-bottom: 6px;
-  }
-
-  .acc-type-buttons {
-    display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  .acc-type-buttons::-webkit-scrollbar {
-    display: none;
-  }
-
-  .acc-filters {
-    margin-bottom: 24px;
-  }
-
   .btn-filter {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -611,6 +565,11 @@
       padding: 14px 20px 24px;
     }
 
+    #search-result-content {
+      margin: 0 -20px;
+      padding: 0 20px;
+    }
+
     .stats {
       grid-template-columns: 1fr;
     }
@@ -632,7 +591,7 @@
       height: 56px;
       border-radius: 50%;
       background: var(--accent);
-      color: #111;
+      color: #fff;
       border: none;
       font-size: 1.6rem;
       font-weight: 300;
@@ -646,12 +605,6 @@
 
     .fab-add:active {
       transform: scale(.92);
-    }
-
-    .list-header {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 12px;
     }
 
     .expense-item {
@@ -691,42 +644,22 @@
   .month-nav {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     margin-bottom: 12px;
-    gap: 12px;
   }
 
   .month-nav-controls {
     display: flex;
     align-items: center;
     gap: 10px;
-  }
-
-  .month-btn {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    width: 32px;
-    height: 32px;
-    cursor: pointer;
-    font-size: 1.2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all .2s;
-    padding: 0;
-  }
-
-  .month-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
+    width: 100%;
+    justify-content: space-between;
   }
 
   #month-display {
     font-size: .95rem;
     font-weight: 500;
-    min-width: 82px;
+    flex: 1;
     text-align: center;
   }
 
@@ -747,11 +680,6 @@
     font-size: .85rem;
     padding: 6px 10px;
     outline: none;
-  }
-
-  .btn-filter.filter-locked {
-    opacity: 0.3;
-    cursor: not-allowed;
   }
 
   .budget-section {
@@ -804,57 +732,366 @@
       display: none;
     }
   }
+
+  /* ── Advanced Filter Button ── */
+  .adv-filter-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all .2s;
+    flex-shrink: 0;
+    padding: 0;
+    position: relative;
+  }
+
+  .adv-filter-btn:hover,
+  .adv-filter-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .adv-filter-btn .filter-dot {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: none;
+  }
+
+  .adv-filter-btn.active .filter-dot {
+    display: block;
+  }
+
+  /* ── Filter Chips (Advanced Filter Modal) ── */
+  .filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .filter-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: .82rem;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .2s;
+  }
+
+  .filter-chip.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .filter-section-label {
+    font-size: .78rem;
+    color: var(--muted);
+    margin-bottom: 10px;
+    letter-spacing: .05em;
+    display: block;
+  }
+
+  /* ── mfilter dropdown（沿用圖表專區的 select 設計） ── */
+  .mfilter-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: .85rem;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: all .2s;
+  }
+
+  .mfilter-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .mfilter-btn.filtered {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* modal 內用展開式（position: static），避免被 .modal 的 overflow 裁切 */
+  .mfilter-menu {
+    display: none;
+    position: static;
+    margin-top: 6px;
+    z-index: 70;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 6px;
+    min-width: 220px;
+    max-height: 280px;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+  }
+
+  .mfilter.open .mfilter-menu {
+    display: block;
+  }
+
+  .mfilter-sep {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 6px;
+  }
+
+  /* ── 資產組成（現金/負債/股票現值） ── */
+  /* 排序方式切換：兩段式滑動膠囊，直接標示「自訂／類型」，靠 data-mode 對應目前狀態 */
+  .bd-mode-toggle {
+    position: relative;
+    display: inline-flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+
+  .bd-mode-toggle::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(50% - 2px);
+    height: calc(100% - 4px);
+    border-radius: 999px;
+    background: var(--accent);
+    transition: transform .2s ease;
+  }
+
+  .bd-mode-toggle.active::before {
+    transform: translateX(100%);
+  }
+
+  .bd-mode-opt {
+    position: relative;
+    z-index: 1;
+    min-width: 40px;
+    text-align: center;
+    padding: 4px 10px;
+    font-size: .68rem;
+    color: var(--muted);
+    transition: color .2s ease;
+  }
+
+  .bd-mode-toggle:not(.active) .bd-mode-opt[data-mode="sort"],
+  .bd-mode-toggle.active .bd-mode-opt[data-mode="category"] {
+    color: var(--bg);
+    font-weight: 600;
+  }
+
+  .bd-section {
+    margin-top: 18px;
+  }
+
+  .bd-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .bd-name {
+    font-size: .78rem;
+    color: var(--muted);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .bd-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .95rem;
+    font-weight: 500;
+  }
+
+  .bd-val.green {
+    color: var(--accent);
+  }
+
+  .bd-val.red {
+    color: var(--danger);
+  }
+
+  .bd-empty {
+    font-size: .8rem;
+    color: var(--muted);
+    padding: 2px 0;
+  }
+
+  /* 資產組成的帳戶列：用 grid 讓「圓點 / 名稱 / % / NT$ / 數字」五欄跨列共用欄寬，
+     金額欄寬自動長到最寬那筆（位數再多也不截斷、仍對齊）。
+     .bd-row 為 display:contents，把子欄攤平成 grid 的直接子項；hover 背景改由父列
+     偵測後套用到各子欄（contents 元素本身無法有背景）。 */
+  .bd-rows {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 0;
+  }
+
+  .bd-row {
+    display: contents;
+  }
+
+  .bd-row>* {
+    padding: 7px 0;
+  }
+
+  .bd-row>*:first-child {
+    padding-left: 4px;
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+  }
+
+  .bd-row>*:last-child {
+    padding-right: 4px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+  }
+
+  .bd-row.clickable>* {
+    cursor: pointer;
+    transition: background .15s;
+  }
+
+  .bd-row.clickable:hover>* {
+    background: rgba(255, 255, 255, .05);
+  }
+
+  .bd-row-name {
+    min-width: 0;
+    font-size: .82rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bd-row-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .72rem;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  /* NT$ 與數字各佔一 grid 欄，所有列的符號與數字尾端因此對齊。
+     column-gap 已提供欄間距，符號欄額外用 margin 拉開與 % 的距離。 */
+  .bd-row-amt-sign {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .82rem;
+    color: var(--muted);
+    text-align: left;
+  }
+
+  .bd-row-amt-digits {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .82rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  /* ── 帳戶明細 modal ── */
+  #acc-detail-content {
+    max-height: 55vh;
+    overflow-y: auto;
+    margin-top: 8px;
+  }
+
+  .acc-month-label {
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: .06em;
+    padding: 16px 0 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .btn-add-entry {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent);
+    color: #0f0f11;
+    border: none;
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-family: inherit;
+    font-size: .82rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity .2s, transform .1s;
+  }
+
+  .btn-add-entry:hover {
+    opacity: .88;
+  }
+
+  .btn-add-entry:active {
+    transform: scale(.96);
+  }
+
+  .btn-add-entry svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+  }
+
+  /* mfilter 選單內的 支出/收入 型別小標 */
+  .mfilter-type-label {
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .08em;
+    padding: 8px 10px 4px;
+  }
+
+  .mfilter-type-label.expense {
+    color: var(--danger);
+  }
+
+  .mfilter-type-label.income {
+    color: var(--accent);
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Account Filters -->
-<div class="acc-filters" id="acc-filters">
-  <div class="acc-filter-header" onclick="toggleAccFilterPanel()">
-    <h2 class="title" style="margin-bottom:0">持有帳戶篩選</h2>
-    <div class="acc-filter-toggle">
-      <span id="acc-filter-summary">全部</span>
-      <i class="arrow" id="acc-filter-arrow">&#9660;</i>
-    </div>
-  </div>
-  <div class="acc-filter-body" id="acc-filter-body">
-    <div class="acc-filter-all-row">
-      <button class="btn-filter active" id="acc-filter-all" data-id="all" onclick="toggleAllFilter(this)">全部</button>
-    </div>
-    {% set specific_types = ['現金', '銀行', '預付儲值', '投資', '保單', '其他', '信用卡', '借貸'] %}
-    {% set icon_type_map = {'💵': '現金', '🏦': '銀行', '🪙': '預付儲值', '💳': '信用卡', '👝': '其他'} %}
-    {% set sub_type_norm = {'負債其他': '其他'} %}
-    {% for type_key in specific_types %}
-    {% set type_accs = [] %}
-    {% set ns = namespace() %}
-    {% for a in all_accounts %}
-    {% set raw_sub = a.get('sub_type') or icon_type_map.get(a.icon, '其他') %}
-    {% set ns.eff = sub_type_norm.get(raw_sub, raw_sub) %}
-    {% if ns.eff == type_key %}
-    {% if type_accs.append(a) %}{% endif %}
-    {% endif %}
-    {% endfor %}
-    {% if type_accs %}
-    <div class="acc-type-group">
-      <span class="acc-type-label">{{ type_key }}</span>
-      <div class="acc-type-buttons">
-        {% for a in type_accs %}
-        <button class="btn-filter filter-locked" data-id="{{ a.id }}" data-bal="{{ account_balances.get(a.id, 0) }}"
-          data-bal-twd="{{ account_balances_twd.get(a.id, 0) }}" data-cur="{{ a.get('currency', 'TWD') }}"
-          data-name="{{ a.icon }} {{ a.name }}" onclick="toggleAccFilter(this)">
-          {{ a.icon }} {{ a.name }}{% if a.get('currency', 'TWD') != 'TWD' %} · {{ a.currency }}{% endif %}
-        </button>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
-    {% endfor %}
-  </div><!-- /acc-filter-body -->
-</div>
-
 <!-- Mobile Panel Nav -->
 <div class="panel-nav" id="panel-nav">
-  <div class="panel-tab" id="panel-tab-0" onclick="panelGo(0)">所選資產餘額</div>
+  <div class="panel-tab" id="panel-tab-0" onclick="panelGo(0)">資產總覽</div>
   <div class="panel-tab active" id="panel-tab-1" onclick="panelGo(1)">記帳明細</div>
 </div>
 
@@ -862,15 +1099,37 @@
 <div class="stats" id="mobile-panel-balance">
   <div class="stat-card">
     <div class="total-header">
-      <div class="label">所選資產總額</div>
+      <div class="label">資產總覽</div>
       <button class="btn-correct" onclick="openCorrect()" title="餘額校正">校正</button>
     </div>
-    <div class="value green" id="stat-total">NT$ {{ "%.0f" | format(total_balance) }}</div>
-    <!-- Proportion bar -->
-    <div id="proportion-wrap" style="display:none;margin-top:16px;">
-      <div class="prop-bar" id="prop-bar"></div>
-      <div class="prop-legend" id="prop-legend"></div>
+    <div class="ov-grid">
+      <div class="ov-row">
+        <div class="ov-label">資產</div>
+        <div class="ov-val" id="ov-cash">—</div>
+      </div>
+      <div class="ov-row">
+        <div class="ov-label">負債</div>
+        <div class="ov-val" id="ov-liab">—</div>
+      </div>
+      <div class="ov-row">
+        <div class="ov-label">股票</div>
+        <div class="ov-val" id="ov-stock">—</div>
+      </div>
+      <div class="ov-row ov-row-total">
+        <div class="ov-label">合計</div>
+        <div class="ov-val" id="ov-total">—</div>
+      </div>
     </div>
+  </div>
+  <!-- 資產組成：現金 / 負債 / 股票現值（自圖表頁移入），各自列出帳戶佔比 -->
+  <div class="stat-card" id="asset-breakdown-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="label">資產組成</div>
+      <button class="bd-mode-toggle" id="bd-group-toggle" onclick="toggleBreakdownGrouping()" title="切換排序方式">
+        <span class="bd-mode-opt" data-mode="sort">自訂</span><span class="bd-mode-opt" data-mode="category">類型</span>
+      </button>
+    </div>
+    <div id="breakdown-sections"></div>
   </div>
 </div>
 
@@ -879,14 +1138,7 @@
   <!-- Add Form -->
   <div class="card" id="add-form-card">
     <h2>新增明細</h2>
-    <div class="segmented-control">
-      <input type="radio" name="f-type" id="f-type-exp" value="expense" checked onchange="onTypeChange('expense', 'f')">
-      <label for="f-type-exp">支出</label>
-      <input type="radio" name="f-type" id="f-type-inc" value="income" onchange="onTypeChange('income', 'f')">
-      <label for="f-type-inc">收入</label>
-      <input type="radio" name="f-type" id="f-type-tra" value="transfer" onchange="onTypeChange('transfer', 'f')">
-      <label for="f-type-tra">轉帳</label>
-    </div>
+
     <div class="field" id="f-title-field">
       <label>名稱</label>
       <input type="text" id="f-title" placeholder="例：午餐" autocomplete="off" />
@@ -933,7 +1185,7 @@
         style="display:none;align-items:center;gap:8px;margin-top:8px;padding:8px 12px;background:rgba(200,240,74,.08);border:1px solid rgba(200,240,74,.25);border-radius:8px;font-size:.8rem;color:var(--accent);">
         <span style="flex:1;">信用卡還款請至「負債區」操作</span>
         <button type="button" onclick="window.parent.switchTab('debts')"
-          style="background:var(--accent);color:#111;border:none;border-radius:6px;padding:4px 10px;font-size:.75rem;font-family:inherit;cursor:pointer;white-space:nowrap;">前往負債區</button>
+          style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:.75rem;font-family:inherit;cursor:pointer;white-space:nowrap;">前往負債區</button>
       </div>
     </div>
     <div class="field" id="f-date-field">
@@ -956,17 +1208,22 @@
 
   <!-- List -->
   <div id="mobile-panel-list" style="min-width: 0;">
-    <div class="list-header">
-      <h2>記帳明細</h2>
-    </div>
 
     <!-- Budget Section -->
     <div class="budget-section">
       <div id="budget-bars"></div>
     </div>
 
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
-      <div class="view-toggle">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:10px;">
+      <button id="adv-filter-btn" class="adv-filter-btn" onclick="openAdvFilter()" title="篩選">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <span class="filter-dot"></span>
+      </button>
+      <div class="view-toggle" style="flex-shrink:0;">
         <input type="radio" name="view-mode" id="view-list" value="list" checked onchange="switchView('list')">
         <label for="view-list">明細</label>
         <input type="radio" name="view-mode" id="view-cal" value="cal" onchange="switchView('cal')">
@@ -982,7 +1239,6 @@
           title="點擊跳轉"></span>
         <button class="month-btn" onclick="changeMonth(1)">&#8250;</button>
       </div>
-      <button class="btn-filter" id="custom-range-btn" onclick="toggleDateRange()">自訂區間</button>
     </div>
     <div id="date-range-bar" style="display:none">
       <input type="date" id="range-start" class="range-input">
@@ -1018,13 +1274,15 @@
           {% if e.type == 'transfer' and e.to_amount %}
           {% set from_acc = account_map.get(e.account_id) %}
           {% set to_acc = account_map.get(e.to_account_id) %}
-          {{ "%.0f" | format(e.amount) }} {{ from_acc.get('currency', 'TWD') if from_acc else 'TWD' }} → {{ "%.0f" |
-          format(e.to_amount) }} {{ to_acc.get('currency', 'TWD') if to_acc else 'TWD' }}
+          {{ "{:,.0f}".format(e.amount) }} {{ from_acc.get('currency', 'TWD') if from_acc else 'TWD' }} → {{
+          "{:,.0f}".format(e.to_amount) }} {{ to_acc.get('currency', 'TWD') if to_acc else 'TWD' }}
           {% else %}
           {% set acc = account_map.get(e.account_id) %}
           {% set cur = acc.get('currency', 'TWD') if acc else 'TWD' %}
-          {% if e.type == 'income' %}+{% elif e.type == 'expense' %}-{% endif %}{% if cur == 'TWD' %}NT$ {% else %}{{
-          cur }} {% endif %}{{ "%.0f" | format(e.amount) }}
+          {% set sign = '+' if e.type == 'income' else ('-' if e.type == 'expense' else '') %}
+          {% set prefix = 'NT$' if cur == 'TWD' else cur %}
+          <span class="amt-sign">{{ sign }}{{ prefix }}</span><span class="amt-digits">{{ "{:,.0f}".format(e.amount)
+            }}</span>
           {% endif %}
         </div>
         <div class="item-actions">
@@ -1053,30 +1311,31 @@
   <div class="modal wide">
     <h3>新增明細</h3>
     <div class="modal-form">
-      <div class="field full">
-        <div class="segmented-control" style="margin-bottom:0">
-          <input type="radio" name="m-type" id="m-type-exp" value="expense" checked
-            onchange="onTypeChange('expense', 'm')">
-          <label for="m-type-exp">支出</label>
-          <input type="radio" name="m-type" id="m-type-inc" value="income" onchange="onTypeChange('income', 'm')">
-          <label for="m-type-inc">收入</label>
-          <input type="radio" name="m-type" id="m-type-tra" value="transfer" onchange="onTypeChange('transfer', 'm')">
-          <label for="m-type-tra">轉帳</label>
-        </div>
+
+      <div class="type-switch" style="margin-bottom:0">
+        <input type="radio" name="m-type" id="m-type-exp" value="expense" checked
+          onchange="onTypeChange('expense', 'm')">
+        <label for="m-type-exp">支出</label>
+        <input type="radio" name="m-type" id="m-type-inc" value="income" onchange="onTypeChange('income', 'm')">
+        <label for="m-type-inc">收入</label>
+        <input type="radio" name="m-type" id="m-type-tra" value="transfer" onchange="onTypeChange('transfer', 'm')">
+        <label for="m-type-tra">轉帳</label>
       </div>
-      <div class="field full" id="m-title-field">
+      <br>
+
+      <div class="field" id="m-title-field">
         <label>名稱</label>
         <input type="text" id="m-title" placeholder="例：午餐" autocomplete="off" />
       </div>
-      <div class="field full">
+      <div class="field">
         <label id="m-amount-label">金額（NT$）</label>
         <input type="number" id="m-amount" placeholder="0" min="0" step="any" autocomplete="off" />
       </div>
-      <div class="field full" id="m-to-amount-field" style="display:none">
+      <div class="field" id="m-to-amount-field" style="display:none">
         <label id="m-to-amount-label">轉入金額</label>
         <input type="number" id="m-to-amount" placeholder="0" min="0" step="any" autocomplete="off" />
       </div>
-      <div class="field full" id="m-category-field">
+      <div class="field" id="m-category-field">
         <label>類別</label>
         <select id="m-category">
           {% for group, cats in grouped_categories.items() %}
@@ -1107,7 +1366,7 @@
           style="display:none;align-items:center;gap:8px;margin-top:8px;padding:8px 12px;background:rgba(200,240,74,.08);border:1px solid rgba(200,240,74,.25);border-radius:8px;font-size:.8rem;color:var(--accent);">
           <span style="flex:1;">信用卡還款請至「負債區」操作</span>
           <button type="button" onclick="window.parent.switchTab('debts')"
-            style="background:var(--accent);color:#111;border:none;border-radius:6px;padding:4px 10px;font-size:.75rem;font-family:inherit;cursor:pointer;white-space:nowrap;">前往負債區</button>
+            style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:.75rem;font-family:inherit;cursor:pointer;white-space:nowrap;">前往負債區</button>
         </div>
       </div>
       <div class="field full" id="m-date-field">
@@ -1134,7 +1393,7 @@
     <input type="hidden" id="e-id" />
     <div class="modal-form">
       <div class="field full">
-        <div class="segmented-control" style="margin-bottom:0">
+        <div class="type-switch" style="margin-bottom:0">
           <input type="radio" name="e-type" id="e-type-exp" value="expense" onchange="onTypeChange('expense', 'e')">
           <label for="e-type-exp">支出</label>
           <input type="radio" name="e-type" id="e-type-inc" value="income" onchange="onTypeChange('income', 'e')">
@@ -1183,7 +1442,7 @@
           style="display:none;align-items:center;gap:8px;margin-top:8px;padding:8px 12px;background:rgba(200,240,74,.08);border:1px solid rgba(200,240,74,.25);border-radius:8px;font-size:.8rem;color:var(--accent);">
           <span style="flex:1;">信用卡還款請至「負債區」操作</span>
           <button type="button" onclick="window.parent.switchTab('debts')"
-            style="background:var(--accent);color:#111;border:none;border-radius:6px;padding:4px 10px;font-size:.75rem;font-family:inherit;cursor:pointer;white-space:nowrap;">前往負債區</button>
+            style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:.75rem;font-family:inherit;cursor:pointer;white-space:nowrap;">前往負債區</button>
         </div>
       </div>
       <div class="field" id="e-date-field"><label>日期</label><input type="date" id="e-date" /></div>
@@ -1198,14 +1457,14 @@
 
 <!-- Delete Modal -->
 <div class="overlay" id="del-overlay">
-  <div class="modal">
+  <div class="modal confirm-modal">
+    <div class="confirm-icon danger">🗑</div>
     <h3>確認刪除？</h3>
-    <p style="color:var(--muted);font-size:.88rem">此操作無法復原。</p>
+    <p>此操作無法復原。</p>
     <input type="hidden" id="del-id" />
-    <div class="modal-actions">
+    <div class="confirm-actions">
       <button class="btn-ghost" onclick="document.getElementById('del-overlay').classList.remove('open')">取消</button>
-      <button class="btn btn-primary" style="flex:1;background:var(--danger);color:#fff"
-        onclick="doDelete()">刪除</button>
+      <button class="btn-danger" onclick="doDelete()">刪除</button>
     </div>
   </div>
 </div>
@@ -1312,6 +1571,107 @@
   </div>
 </div>
 
+<!-- Account Detail Overlay -->
+<div class="overlay" id="acc-detail-overlay">
+  <div class="modal wide">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <h3 id="acc-detail-title" style="margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+      </h3>
+      <button class="btn-add-entry" onclick="accModalAdd()">
+        <svg viewBox="0 0 24 24">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        記一筆
+      </button>
+    </div>
+    <div id="acc-detail-sub"
+      style="font-size:.8rem;color:var(--muted);margin-top:6px;font-family:'JetBrains Mono',monospace;"></div>
+    <div id="acc-detail-content"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost"
+        onclick="document.getElementById('acc-detail-overlay').classList.remove('open')">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- Advanced Filter Overlay -->
+<div class="overlay" id="adv-filter-overlay">
+  <div class="modal wide">
+    <h3>篩選</h3>
+
+    <div style="margin-bottom:20px;">
+      <span class="filter-section-label">名稱</span>
+      <input type="text" id="adv-keyword" class="range-input" style="width:100%;box-sizing:border-box;"
+        placeholder="輸入關鍵字…" autocomplete="off">
+    </div>
+
+    <div style="margin-bottom:20px;">
+      <span class="filter-section-label">交易類型</span>
+      <div class="filter-chips" id="adv-type-chips">
+        <button class="filter-chip active" data-value="" onclick="toggleAdvChip(this,'type')">全部</button>
+        <button class="filter-chip" data-value="income" onclick="toggleAdvChip(this,'type')">收入</button>
+        <button class="filter-chip" data-value="expense" onclick="toggleAdvChip(this,'type')">支出</button>
+        <button class="filter-chip" data-value="transfer" onclick="toggleAdvChip(this,'type')">轉帳</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:20px;">
+      <span class="filter-section-label">帳戶</span>
+      <div class="mfilter" id="adv-acc-mfilter">
+        <button class="mfilter-btn" id="adv-acc-btn" onclick="toggleAdvMenu(event,'acc')">
+          <span id="adv-acc-label">全部帳戶</span>
+          <svg viewBox="0 0 24 24">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="mfilter-menu" id="adv-acc-menu"></div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:20px;" id="adv-grp-section">
+      <span class="filter-section-label">群組</span>
+      <div class="mfilter" id="adv-grp-mfilter">
+        <button class="mfilter-btn" id="adv-grp-btn" onclick="toggleAdvMenu(event,'grp')">
+          <span id="adv-grp-label">全部群組</span>
+          <svg viewBox="0 0 24 24">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="mfilter-menu" id="adv-grp-menu"></div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:20px;" id="adv-cat-section">
+      <span class="filter-section-label">類別</span>
+      <div class="mfilter" id="adv-cat-mfilter">
+        <button class="mfilter-btn" id="adv-cat-btn" onclick="toggleAdvMenu(event,'cat')">
+          <span id="adv-cat-label">全部類別</span>
+          <svg viewBox="0 0 24 24">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="mfilter-menu" id="adv-cat-menu"></div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:4px;">
+      <span class="filter-section-label">日期區間</span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <input type="date" id="adv-date-start" class="range-input" style="flex:1;min-width:120px;">
+        <span style="color:var(--muted);font-size:.85rem;">至</span>
+        <input type="date" id="adv-date-end" class="range-input" style="flex:1;min-width:120px;">
+        <button onclick="clearAdvDates()" class="btn-ghost" style="padding:6px 12px;font-size:.8rem;">清除</button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="resetAdvFilter()">重置</button>
+      <button class="btn btn-primary" style="flex:1;" onclick="applyAdvFilter()">確認</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 {% endblock %}
 
@@ -1327,17 +1687,54 @@
   const CC_ACCOUNT_IDS = new Set({{ cc_account_ids | tojson | safe }});
   const RATES = {{ rates | tojson | safe }};
   const ACCOUNT_BALANCES = {{ account_balances | tojson | safe }};
-  const LOAN_LEND_NET = {{ lend_net | default(0) | tojson }};
-  const LOAN_BORROW_NET = {{ borrow_net | default(0) | tojson }};
+  const ACCOUNT_BALANCES_TWD = {{ account_balances_twd | tojson | safe }};
+  const ALL_ACCOUNTS = {{ all_accounts | tojson | safe }};
+  const ALL_GROUPS = {{ groups | tojson | safe }};
+  const STOCK_ITEMS = {{ stock_items | tojson | safe }};
+  const STOCK_VALUE = {{ stock_value | tojson | safe }};
+  const LOAN_LEND_NET = {{ lend_net | default (0) | tojson }};
+  const LOAN_BORROW_NET = {{ borrow_net | default (0) | tojson }};
 
-  // Cool palette for asset segments.
-  const PROP_COLORS = ['#c8f04a', '#5bc0de', '#4ad9c8', '#a78bfa', '#7a9cf0',
-    '#8ad04a', '#5bd0a0', '#6ab0f0', '#b0e04a', '#4ac8d9'];
-  // Warm palette for liability segments.
-  const PROP_COLORS_WARM = ['#ff5f5f', '#ff8a4a', '#ffab40', '#f06aa0', '#ff7050',
-    '#e0704a', '#ffca28', '#f0904a', '#ff6f91', '#d9884a'];
+  // 資產／負債長條的配色改為「依序漸層」：沿著固定色相帶均勻取樣，
+  // 段數越多、色相間距越細，讀起來是一條連續光譜而非隨機色塊。
+  // hueStart→hueEnd 為色相範圍（HSL 角度），冷色帶給資產、暖色帶給負債。
+  function hsl(h, s, l) { return `hsl(${h}, ${s}%, ${l}%)`; }
+  function rampPalette(n, hueStart, hueEnd, sat, lightStart, lightEnd) {
+    if (n <= 0) return [];
+    if (n === 1) return [hsl((hueStart + hueEnd) / 2, sat, (lightStart + lightEnd) / 2)];
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      out.push(hsl(
+        Math.round(hueStart + (hueEnd - hueStart) * t),
+        sat,
+        Math.round(lightStart + (lightEnd - lightStart) * t)
+      ));
+    }
+    return out;
+  }
+  // 冷色帶：黃綠(70°) → 綠 → 青 → 藍 → 紫(300°)，跨度加大、亮度也拉開讓每段更好區分
+  const PROP_RAMP_COOL = n => rampPalette(n, 70, 300, 68, 72, 52);
+  // 暖色帶：紅(-8°) → 橘 → 琥珀黃(52°)，跨度加大並拉開亮度
+  const PROP_RAMP_WARM = n => rampPalette(n, -8, 52, 82, 56, 66);
 
   function fmtTWD(n) { return 'NT$ ' + Math.round(n).toLocaleString(); }
+  function fmtTWDHtml(n) {
+    const neg = n < 0 ? '-' : '';
+    return `<span class="amt-sign">NT$</span><span class="amt-digits">${neg}${Math.round(Math.abs(n)).toLocaleString()}</span>`;
+  }
+  // 大金額縮寫（億/萬），用於空間有限的列表；一般金額（< 1000 萬）仍顯示完整數字。
+  // 完整金額放進 title 供 hover 檢視。
+  function fmtDigitsShort(n) {
+    const a = Math.abs(n);
+    if (a >= 1e8) return trimNum(a / 1e8) + '億';
+    if (a >= 1e7) return trimNum(a / 1e4) + '萬';
+    return Math.round(a).toLocaleString();
+  }
+  function trimNum(v) {
+    // 最多一位小數，去掉多餘的 .0
+    return (Math.round(v * 10) / 10).toLocaleString(undefined, { maximumFractionDigits: 1 });
+  }
 
   // Build currency lookup from account data
   const accCurrencyMap = {};
@@ -1484,18 +1881,34 @@
   }
 
   // ── Budget display ──
+  function goToSettingsBudget() {
+    try {
+      window.parent.switchTab('settings');
+      window.parent.document.getElementById('frame-settings').src = '/settings?tab=budget&embed=1';
+    } catch (e) {
+      window.location.href = '/settings?tab=budget';
+    }
+  }
+
   function buildBudgetBar(name, spent, budget, pct, over) {
     return `<div style="margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">
         <span style="font-size:.85rem;font-weight:500;">${name}</span>
-        <span style="font-family:'DM Mono',monospace;font-size:.75rem;color:var(--muted);">NT$ ${Math.round(spent).toLocaleString()} / ${Math.round(budget).toLocaleString()}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--muted);">NT$ ${Math.round(spent).toLocaleString()} / ${Math.round(budget).toLocaleString()}</span>
       </div>
       <div class="progress-bar"><div class="progress-fill ${over ? 'over' : ''}" style="width:${pct}%;"></div></div>
     </div>`;
   }
 
   // Budget display (fetches per-month data from API)
-  const _budgetCache = {};
+  let _budgetCache = {};
+
+  // Called by the shell when this tab becomes active again, since budgets may have
+  // been edited in the settings tab (a separate, persistently-loaded iframe).
+  function invalidateBudgetCache() {
+    _budgetCache = {};
+    updateBudgetDisplay();
+  }
 
   async function updateBudgetDisplay() {
     const catMap = {};
@@ -1503,9 +1916,8 @@
 
     const catSpent = {};
     let totalSpent = 0;
-    allExpenses.forEach(e => {
+    getVisibleExpenses().forEach(e => {
       if (e.type !== 'expense') return;
-      if (!dateMatchesFilter(e.date)) return;
       const cat = catMap[e.category];
       if (cat && cat.in_budget) totalSpent += e.amount;
       catSpent[e.category] = (catSpent[e.category] || 0) + e.amount;
@@ -1513,8 +1925,9 @@
 
     let totalBudget = 0;
     let catBudgetMap = {};
+    let grpBudgetMap = {};
 
-    if (!isCustomRange) {
+    if (!isCustomRange && !advFilter.dateStart) {
       const cacheKey = `${currentYear}-${currentMonth + 1}`;
       if (!_budgetCache[cacheKey]) {
         try {
@@ -1526,15 +1939,32 @@
       if (bdata) {
         totalBudget = bdata.total_budget || 0;
         (bdata.categories || []).forEach(cb => { catBudgetMap[String(cb.id)] = cb.amount; });
+        (bdata.groups || []).forEach(gb => { grpBudgetMap[String(gb.id)] = gb.amount; });
       }
     }
+
+    // 依群組彙總已花費金額（用於群組預算條）
+    const groupSpent = {};
+    allCategories.filter(c => c.type === 'expense').forEach(cat => {
+      const g = ALL_GROUPS.find(x => x.name === cat.group_name);
+      if (!g) return;
+      groupSpent[String(g.id)] = (groupSpent[String(g.id)] || 0) + (catSpent[cat.name] || 0);
+    });
 
     let html = '';
     if (totalBudget > 0) {
       const pct = Math.min(100, Math.round(totalSpent / totalBudget * 100));
       html += buildBudgetBar('總預算', totalSpent, totalBudget, pct, totalSpent > totalBudget);
     }
+    ALL_GROUPS.forEach(g => {
+      const b = grpBudgetMap[String(g.id)] || 0;
+      if (b <= 0) return;
+      const spent = groupSpent[String(g.id)] || 0;
+      const pct = Math.min(100, Math.round(spent / b * 100));
+      html += buildBudgetBar(g.name, spent, b, pct, spent > b);
+    });
     allCategories.filter(c => c.type === 'expense').forEach(cat => {
+      if (advFilter.cats.length > 0 && !advFilter.cats.includes(cat.name)) return;
       const b = catBudgetMap[String(cat.id)] || 0;
       if (b <= 0) return;
       const spent = catSpent[cat.name] || 0;
@@ -1544,7 +1974,7 @@
 
     const container = document.getElementById('budget-bars');
     if (!html) {
-      container.innerHTML = '<p style="color:var(--muted);font-size:.85rem;text-align:center;padding:20px 0;">尚未設定預算 · <a href="/settings?tab=budget" style="color:var(--accent);">前往設定</a></p>';
+      container.innerHTML = '<p style="color:var(--muted);font-size:.85rem;text-align:center;padding:20px 0;">尚未設定預算 · <a href="#" onclick="goToSettingsBudget();return false;" style="color:var(--accent);">前往設定</a></p>';
     } else {
       container.innerHTML = html;
     }
@@ -1679,57 +2109,57 @@
     }
   }
 
-  // ── Account filter panel toggle ──
-  function toggleAccFilterPanel() {
-    const body = document.getElementById('acc-filter-body');
-    const arrow = document.getElementById('acc-filter-arrow');
-    const open = body.classList.toggle('open');
-    arrow.classList.toggle('open', open);
+  // ── Account filter（併入放大鏡 modal 的下拉選單） ──
+  function isAllFilterActive() { return advFilter.accs.length === 0; }
+  function getActiveAccountIds() { return new Set(advFilter.accs.map(String)); }
+
+  // ── Advanced Filter State ──
+  let advFilter = { types: [], accs: [], grps: [], cats: [], dateStart: '', dateEnd: '', keyword: '' };
+  // modal 開啟期間的工作選取（帳戶/群組/類別），按「確認」才生效
+  const advSel = { acc: [], grp: [], cat: [] };
+  const ADV_LABEL = { acc: ['全部帳戶', '帳戶'], grp: ['全部群組', '群組'], cat: ['全部類別', '類別'] };
+
+  // 群組/類別 helpers
+  const groupNameSet = new Set(ALL_GROUPS.map(g => g.name));
+  function groupTypeOfName(name) {
+    const g = ALL_GROUPS.find(x => x.name === name);
+    return g && g.type === 'income' ? 'income' : 'expense';
+  }
+  function catGroupOf(catName) {
+    const c = allCategories.find(x => x.name === catName);
+    const gn = c && c.group_name;
+    return gn && groupNameSet.has(gn) ? gn : '未分類';
   }
 
-  function updateAccFilterSummary() {
-    const summary = document.getElementById('acc-filter-summary');
-    if (!summary) return;
-    if (isAllFilterActive()) {
-      summary.textContent = '全部';
-    } else {
-      const n = document.querySelectorAll('.btn-filter.active[data-id]:not([data-id="all"])').length;
-      summary.textContent = n === 0 ? '未選取' : `${n} 個帳戶`;
+  function expenseMatchesAdvFilter(e) {
+    if (advFilter.types.length > 0 && !advFilter.types.includes(e.type)) return false;
+    if (advFilter.grps.length > 0) {
+      if (e.type === 'transfer') return false;
+      if (!advFilter.grps.includes(catGroupOf(e.category))) return false;
     }
+    if (advFilter.cats.length > 0 && !advFilter.cats.includes(e.category)) return false;
+    if (advFilter.keyword && !(e.title && e.title.toLowerCase().includes(advFilter.keyword.toLowerCase()))) return false;
+    return true;
   }
 
-  // ── Account filters ──
-  let filterTimer = null;
-
-  function isAllFilterActive() {
-    const b = document.getElementById('acc-filter-all');
-    return b ? b.classList.contains('active') : true;
+  function expenseDateInRange(dateStr) {
+    if (!dateStr) return false;
+    if (advFilter.dateStart && advFilter.dateEnd) return dateStr >= advFilter.dateStart && dateStr <= advFilter.dateEnd;
+    return dateMatchesFilter(dateStr);
   }
 
-  function getActiveAccountIds() {
-    return new Set(Array.from(document.querySelectorAll('.btn-filter.active[data-id]:not([data-id="all"])')).map(b => b.dataset.id));
-  }
-
-  function toggleAllFilter(btn) {
-    const activating = !btn.classList.contains('active');
-    btn.classList.toggle('active');
-    const individual = document.querySelectorAll('.btn-filter[data-id]:not([data-id="all"])');
-    if (activating) {
-      individual.forEach(b => { b.classList.remove('active'); b.classList.add('filter-locked'); });
-    } else {
-      individual.forEach(b => { b.classList.remove('active'); b.classList.remove('filter-locked'); });
-    }
-    if (filterTimer) clearTimeout(filterTimer);
-    updateAccFilterSummary();
-    applyFilters();
-  }
-
-  function toggleAccFilter(btn) {
-    if (btn.classList.contains('filter-locked')) return;
-    btn.classList.toggle('active');
-    if (filterTimer) clearTimeout(filterTimer);
-    updateAccFilterSummary();
-    filterTimer = setTimeout(() => { applyFilters(); }, 1000);
+  function getVisibleExpenses() {
+    const allActive = isAllFilterActive();
+    const activeIds = allActive ? null : getActiveAccountIds();
+    return allExpenses.filter(e => {
+      if (!allActive) {
+        const s1 = String(e.account_id);
+        const s2 = e.type === 'transfer' ? String(e.to_account_id) : null;
+        if (!(activeIds.has(s1) || (s2 && activeIds.has(s2)))) return false;
+      }
+      if (!expenseDateInRange(e.date)) return false;
+      return expenseMatchesAdvFilter(e);
+    });
   }
 
   // ── Month navigation ──
@@ -1747,7 +2177,7 @@
     rangeStart = null;
     rangeEnd = null;
     document.getElementById('date-range-bar').style.display = 'none';
-    document.getElementById('custom-range-btn').classList.remove('active');
+    document.getElementById('custom-range-btn')?.classList.remove('active');
     currentMonth += delta;
     if (currentMonth < 0) { currentMonth = 11; currentYear--; }
     if (currentMonth > 11) { currentMonth = 0; currentYear++; }
@@ -1779,7 +2209,7 @@
     rangeStart = null;
     rangeEnd = null;
     document.getElementById('date-range-bar').style.display = 'none';
-    document.getElementById('custom-range-btn').classList.remove('active');
+    document.getElementById('custom-range-btn')?.classList.remove('active');
     updateMonthDisplay();
     applyFilters();
     if (calendar) calendar.gotoDate(new Date(currentYear, currentMonth, 1));
@@ -1788,10 +2218,9 @@
 
   function toggleDateRange() {
     const bar = document.getElementById('date-range-bar');
-    const btn = document.getElementById('custom-range-btn');
+    if (!bar) return;
     if (bar.style.display === 'none' || bar.style.display === '') {
       bar.style.display = 'flex';
-      btn.classList.add('active');
     } else {
       clearDateRange();
     }
@@ -1814,7 +2243,7 @@
     rangeStart = null;
     rangeEnd = null;
     document.getElementById('date-range-bar').style.display = 'none';
-    document.getElementById('custom-range-btn').classList.remove('active');
+    document.getElementById('custom-range-btn')?.classList.remove('active');
     document.getElementById('range-start').value = '';
     document.getElementById('range-end').value = '';
     updateMonthDisplay();
@@ -1830,50 +2259,18 @@
   }
 
   // ── Apply all filters ──
+  function accBalTwd(id) { return parseFloat(ACCOUNT_BALANCES_TWD[String(id)] || 0) || 0; }
+  function accBalNative(id) { return parseFloat(ACCOUNT_BALANCES[String(id)] || 0) || 0; }
+  function accDisplayName(a) { return `${a.icon ? a.icon + ' ' : ''}${a.name}`; }
+
   function applyFilters() {
     const allActive = isAllFilterActive();
     const activeIds = allActive ? null : getActiveAccountIds();
 
-    let totalBal = 0;
-    const selectedAccounts = [];
-    document.querySelectorAll('.btn-filter[data-id]:not([data-id="all"])').forEach(b => {
-      if (allActive || b.classList.contains('active')) {
-        const twd = parseFloat(b.dataset.balTwd || 0);
-        totalBal += twd;
-        selectedAccounts.push({
-          id: b.dataset.id,
-          name: b.dataset.name || '',
-          cur: b.dataset.cur || 'TWD',
-          native: parseFloat(b.dataset.bal || 0),
-          twd: twd,
-        });
-      }
-    });
-    // Inject loan net into total and proportion bar (only when all accounts selected)
-    if (allActive) {
-      if (LOAN_LEND_NET > 0) {
-        totalBal += LOAN_LEND_NET;
-        selectedAccounts.push({ id: 'loan-lend', name: '借出應收', cur: 'TWD', native: LOAN_LEND_NET, twd: LOAN_LEND_NET });
-      }
-      if (LOAN_BORROW_NET > 0) {
-        totalBal -= LOAN_BORROW_NET;
-        selectedAccounts.push({ id: 'loan-borrow', name: '借入未還', cur: 'TWD', native: -LOAN_BORROW_NET, twd: -LOAN_BORROW_NET });
-      }
-    }
-
-    const valEl = document.getElementById("stat-total");
-    valEl.textContent = fmtTWD(totalBal);
-    if (totalBal >= 0) { valEl.classList.remove('red'); valEl.classList.add('green'); }
-    else { valEl.classList.remove('green'); valEl.classList.add('red'); }
-
-    renderProportionBar(selectedAccounts);
-
+    const visibleIds = new Set(getVisibleExpenses().map(e => String(e.id)));
     document.querySelectorAll('.expense-item').forEach(el => {
-      const s1 = el.getAttribute('data-acc-id');
-      const s2 = el.getAttribute('data-to-acc-id');
-      const accountOk = allActive || (activeIds && ((s1 && activeIds.has(s1)) || (s2 && activeIds.has(s2))));
-      const dateOk = dateMatchesFilter(el.getAttribute('data-date') || '');
-      el.style.display = (accountOk && dateOk) ? '' : 'none';
+      const id = el.id ? el.id.replace('exp-', '') : '';
+      el.style.display = visibleIds.has(id) ? '' : 'none';
     });
 
     updateBudgetDisplay();
@@ -1884,52 +2281,6 @@
   }
 
   function updateDisplayedBalance() { applyFilters(); }
-
-  // ── Asset / liability proportion bar (single combined bar) ──
-  function renderProportionBar(accounts) {
-    const wrap = document.getElementById('proportion-wrap');
-    const bar = document.getElementById('prop-bar');
-    const legend = document.getElementById('prop-legend');
-    if (!wrap || !bar || !legend) return;
-
-    // Assets (positive, cool) first, then liabilities (negative, warm), each by magnitude.
-    const assets = accounts.filter(a => a.twd > 0)
-      .map((a, i) => ({ ...a, mag: a.twd, liab: false, color: PROP_COLORS[i % PROP_COLORS.length] }))
-      .sort((x, y) => y.mag - x.mag);
-    const liabs = accounts.filter(a => a.twd < 0)
-      .map((a, i) => ({ ...a, mag: -a.twd, liab: true, color: PROP_COLORS_WARM[i % PROP_COLORS_WARM.length] }))
-      .sort((x, y) => y.mag - x.mag);
-    const rows = assets.concat(liabs);
-
-    const total = rows.reduce((s, a) => s + a.mag, 0);
-    if (rows.length === 0 || total <= 0) {
-      wrap.style.display = 'none';
-      bar.innerHTML = '';
-      legend.innerHTML = '';
-      return;
-    }
-    wrap.style.display = 'block';
-
-    bar.innerHTML = rows.map(a => {
-      const pct = a.mag / total * 100;
-      return `<div class="prop-seg" style="width:${pct}%;background:${a.color};" title="${a.name} ${pct.toFixed(1)}%"></div>`;
-    }).join('');
-
-    legend.innerHTML = rows.map(a => {
-      const pct = a.mag / total * 100;
-      const nativeStr = a.cur !== 'TWD'
-        ? `<span class="prop-legend-native">${Math.round(Math.abs(a.native)).toLocaleString()} ${a.cur}</span>`
-        : '';
-      const amtStr = a.liab ? `-${fmtTWD(a.mag)}` : fmtTWD(a.mag);
-      return `<div class="prop-legend-item">
-        <span class="prop-dot" style="background:${a.color};"></span>
-        <span class="prop-legend-name">${a.name}</span>
-        <span class="prop-legend-pct">${pct.toFixed(1)}%</span>
-        <span class="prop-legend-amt">${amtStr}</span>
-        ${nativeStr}
-      </div>`;
-    }).join('');
-  }
 
   // ── Balance correction ──
   function openCorrect() {
@@ -2019,11 +2370,14 @@
   function initCalendar(activeIds) {
     const calendarEl = document.getElementById('calendar-view');
 
-    const filteredData = activeIds
-      ? allExpenses.filter(e =>
-        activeIds.has(String(e.account_id)) || (e.type === 'transfer' && e.to_account_id && activeIds.has(String(e.to_account_id)))
-      )
-      : allExpenses;
+    const filteredData = allExpenses.filter(e => {
+      if (activeIds) {
+        const s1 = String(e.account_id);
+        const s2 = e.type === 'transfer' ? String(e.to_account_id) : null;
+        if (!(activeIds.has(s1) || (s2 && activeIds.has(s2)))) return false;
+      }
+      return expenseMatchesAdvFilter(e);
+    });
 
     const agg = {};
     filteredData.forEach(e => {
@@ -2067,8 +2421,12 @@
     const activeIds = allActive ? null : getActiveAccountIds();
     const dayItems = allExpenses.filter(e => {
       if (e.date !== dateStr) return false;
-      if (allActive) return true;
-      return activeIds.has(String(e.account_id)) || (e.type === 'transfer' && e.to_account_id && activeIds.has(String(e.to_account_id)));
+      if (!allActive) {
+        const s1 = String(e.account_id);
+        const s2 = e.type === 'transfer' ? String(e.to_account_id) : null;
+        if (!(activeIds.has(s1) || (s2 && activeIds.has(s2)))) return false;
+      }
+      return expenseMatchesAdvFilter(e);
     });
 
     const d = new Date(dateStr + 'T00:00:00');
@@ -2090,11 +2448,11 @@
         if (e.type === 'transfer' && e.to_amount) {
           const fromCur = acc ? (acc.currency || 'TWD') : 'TWD';
           const toCur = toAcc ? (toAcc.currency || 'TWD') : 'TWD';
-          amountStr = `${Math.round(e.amount)} ${fromCur} → ${Math.round(e.to_amount)} ${toCur}`;
+          amountStr = `${Math.round(e.amount).toLocaleString()} ${fromCur} → ${Math.round(e.to_amount).toLocaleString()} ${toCur}`;
         } else {
           const cur = acc ? (acc.currency || 'TWD') : 'TWD';
           const curPrefix = cur === 'TWD' ? 'NT$' : cur;
-          amountStr = `${sign}${curPrefix} ${Math.round(e.amount)}`;
+          amountStr = `<span class="amt-sign">${sign}${curPrefix}</span><span class="amt-digits">${Math.round(e.amount).toLocaleString()}</span>`;
         }
         const isSystemManaged = !!(e.stock_transaction_id || e.loan_id || e.loan_payment_id);
         const actionsHtml = isSystemManaged ? '' :
@@ -2103,10 +2461,10 @@
             <button class="icon-btn del" onclick="closeDayAndDelete('${e.id}')">✕</button>
           </div>`;
         return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-          <span class="cat-badge ${badgeCls}">${badgeText}</span>
           <div style="flex:1;min-width:0">
             <div class="item-title">${e.title}</div>
-            <div class="item-date">${e.note ? e.note + ' ' : ''}${accTag}${toAccTag}</div>
+            <div style="margin-top:5px;"><span class="cat-badge ${badgeCls}">${badgeText}</span></div>
+            <div class="item-date" style="margin-top:5px;">${e.note ? e.note + ' ' : ''}${accTag}${toAccTag}</div>
           </div>
           <div class="item-amount ${e.type}">${amountStr}</div>
           ${actionsHtml}
@@ -2146,19 +2504,432 @@
 
   // ── Day modal: close + open edit/delete ──
   function closeDayAndEdit(id) {
-    document.getElementById('day-overlay').classList.remove('open');
     openEditById(id);
   }
 
   function closeDayAndDelete(id) {
-    document.getElementById('day-overlay').classList.remove('open');
     confirmDelete(id);
+  }
+
+  // ── Advanced Filter ──
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function isAdvFilterActive() {
+    return advFilter.types.length > 0 || advFilter.accs.length > 0 || advFilter.grps.length > 0 ||
+      advFilter.cats.length > 0 || !!advFilter.dateStart || !!advFilter.keyword;
+  }
+
+  function updateFilterBtn() {
+    const btn = document.getElementById('adv-filter-btn');
+    if (!btn) return;
+    btn.classList.toggle('active', isAdvFilterActive());
+  }
+
+  function openAdvFilter() {
+    // Restore type chips
+    document.querySelectorAll('#adv-type-chips .filter-chip').forEach(b => {
+      const v = b.dataset.value;
+      b.classList.toggle('active', v === '' ? advFilter.types.length === 0 : advFilter.types.includes(v));
+    });
+    // 下拉選單：以目前生效的選取為起點，按「確認」才寫回
+    advSel.acc = advFilter.accs.slice();
+    advSel.grp = advFilter.grps.slice();
+    advSel.cat = advFilter.cats.slice();
+    buildAccMenu();
+    buildAdvGrpMenu();
+    buildAdvCatMenu();
+    ['acc', 'grp', 'cat'].forEach(syncAdvMenuUI);
+    // Restore dates and keyword
+    document.getElementById('adv-date-start').value = advFilter.dateStart || '';
+    document.getElementById('adv-date-end').value = advFilter.dateEnd || '';
+    document.getElementById('adv-keyword').value = advFilter.keyword || '';
+    document.getElementById('adv-filter-overlay').classList.add('open');
+  }
+
+  // ── 帳戶/群組/類別 下拉選單（沿用圖表專區 select 設計） ──
+  const ACC_TYPE_ORDER = ['現金', '銀行', '預付儲值', '投資', '保單', '其他', '信用卡', '借貸'];
+  const ACC_ICON_TYPE = { '💵': '現金', '🏦': '銀行', '🪙': '預付儲值', '💳': '信用卡', '👝': '其他' };
+  const ACC_SUBTYPE_NORM = { '負債其他': '其他' };
+  const ADV_CHECK_SVG = '<svg class="check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+  const ADV_TYPE_SECTIONS = [['expense', '支出'], ['income', '收入']];
+
+  function accEffType(a) {
+    const raw = a.sub_type || ACC_ICON_TYPE[a.icon] || '其他';
+    return ACC_SUBTYPE_NORM[raw] || raw;
+  }
+
+  function advOptHtml(kind, value, label) {
+    return `<button class="mfilter-opt" data-value="${esc(String(value))}" onclick="toggleAdvOpt('${kind}', this)">
+      <span>${label}</span>${ADV_CHECK_SVG}</button>`;
+  }
+
+  function buildAccMenu() {
+    let html = advOptHtml('acc', '', '全部') + '<div class="mfilter-sep"></div>';
+    ACC_TYPE_ORDER.forEach(t => {
+      const accs = ALL_ACCOUNTS.filter(a => accEffType(a) === t);
+      if (!accs.length) return;
+      html += `<div class="mfilter-group-label">${esc(t)}</div>`;
+      html += accs.map(a => {
+        const curSuffix = (a.currency || 'TWD') !== 'TWD' ? ` · ${a.currency}` : '';
+        return advOptHtml('acc', a.id, esc(accDisplayName(a) + curSuffix));
+      }).join('');
+    });
+    document.getElementById('adv-acc-menu').innerHTML = html;
+  }
+
+  function buildAdvGrpMenu() {
+    const showTypes = advShowTypes();
+    let html = advOptHtml('grp', '', '全部') + '<div class="mfilter-sep"></div>';
+    ADV_TYPE_SECTIONS.forEach(([t, label]) => {
+      if (!showTypes.includes(t)) return;
+      const names = ALL_GROUPS.filter(g => groupTypeOfName(g.name) === t).map(g => g.name);
+      if (!names.length) return;
+      html += `<div class="mfilter-type-label ${t}">${label}</div>` +
+        names.map(n => advOptHtml('grp', n, esc(n))).join('');
+    });
+    const hasUngrouped = allCategories.some(c => showTypes.includes(c.type) && catGroupOf(c.name) === '未分類');
+    if (hasUngrouped) html += '<div class="mfilter-sep"></div>' + advOptHtml('grp', '未分類', '未分類');
+    document.getElementById('adv-grp-menu').innerHTML = html;
+  }
+
+  function buildAdvCatMenu() {
+    const showTypes = advShowTypes();
+    const selGrps = advSel.grp.map(String);
+    let html = advOptHtml('cat', '', '全部') + '<div class="mfilter-sep"></div>';
+    ADV_TYPE_SECTIONS.forEach(([t, label]) => {
+      if (!showTypes.includes(t)) return;
+      const grpOrder = [...ALL_GROUPS.filter(g => groupTypeOfName(g.name) === t).map(g => g.name), '未分類'];
+      let body = '';
+      grpOrder.forEach(g => {
+        if (selGrps.length && !selGrps.includes(g)) return;
+        const cats = allCategories.filter(c => c.type === t && catGroupOf(c.name) === g);
+        if (!cats.length) return;
+        body += `<div class="mfilter-group-label">${esc(g)}</div>` +
+          cats.map(c => advOptHtml('cat', c.name, esc(c.name))).join('');
+      });
+      if (body) html += `<div class="mfilter-type-label ${t}">${label}</div>` + body;
+    });
+    document.getElementById('adv-cat-menu').innerHTML = html;
+  }
+
+  function toggleAdvMenu(ev, kind) {
+    ev.stopPropagation();
+    const el = document.getElementById(`adv-${kind}-mfilter`);
+    const wasOpen = el.classList.contains('open');
+    document.querySelectorAll('#adv-filter-overlay .mfilter.open').forEach(x => x.classList.remove('open'));
+    if (!wasOpen) el.classList.add('open');
+  }
+
+  function toggleAdvOpt(kind, btn) {
+    const v = btn.dataset.value;
+    if (v === '') {
+      advSel[kind] = [];
+    } else {
+      const arr = advSel[kind];
+      const i = arr.findIndex(x => String(x) === v);
+      if (i >= 0) arr.splice(i, 1);
+      else arr.push(v);
+    }
+    // 群組變動：類別選單只留所選群組的類別，已選但不再允許的一併剔除
+    if (kind === 'grp') {
+      if (advSel.grp.length) advSel.cat = advSel.cat.filter(n => advSel.grp.includes(catGroupOf(n)));
+      buildAdvCatMenu();
+      syncAdvMenuUI('cat');
+    }
+    syncAdvMenuUI(kind);
+  }
+
+  function syncAdvMenuUI(kind) {
+    const sel = advSel[kind].map(String);
+    document.querySelectorAll(`#adv-${kind}-menu .mfilter-opt`).forEach(o => {
+      const v = o.dataset.value;
+      o.classList.toggle('active', v === '' ? sel.length === 0 : sel.includes(v));
+    });
+    const btn = document.getElementById(`adv-${kind}-btn`);
+    if (!btn) return;
+    btn.classList.toggle('filtered', sel.length > 0);
+    document.getElementById(`adv-${kind}-label`).textContent =
+      sel.length ? `${ADV_LABEL[kind][1]} · ${sel.length}` : ADV_LABEL[kind][0];
+  }
+
+  document.addEventListener('click', ev => {
+    if (!ev.target.closest('.mfilter'))
+      document.querySelectorAll('#adv-filter-overlay .mfilter.open').forEach(x => x.classList.remove('open'));
+  });
+
+  function activeChipValues(containerId) {
+    return Array.from(document.querySelectorAll(`#${containerId} .filter-chip.active[data-value]`))
+      .map(b => b.dataset.value).filter(v => v);
+  }
+
+  function advShowTypes() {
+    const selectedTypes = activeChipValues('adv-type-chips');
+    return selectedTypes.length === 0 ? ['expense', 'income'] : selectedTypes.filter(t => t !== 'transfer');
+  }
+
+  // 交易類型 chips：切換後連動群組/類別選單，剔除不再符合類型的選取
+  function toggleAdvChip(btn, group) {
+    const value = btn.dataset.value;
+    const container = btn.parentElement;
+    if (value === '') {
+      container.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    } else {
+      const allBtn = container.querySelector('[data-value=""]');
+      if (allBtn) allBtn.classList.remove('active');
+      btn.classList.toggle('active');
+      const anyActive = Array.from(container.querySelectorAll('.filter-chip[data-value]:not([data-value=""])')).some(b => b.classList.contains('active'));
+      if (!anyActive && allBtn) allBtn.classList.add('active');
+    }
+    if (group === 'type') {
+      const showTypes = advShowTypes();
+      advSel.grp = advSel.grp.filter(n => n === '未分類' || showTypes.includes(groupTypeOfName(n)));
+      advSel.cat = advSel.cat.filter(n => {
+        const c = allCategories.find(x => x.name === n);
+        return c && showTypes.includes(c.type);
+      });
+      buildAdvGrpMenu();
+      buildAdvCatMenu();
+      syncAdvMenuUI('grp');
+      syncAdvMenuUI('cat');
+    }
+  }
+
+  function clearAdvDates() {
+    document.getElementById('adv-date-start').value = '';
+    document.getElementById('adv-date-end').value = '';
+  }
+
+  function applyAdvFilter() {
+    const types = activeChipValues('adv-type-chips');
+
+    const dateStart = document.getElementById('adv-date-start').value;
+    const dateEnd = document.getElementById('adv-date-end').value;
+    if (dateStart && dateEnd && dateStart > dateEnd) { toast('起始日期不能晚於結束日期'); return; }
+
+    const keyword = (document.getElementById('adv-keyword').value || '').trim();
+
+    advFilter = {
+      types,
+      accs: advSel.acc.slice(),
+      grps: advSel.grp.slice(),
+      cats: advSel.cat.slice(),
+      dateStart, dateEnd, keyword
+    };
+    applyFilters();
+    updateFilterBtn();
+    document.getElementById('adv-filter-overlay').classList.remove('open');
+  }
+
+  function resetAdvFilter() {
+    advFilter = { types: [], accs: [], grps: [], cats: [], dateStart: '', dateEnd: '', keyword: '' };
+    advSel.acc = [];
+    advSel.grp = [];
+    advSel.cat = [];
+    document.querySelectorAll('#adv-type-chips .filter-chip').forEach((b, i) => b.classList.toggle('active', i === 0));
+    clearAdvDates();
+    const kw = document.getElementById('adv-keyword');
+    if (kw) kw.value = '';
+    buildAdvGrpMenu();
+    buildAdvCatMenu();
+    ['acc', 'grp', 'cat'].forEach(syncAdvMenuUI);
+    applyFilters();
+    updateFilterBtn();
+    document.getElementById('adv-filter-overlay').classList.remove('open');
+  }
+
+  // ── 資產組成（現金 / 負債 / 股票現值，各自的帳戶佔比；帳戶列可點開明細） ──
+  function bdSectionHtml(title, totalStr, valClass, rows, rampFn, sortByMag = true) {
+    let inner;
+    const total = rows.reduce((s, r) => s + Math.abs(r.value), 0);
+    if (!rows.length || total <= 0) {
+      inner = '<div class="bd-empty">無資料</div>';
+    } else {
+      const sorted = rows
+        .map(r => ({ ...r, mag: Math.abs(r.value) }))
+        .sort((a, b) => sortByMag ? b.mag - a.mag : 0);
+      const palette = rampFn(sorted.length);
+      const colored = sorted.map((r, i) => ({ ...r, color: palette[i] }));
+      const bar = colored.map(r =>
+        `<div class="prop-seg" style="width:${r.mag / total * 100}%;background:${r.color};"></div>`).join('');
+      const list = colored.map(r => {
+        const pct = (r.mag / total * 100).toFixed(1);
+        const neg = r.value < 0 ? '-' : '';
+        const digits = neg + fmtDigitsShort(r.mag);
+        const full = 'NT$ ' + neg + Math.round(r.mag).toLocaleString();
+        const clickable = r.id !== undefined;
+        return `<div class="bd-row${clickable ? ' clickable' : ''}"${clickable ? ` onclick="openAccModal('${r.id}')"` : ''}>
+          <span class="prop-dot" style="background:${r.color};"></span>
+          <span class="bd-row-name">${esc(r.name)}</span>
+          <span class="bd-row-pct">${pct}%</span>
+          <span class="bd-row-amt-sign amt-sign" title="${full}">NT$</span>
+          <span class="bd-row-amt-digits amt-digits" title="${full}">${digits}</span>
+        </div>`;
+      }).join('');
+      inner = `<div class="prop-bar">${bar}</div><div class="bd-rows">${list}</div>`;
+    }
+    return `<div class="bd-section">
+      <div class="bd-head"><span class="bd-name">${title}</span><span class="bd-val ${valClass}">${totalStr}</span></div>
+      ${inner}
+    </div>`;
+  }
+
+  // 'sort'：帳戶列依設定專區的自訂排序（sort_order）顯示（原本行為，A方案）
+  // 'category'：帳戶列依帳戶類型（銀行/保單/借出…）分小組，組內再依金額排序（B方案）
+  let breakdownGroupMode = localStorage.getItem('breakdownGroupMode') || 'sort';
+  if (breakdownGroupMode === 'type') breakdownGroupMode = 'sort'; // 舊版模式名稱相容
+
+  function toggleBreakdownGrouping() {
+    breakdownGroupMode = breakdownGroupMode === 'sort' ? 'category' : 'sort';
+    localStorage.setItem('breakdownGroupMode', breakdownGroupMode);
+    document.getElementById('bd-group-toggle').classList.toggle('active', breakdownGroupMode === 'category');
+    renderAssetBreakdown();
+  }
+
+  // B方案：先依帳戶類型（ACC_TYPE_ORDER，如銀行/保單/借出）排列，同類型內再依金額排序
+  function sortByAccType(rows) {
+    const idx = r => {
+      const acc = ALL_ACCOUNTS.find(a => String(a.id) === String(r.id));
+      const t = acc ? accEffType(acc) : '其他';
+      const i = ACC_TYPE_ORDER.indexOf(t);
+      return i === -1 ? ACC_TYPE_ORDER.length : i;
+    };
+    return [...rows].sort((a, b) => idx(a) - idx(b) || Math.abs(b.value) - Math.abs(a.value));
+  }
+
+  function renderAssetBreakdown() {
+    const cashRows = [], liabRows = [];
+    const sortedAccounts = [...ALL_ACCOUNTS].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    sortedAccounts.forEach(a => {
+      const twd = accBalTwd(a.id);
+      if (Math.abs(twd) < 0.005) return;
+      (a.type === 'liability' ? liabRows : cashRows).push({ id: String(a.id), name: accDisplayName(a), value: twd });
+    });
+    const cashTotal = cashRows.reduce((s, r) => s + r.value, 0);
+    const liabTotal = liabRows.reduce((s, r) => s + r.value, 0);
+    const stockRows = STOCK_ITEMS.map(s => ({ name: s.name, value: s.value }));
+
+    // 總覽 grid（已加總的總額）
+    const setOv = (id, val, negIsRed) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = fmtTWDHtml(val);
+      el.classList.toggle('red', negIsRed && val < 0);
+      el.classList.toggle('green', !(negIsRed && val < 0));
+    };
+    setOv('ov-cash', cashTotal, true);
+    const liabEl = document.getElementById('ov-liab');
+    if (liabEl) {
+      liabEl.innerHTML = fmtTWDHtml(liabTotal);
+      liabEl.classList.toggle('red', liabTotal < 0);
+      liabEl.classList.toggle('green', liabTotal >= 0);
+    }
+    setOv('ov-stock', STOCK_VALUE, false);
+    setOv('ov-total', cashTotal + liabTotal + STOCK_VALUE, true);
+
+    const el = document.getElementById('breakdown-sections');
+    if (!el) return;
+    const toggleBtn = document.getElementById('bd-group-toggle');
+    if (toggleBtn) toggleBtn.classList.toggle('active', breakdownGroupMode === 'category');
+
+    if (breakdownGroupMode === 'category') {
+      el.innerHTML =
+        bdSectionHtml('現金', fmtTWD(cashTotal), cashTotal >= 0 ? 'green' : 'red', sortByAccType(cashRows), PROP_RAMP_COOL, false) +
+        bdSectionHtml('負債', fmtTWD(liabTotal), liabTotal < 0 ? 'red' : 'green', sortByAccType(liabRows), PROP_RAMP_WARM, false) +
+        bdSectionHtml('股票現值', fmtTWD(STOCK_VALUE), 'green', stockRows, PROP_RAMP_COOL);
+    } else {
+      el.innerHTML =
+        bdSectionHtml('現金', fmtTWD(cashTotal), cashTotal >= 0 ? 'green' : 'red', cashRows, PROP_RAMP_COOL, false) +
+        bdSectionHtml('負債', fmtTWD(liabTotal), liabTotal < 0 ? 'red' : 'green', liabRows, PROP_RAMP_WARM, false) +
+        bdSectionHtml('股票現值', fmtTWD(STOCK_VALUE), 'green', stockRows, PROP_RAMP_COOL);
+    }
+  }
+
+  // ── 帳戶明細 modal（最新至最舊，依年月分群） ──
+  let accModalCurId = null;
+
+  function accModalRowHtml(e) {
+    const isIn = e.type === 'transfer' && String(e.to_account_id) === accModalCurId && String(e.account_id) !== accModalCurId;
+    const badgeCls = e.type === 'expense' ? 'expense' : e.type === 'transfer' ? 'transfer' : '';
+    const badgeText = e.type === 'transfer' ? '轉帳' : e.category;
+    const acc = accountMapData[String(e.account_id)];
+    const toAcc = e.type === 'transfer' && e.to_account_id ? accountMapData[String(e.to_account_id)] : null;
+    const accTag = acc ? `<span class="account-tag">${acc.icon || ''} ${acc.name}</span>` : '';
+    const toAccTag = toAcc ? ` ➔ <span class="account-tag">${toAcc.icon || ''} ${toAcc.name}</span>` : '';
+    let amountStr, amountCls = e.type;
+    if (e.type === 'transfer') {
+      const cur = isIn ? (toAcc ? toAcc.currency || 'TWD' : 'TWD') : (acc ? acc.currency || 'TWD' : 'TWD');
+      const amt = isIn ? (e.to_amount || e.amount) : e.amount;
+      const curPrefix = cur === 'TWD' ? 'NT$' : cur;
+      amountStr = `<span class="amt-sign">${isIn ? '+' : '-'}${curPrefix}</span><span class="amt-digits">${Math.round(amt).toLocaleString()}</span>`;
+      amountCls = isIn ? 'income' : 'expense';
+    } else {
+      const cur = acc ? (acc.currency || 'TWD') : 'TWD';
+      const curPrefix = cur === 'TWD' ? 'NT$' : cur;
+      const sign = e.type === 'income' ? '+' : '-';
+      amountStr = `<span class="amt-sign">${sign}${curPrefix}</span><span class="amt-digits">${Math.round(e.amount).toLocaleString()}</span>`;
+    }
+    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div class="item-title">${esc(e.title || '')}</div>
+        <div style="margin-top:5px;"><span class="cat-badge ${badgeCls}">${esc(badgeText || '')}</span></div>
+        <div class="item-date" style="margin-top:5px;"><span>${e.date}${e.note ? ' · ' + esc(e.note) : ''}</span>${accTag}${toAccTag}</div>
+      </div>
+      <div class="item-amount ${amountCls}">${amountStr}</div>
+    </div>`;
+  }
+
+  function openAccModal(id) {
+    accModalCurId = String(id);
+    const a = accountMapData[accModalCurId];
+    document.getElementById('acc-detail-title').textContent = a ? accDisplayName(a) : '帳戶明細';
+
+    const cur = a ? (a.currency || 'TWD') : 'TWD';
+    const native = accBalNative(id);
+    const balStr = cur === 'TWD'
+      ? fmtTWD(native)
+      : `${Math.round(native).toLocaleString()} ${cur}（${fmtTWD(accBalTwd(id))}）`;
+    document.getElementById('acc-detail-sub').textContent = `餘額 ${balStr}`;
+
+    const items = allExpenses
+      .filter(e => String(e.account_id) === accModalCurId ||
+        (e.type === 'transfer' && String(e.to_account_id) === accModalCurId))
+      .sort((x, y) => x.date === y.date ? (y.id - x.id) : (x.date < y.date ? 1 : -1));
+
+    const content = document.getElementById('acc-detail-content');
+    if (!items.length) {
+      content.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px 0">此帳戶尚無記帳</p>';
+    } else {
+      let html = '', curYm = '';
+      items.forEach(e => {
+        const ym = (e.date || '').slice(0, 7);
+        if (ym !== curYm) {
+          curYm = ym;
+          html += `<div class="acc-month-label">${ym.slice(0, 4)}年${parseInt(ym.slice(5, 7), 10)}月</div>`;
+        }
+        html += accModalRowHtml(e);
+      });
+      content.innerHTML = html;
+    }
+    content.scrollTop = 0;
+    document.getElementById('acc-detail-overlay').classList.add('open');
+  }
+
+  // 以該帳戶為預設帳戶，直接開新增明細 modal 記收支/轉帳
+  function accModalAdd() {
+    document.getElementById('acc-detail-overlay').classList.remove('open');
+    const sel = document.getElementById('m-account');
+    if (sel && accModalCurId) sel.value = accModalCurId;
+    updateAmountLabel('m');
+    openMobileAdd();
   }
 
   document.addEventListener("DOMContentLoaded", () => {
     updateMonthDisplay();
     applyFilters();
-    updateAccFilterSummary();
+    renderAssetBreakdown();
     syncRates();
     // Init mobile panels: default to list (panel 1)
     if (window.innerWidth <= 768) panelGo(1);

@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import random
 import zipfile
 import tempfile
 from datetime import datetime
@@ -9,16 +10,31 @@ from app.models.csv_store import read_csv, write_csv, next_id, SCHEMA
 DATE_FORMATS = ["%Y/%m/%d", "%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y",
                 "%Y.%m.%d", "%Y%m%d"]
 
+# "to_account" must be matched before "account": otherwise the generic 帳戶 hint
+# would claim a 到帳戶/轉入帳戶 column first and leave nothing for the transfer
+# target. No bare「轉入」hint — it would grab a 轉入金額 (amount) column.
 FIELD_HINTS = {
+    "to_account": ["轉入帳戶", "到帳戶", "入帳帳戶", "存入帳戶", "目標帳戶", "帳戶2", "to account", "to_account", "target account"],
+    "account":  ["帳戶", "account", "戶名", "戶頭", "轉出"],
     "date":     ["日期", "date", "交易日期", "time", "時間"],
     "amount":   ["金額", "amount", "數量", "price", "費用"],
     "type":     ["類型", "type", "收支", "收支類型", "交易類型", "方向"],
     "category": ["類別", "category", "分類", "子類別"],
-    "account":  ["帳戶", "account", "帳戶1", "帳戶名稱"],
 }
 
+# Canonical intermediate CSV produced by normalize_files(): every import path
+# (single file, or separate 收支 + 轉帳 files) is merged into this fixed layout,
+# so analyze/import downstream only ever deal with one known schema.
+CANONICAL_HEADER = ["日期", "類別", "帳戶1", "帳戶2", "金額", "收/支"]
+CANONICAL_MAPPING = {
+    "date": "日期", "category": "類別", "account": "帳戶1",
+    "to_account": "帳戶2", "amount": "金額", "type": "收/支",
+}
+CANONICAL_TYPE_MAPPING = {"支": "expense", "收": "income", "轉帳": "transfer"}
+_CANONICAL_TYPE_LABEL = {"expense": "支", "income": "收", "transfer": "轉帳"}
+
 _TYPE_VALUE_HINTS = frozenset({
-    "支出", "收入", "轉帳", "轉入", "轉出",
+    "支出", "收入", "轉帳", "轉入", "轉出", "收", "支",
     "expense", "income", "transfer", "debit", "credit",
 })
 
@@ -32,16 +48,21 @@ _INCOME_HINTS = frozenset({
 
 ICON_MAP = {
     "現金": "💵", "銀行": "🏦", "預付儲值": "🪙", "投資": "📈",
-    "保單": "🛡️", "其他": "👝", "信用卡": "💳", "借貸": "🤝", "負債其他": "👝",
+    "保單": "🛡️", "其他": "👝", "信用卡": "💳", "借貸": "🤝",
+    "借入": "🤝", "借出": "🤝", "負債其他": "👝",
 }
-LIABILITY_SUBTYPES = frozenset({"信用卡", "借貸", "負債其他"})
+LIABILITY_SUBTYPES = frozenset({"信用卡", "借貸", "借入", "負債其他"})
+# 借入/借出 accounts double as loans: the account is created as the loan's
+# linked (system-managed) account and a loans.csv row is created alongside.
+LOAN_SUBTYPES = {"借入": "borrow", "借出": "lend"}
 
 
 def _parse_date(value: str) -> str:
+    """Normalize any recognized date to YYYY/MM/DD (unrecognized values pass through)."""
     value = value.strip()
     for fmt in DATE_FORMATS:
         try:
-            return datetime.strptime(value, fmt).strftime("%Y-%m-%d")
+            return datetime.strptime(value, fmt).strftime("%Y/%m/%d")
         except ValueError:
             pass
     return value
@@ -73,11 +94,11 @@ def _resolve_type(raw_type: str, type_mapping: dict,
 
     if raw_type:
         t = raw_type.lower()
-        if "收入" in t or t in ("income", "credit", "in"):
+        if "收入" in t or t == "收" or t in ("income", "credit", "in"):
             return "income"
         if "轉" in t or t in ("transfer",):
             return "transfer"
-        if "支出" in t or "費用" in t or t in ("expense", "debit", "out"):
+        if "支出" in t or "費用" in t or t == "支" or t in ("expense", "debit", "out"):
             return "expense"
 
     if any(hint in raw_category for hint in _INCOME_HINTS):
@@ -96,15 +117,29 @@ def _resolve_type(raw_type: str, type_mapping: dict,
 
 
 def _guess_mapping(columns: list, column_values: dict = None) -> dict:
+    """A column with zero non-empty values across the whole file (e.g. an
+    unused 標籤/tag column) is never a valid mapping target for any field —
+    a name match alone (column literally titled "類型" but left blank) isn't
+    enough, so blank columns are excluded up front."""
+    blank_cols = set()
+    if column_values is not None:
+        blank_cols = {c for c in columns if not column_values.get(c)}
+
     mapping = {}
-    lower_cols = {c.lower(): c for c in columns}
+    used_cols = set()
     for field, hints in FIELD_HINTS.items():
-        for hint in hints:
-            if hint.lower() in lower_cols:
-                mapping[field] = lower_cols[hint.lower()]
+        for col in columns:
+            if col in used_cols or col in blank_cols:
+                continue
+            lower_col = col.lower()
+            if any(hint.lower() in lower_col for hint in hints):
+                mapping[field] = col
+                used_cols.add(col)
                 break
     if "type" not in mapping and column_values:
         for col in columns:
+            if col in blank_cols:
+                continue
             vals = [v for v in column_values.get(col, []) if v]
             if vals and all(v in _TYPE_VALUE_HINTS for v in vals):
                 mapping["type"] = col
@@ -123,7 +158,8 @@ def ai_suggest_mapping(headers: list, sample_rows: list) -> dict | None:
 
     system = (
         "You are a financial data analyst. Map CSV columns to expense tracker fields: "
-        "date, amount, category, account, type. "
+        "date, amount, category, account, type, to_account "
+        "(to_account = transfer destination account, if the file has one). "
         "Only include confident mappings. Respond ONLY with valid JSON, no markdown."
     )
     user = (
@@ -196,9 +232,12 @@ def extract_from_zip(zip_path: str) -> str:
         return tmp_path
 
 
-def preview_file(file_path: str) -> dict:
+def preview_file(file_path: str, sample_size: int = 5) -> dict:
+    """Preview shows the file's own rows as-is (unmapped) — a random sample
+    (reservoir sampling) rather than just the first N, so it's representative
+    of the whole file, then re-sorted back to original row order for display."""
     delimiter = _detect_delimiter(file_path)
-    preview_rows = []
+    reservoir = []  # [(row_index, row_dict), ...]
     columns = []
     column_values: dict = {}
     with open(file_path, "r", encoding="utf-8-sig", errors="replace", newline="") as f:
@@ -211,13 +250,18 @@ def preview_file(file_path: str) -> dict:
         _seen: dict = {c: set() for c in columns}
         for i, row in enumerate(reader):
             row_dict = {columns[j]: row[j].strip() if j < len(row) else "" for j in range(len(columns))}
-            if i < 5:
-                preview_rows.append(row_dict)
+            if i < sample_size:
+                reservoir.append((i, row_dict))
+            else:
+                j = random.randint(0, i)
+                if j < sample_size:
+                    reservoir[j] = (i, row_dict)
             for c in columns:
                 val = row_dict.get(c, "")
                 if val and val not in _seen[c]:
                     _seen[c].add(val)
                     column_values[c].append(val)
+    preview_rows = [row for _, row in sorted(reservoir, key=lambda p: p[0])]
     return {
         "columns": columns,
         "preview": preview_rows,
@@ -227,6 +271,84 @@ def preview_file(file_path: str) -> dict:
 
 
 preview_csv = preview_file
+
+
+def _build_canonical_rows(files: list) -> list:
+    """
+    Merge one or more mapped CSV files into canonical rows (CANONICAL_HEADER
+    keys), sorted by date (YYYY/MM/DD).
+
+    files: [{path, mapping, type_mapping, role}]
+      role: "records"   — income/expense file (dual-file mode)
+            "transfers" — transfer file (dual-file mode); every row is a transfer
+            "single"    — mixed file; transfers detected via type column or 帳戶2
+    """
+    rows = []
+    for spec in files:
+        path = spec["path"]
+        mapping = spec.get("mapping", {}) or {}
+        type_mapping = spec.get("type_mapping", {}) or {}
+        role = spec.get("role", "single")
+
+        delimiter = _detect_delimiter(path)
+        with open(path, "r", encoding="utf-8-sig", errors="replace", newline="") as f:
+            reader = csv.reader(f, delimiter=delimiter)
+            header = next(reader, None)
+            if not header:
+                continue
+            header = [c.strip() for c in header]
+            for raw_row in reader:
+                if not any(cell.strip() for cell in raw_row):
+                    continue
+                row = {header[j]: raw_row[j].strip() if j < len(raw_row) else ""
+                       for j in range(len(header))}
+
+                def get(field):
+                    return row.get(mapping.get(field, ""), "").strip()
+
+                raw_amount = get("amount") or "0"
+                amount = _parse_amount(raw_amount)
+                if amount == 0:
+                    continue
+
+                to_acc = get("to_account")
+                if role == "transfers":
+                    mapped_type = "transfer"
+                else:
+                    mapped_type = _resolve_type(get("type"), type_mapping,
+                                                get("category"), raw_amount)
+                    # A filled destination account overrides an ambiguous type
+                    if to_acc and mapped_type != "transfer":
+                        mapped_type = "transfer"
+
+                raw_date = get("date")
+                rows.append({
+                    "日期": _parse_date(raw_date) if raw_date else "",
+                    "類別": get("category"),
+                    "帳戶1": get("account"),
+                    "帳戶2": to_acc if mapped_type == "transfer" else "",
+                    "金額": amount,
+                    "收/支": _CANONICAL_TYPE_LABEL[mapped_type],
+                })
+
+    rows.sort(key=lambda r: r["日期"])
+    return rows
+
+
+def normalize_files(files: list) -> str:
+    """Write the merged canonical CSV to a temp file and return its path."""
+    rows = _build_canonical_rows(files)
+
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".csv")
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8-sig", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=CANONICAL_HEADER)
+            writer.writeheader()
+            writer.writerows(rows)
+    except Exception:
+        os.unlink(tmp_path)
+        raise
+    return tmp_path
 
 
 def analyze_settings_import(file_path: str, mapping: dict, type_mapping: dict = None) -> dict:
@@ -260,6 +382,7 @@ def analyze_settings_import(file_path: str, mapping: dict, type_mapping: dict = 
             raw_type   = row.get(mapping.get("type",     ""), "").strip()
             raw_cat    = row.get(mapping.get("category", ""), "").strip()
             raw_acc    = row.get(mapping.get("account",  ""), "").strip()
+            raw_to_acc = row.get(mapping.get("to_account", ""), "").strip()
 
             amount = _parse_amount(raw_amount)
             if amount == 0:
@@ -267,15 +390,19 @@ def analyze_settings_import(file_path: str, mapping: dict, type_mapping: dict = 
 
             mapped_type = _resolve_type(raw_type, type_mapping, raw_cat, raw_amount)
 
-            # Skip transfers entirely — transfer accounts are not proposed as new
+            if raw_acc and raw_acc not in existing_accs and raw_acc not in new_accs:
+                new_accs[raw_acc] = "TWD"
+
+            # Transfers still contribute both endpoint accounts (so the target
+            # account of a transfer-in is proposed for creation too), but have
+            # no category and are excluded from the monthly income/expense summary.
             if mapped_type == "transfer":
+                if raw_to_acc and raw_to_acc not in existing_accs and raw_to_acc not in new_accs:
+                    new_accs[raw_to_acc] = "TWD"
                 continue
 
             if raw_cat and raw_cat not in existing_cats and raw_cat not in new_cats:
                 new_cats[raw_cat] = mapped_type
-
-            if raw_acc and raw_acc not in existing_accs and raw_acc not in new_accs:
-                new_accs[raw_acc] = "TWD"
 
             if raw_date:
                 date = _parse_date(raw_date)
@@ -318,6 +445,8 @@ def import_settings(file_path: str, mapping: dict, type_mapping: dict,
     Import settings from CSV:
     - Creates category groups + categories
     - Creates accounts with opening balance expenses
+    - 借入/借出 accounts additionally create a loans.csv row (the account becomes
+      the loan's linked account; the balance becomes the outstanding principal)
     - Optionally stores monthly history in monthly_history.csv
 
     accounts_config: [{name, sub_type, currency, is_asset, opening_balance, ...}]
@@ -376,6 +505,7 @@ def import_settings(file_path: str, mapping: dict, type_mapping: dict,
     acc_rows = read_csv("accounts.csv")
     existing_acc_names = {r["name"] for r in acc_rows}
     accs_created = 0
+    pending_loans = []   # (account_id, name, loan_type, principal)
 
     for cfg in accounts_config:
         name = cfg.get("name", "").strip()
@@ -383,14 +513,20 @@ def import_settings(file_path: str, mapping: dict, type_mapping: dict,
             continue
 
         sub_type  = cfg.get("sub_type", "其他")
+        loan_type = LOAN_SUBTYPES.get(sub_type)
         is_liab   = sub_type in LIABILITY_SUBTYPES
         acc_type  = "liability" if is_liab else "asset"
         currency  = cfg.get("currency", "TWD")
         is_asset  = int(cfg.get("is_asset", 1))
         icon      = ICON_MAP.get(sub_type, "👝")
         balance   = float(cfg.get("opening_balance") or 0)
-        # Store signed: positive = asset funds, negative = liability debt
-        opening_balance = -balance if is_liab else balance
+        # Store signed: positive = asset funds, negative = liability debt.
+        # Loan accounts open at 0: the outstanding amount lives on the loans.csv
+        # row (counted into net worth via loan_net), not on the account.
+        if loan_type:
+            opening_balance = 0
+        else:
+            opening_balance = -balance if is_liab else balance
 
         new_acc_id = next_id(acc_rows)
         acc_rows.append({
@@ -412,9 +548,36 @@ def import_settings(file_path: str, mapping: dict, type_mapping: dict,
         })
         existing_acc_names.add(name)
         accs_created += 1
+        if loan_type:
+            pending_loans.append((new_acc_id, name, loan_type, abs(balance)))
 
     if accs_created:
         write_csv("accounts.csv", acc_rows, SCHEMA["accounts.csv"])
+
+    # ── 4b. Loans for 借入/借出 accounts ─────────────────────────────────────
+    loans_created = 0
+    if pending_loans:
+        loan_rows = read_csv("loans.csv")
+        today = datetime.now().strftime("%Y-%m-%d")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for acc_id, name, loan_type, principal in pending_loans:
+            loan_rows.append({
+                "id": next_id(loan_rows),
+                "name": name,
+                "type": loan_type,
+                "principal": principal,
+                "remaining": principal,
+                "interest_rate": 0,
+                "start_date": today,
+                "due_date": "",
+                "account_id": acc_id,
+                "linked_account_id": acc_id,
+                "status": "active" if principal > 0 else "closed",
+                "note": "匯入建立",
+                "created_at": now,
+            })
+            loans_created += 1
+        write_csv("loans.csv", loan_rows, SCHEMA["loans.csv"])
 
     # ── 5. Monthly history ───────────────────────────────────────────────────
     history_months = 0
@@ -477,5 +640,6 @@ def import_settings(file_path: str, mapping: dict, type_mapping: dict,
     return {
         "accounts_created": accs_created,
         "categories_created": cats_created,
+        "loans_created": loans_created,
         "history_months": history_months,
     }

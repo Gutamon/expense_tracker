@@ -1,7 +1,7 @@
-from flask import Blueprint, render_template, jsonify, redirect
+from flask import Blueprint, render_template, request, jsonify, redirect
 from app.models.category import CategoryModel, CategoryGroupModel
 from app.models.account import AccountModel
-from app.models import csv_store
+from app.models import csv_store, user
 
 onboarding_bp = Blueprint("onboarding", __name__)
 category_model = CategoryModel()
@@ -22,3 +22,15 @@ def api_onboarding_fresh():
     account_model.ensure_defaults()
     csv_store.set_setting("onboarded", "true")
     return jsonify({"success": True})
+
+
+@onboarding_bp.route("/api/onboarding/restore-device", methods=["POST"])
+def restore_device():
+    """Re-attach this browser to a device's data folder via its rescue code."""
+    code = (request.get_json(silent=True) or {}).get("code", "")
+    device_id = user.resolve_rescue_code(csv_store.root_dir(), code)
+    if not device_id:
+        return jsonify({"error": "救援碼無效或已失效"}), 404
+    resp = jsonify({"success": True})
+    user.set_device_cookie(resp, device_id)
+    return resp

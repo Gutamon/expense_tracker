@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
@@ -6,7 +6,10 @@
   <title>記帳本</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/globals.css') }}">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icon-192.png') }}">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="帳本">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0f0f11">
@@ -196,6 +199,26 @@
   </nav>
 
   <script>
+    // Mirror this device's rescue code into localStorage. If iOS later drops the
+    // httponly device cookie (common for home-screen PWAs across cold launches), the
+    // onboarding screen reads this and silently re-attaches — no fresh start.
+    try { localStorage.setItem('rescue_code', '{{ rescue_code }}'); } catch (e) {}
+
+    // Register the PWA service worker (installability + offline app shell).
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js').catch(function() {});
+      });
+      // Any code change gives sw.js new bytes, so the browser installs a new worker.
+      // This fires once when it takes over — reload so the page isn't left stale.
+      var _swReloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        if (_swReloaded) return;
+        _swReloaded = true;
+        window.location.reload();
+      });
+    }
+
     // Pinch-zoom + double-tap lock (Chrome Android ignores viewport meta alone)
     document.addEventListener('touchmove', function(e) {
       if (e.touches.length > 1) e.preventDefault();
@@ -232,6 +255,11 @@
       var frame = document.getElementById('frame-' + name);
       if (!frame.getAttribute('src')) {
         frame.src = SRCS[name];
+      } else if (name === 'home') {
+        // Budgets may have been edited in the settings tab, which stays loaded
+        // in its own iframe — force the home tab to refetch instead of using
+        // its stale per-month budget cache.
+        try { frame.contentWindow.invalidateBudgetCache(); } catch (e) {}
       }
       frame.classList.add('active');
 

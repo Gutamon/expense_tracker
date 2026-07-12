@@ -1,6 +1,0 @@
-﻿id,name,icon,sort_order,type,sub_type,is_asset,billing_start_day,currency,credit_limit,payment_due_day,min_payment_pct,min_payment_floor,apr,opening_balance
-1,撲滿現金,💵,80,asset,現金,1,1,TWD,0.0,0,10.0,1000.0,0.0,100.0
-2,現金書款,💵,81,asset,現金,1,1,TWD,0.0,0,10.0,1000.0,0.0,0.0
-3,國泰子帳戶,🏦,82,asset,銀行,1,1,TWD,0.0,0,10.0,1000.0,0.0,2000.0
-4,BT21,💳,83,liability,信用卡,0,1,TWD,0.0,0,10.0,1000.0,0.0,-1000.0
-5,台新美元,🏦,84,asset,銀行,1,1,USD,0.0,0,10.0,1000.0,0.0,20.0

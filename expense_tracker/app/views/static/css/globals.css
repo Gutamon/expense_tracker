@@ -1,14 +1,18 @@
 :root {
-  --bg: #0f0f11;
-  --surface: #18181c;
-  --border: #2a2a30;
-  --accent: #c8f04a;
-  --accent-dim: rgba(200, 240, 74, 0.12);
-  --text: #e8e8ec;
-  --muted: #6b6b78;
-  --danger: #ff5f5f;
-  --danger-dim: rgba(255, 95, 95, 0.12);
-  --radius: 12px;
+  --bg: #17181a;
+  --surface: #1e2022;
+  --border: rgba(255, 255, 255, 0.10);
+  --accent: #3b82f6;
+  --accent-dim: rgba(59, 130, 246, 0.14);
+  --text: #f4f6f8;
+  --muted: #9a9da2;
+  --danger: #ef4444;
+  --danger-dim: rgba(239, 68, 68, 0.14);
+  --positive: #22c55e;
+  --positive-dim: rgba(34, 197, 94, 0.14);
+  --info: #5bc0de;
+  --info-dim: rgba(91, 192, 222, 0.14);
+  --radius: 10px;
 }
 
 *,
@@ -32,7 +36,7 @@ html::-webkit-scrollbar {
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
+  font-family: 'Figtree', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
   font-weight: 300;
   min-height: 100vh;
   overflow-x: hidden;
@@ -85,7 +89,7 @@ select {
 }
 
 .page-tab.active {
-  color: #111;
+  color: #fff;
   background: var(--accent);
   font-weight: 500;
 }
@@ -138,23 +142,27 @@ select {
 /* ── Shared: Segmented control ── */
 .segmented-control {
   display: flex;
+  gap: 4px;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 4px;
   margin-bottom: 16px;
 }
 
 .segmented-control label {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   text-align: center;
-  padding: 8px 0;
-  border-radius: 6px;
+  padding: 9px 0;
+  border-radius: 7px;
   cursor: pointer;
   font-size: .85rem;
   font-weight: 500;
   color: var(--muted);
-  transition: all .2s;
+  background: rgba(255, 255, 255, .03);
+  transition: background .18s, color .18s;
+  white-space: nowrap;
 }
 
 .segmented-control input[type="radio"] {
@@ -165,6 +173,134 @@ select {
   background: var(--surface);
   color: var(--text);
   box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+}
+
+/* ── Shared: Type switch (支出／收入／轉帳) ──
+   結構比照 .panel-tab（資產總覽／記帳明細），選中狀態的顏色由各頁面依 value 疊加
+   （見 index.html 的 .type-switch input[value=...]）。 */
+.type-switch {
+  display: flex;
+  background: #0f0f11;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+
+.type-switch input[type="radio"] {
+  display: none;
+}
+
+.type-switch label {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  padding: 8px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .85rem;
+  font-weight: 500;
+  color: var(--muted);
+  transition: all .2s;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.type-switch label:active {
+  transform: scale(.97);
+}
+
+/* ── Shared: Month/date nav arrow button ── */
+.month-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+  padding: 0;
+}
+
+.month-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Shared: mfilter dropdown（篩選選單，圖表/明細/預算頁共用）── */
+.mfilter {
+  position: relative;
+}
+
+.mfilter-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform .2s;
+}
+
+.mfilter.open .mfilter-btn svg {
+  transform: rotate(180deg);
+}
+
+.mfilter-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: .85rem;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .15s;
+  white-space: nowrap;
+}
+
+.mfilter-opt:hover {
+  background: rgba(255, 255, 255, .05);
+}
+
+.mfilter-opt.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.mfilter-opt .check {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  visibility: hidden;
+}
+
+.mfilter-opt.active .check {
+  visibility: visible;
+}
+
+.mfilter-group-label {
+  font-size: .72rem;
+  color: var(--muted);
+  letter-spacing: .05em;
+  padding: 8px 10px 4px;
 }
 
 /* ── Shared: Icon buttons ── */
@@ -193,6 +329,12 @@ select {
 .icon-btn.del:hover {
   border-color: var(--danger);
   color: var(--danger);
+}
+
+.icon-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(200, 240, 74, .08);
 }
 
 /* ── Shared: Overlay & Modal ── */
@@ -258,13 +400,101 @@ select {
   border-color: var(--accent);
 }
 
+/* ── Shared: Universal confirm / delete dialog ──
+   通用刪除／確認警示框。用法：
+   <div class="overlay" id="xxx-overlay">
+     <div class="modal confirm-modal">
+       <div class="confirm-icon danger">🗑</div>
+       <h3>確認刪除？</h3>
+       <p>此操作無法復原。</p>
+       <div class="confirm-actions">
+         <button class="btn-ghost" ...>取消</button>
+         <button class="btn-danger" ...>刪除</button>
+       </div>
+     </div>
+   </div>
+   confirm-modal 覆寫 .modal 的表單版型（去掉 sticky footer 分隔線），做成置中、精簡的對話框。 */
+.modal.confirm-modal {
+  max-width: 340px;
+  padding: 28px 28px 28px;
+  text-align: center;
+}
+
+.confirm-modal .confirm-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
+
+.confirm-modal .confirm-icon.danger {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+
+.confirm-modal h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.confirm-modal p {
+  color: var(--muted);
+  font-size: .88rem;
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+/* confirm-actions：取代 .modal-actions，無 sticky/border-top，等寬雙鍵 */
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.confirm-actions>button {
+  flex: 1;
+  padding: 11px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: .9rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity .15s, border-color .2s;
+}
+
+.confirm-actions .btn-ghost {
+  border-color: var(--border);
+  background: none;
+  color: var(--text);
+}
+
+.confirm-actions .btn-ghost:hover {
+  border-color: var(--accent);
+}
+
+/* 通用危險按鈕，可在任何刪除確認處重用 */
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+  border: none;
+}
+
+.btn-danger:hover {
+  opacity: .88;
+}
+
 /* ── Shared: Toast ── */
 #toast {
   position: fixed;
   bottom: 24px;
   right: 24px;
   background: var(--accent);
-  color: #111;
+  color: #fff;
   border-radius: 8px;
   padding: 12px 20px;
   font-size: .85rem;

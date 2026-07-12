@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block title %}負債管理 · 記帳本{% endblock %}
 
@@ -40,7 +40,7 @@
   .s-value {
     font-size: 1.4rem;
     font-weight: 700;
-    font-family: 'DM Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
   }
 
   .s-value.danger {
@@ -101,8 +101,21 @@
     font-weight: 600;
   }
 
-  .debt-icon {
-    font-size: 1.3rem;
+  .cc-title-row {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .cc-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  .cc-title-row .badge {
+    flex-shrink: 0;
   }
 
   .debt-stats {
@@ -124,7 +137,7 @@
   }
 
   .stat-value {
-    font-family: 'DM Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: .95rem;
   }
 
@@ -152,7 +165,7 @@
   }
 
   .formula-value {
-    font-family: 'DM Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: .95rem;
   }
 
@@ -162,14 +175,7 @@
     white-space: nowrap;
   }
 
-  .formula-op {
-    font-size: 1rem;
-    color: var(--muted);
-    padding-bottom: 18px;
-    flex-shrink: 0;
-  }
-
-  .formula-eq {
+  .formula-sep {
     font-size: 1rem;
     color: var(--muted);
     padding-bottom: 18px;
@@ -296,15 +302,29 @@
   .tx-date {
     color: var(--muted);
     white-space: nowrap;
-    font-family: 'DM Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: .8rem;
   }
 
   .tx-amount {
-    font-family: 'DM Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: .85rem;
-    text-align: right;
+    font-variant-numeric: tabular-nums;
+    text-align: left;
     flex-shrink: 0;
+    display: inline-flex;
+    gap: 4px;
+    min-width: 108px;
+  }
+
+  .tx-amount .amt-sign {
+    display: inline-block;
+    width: 42px;
+  }
+
+  .tx-amount .amt-digits {
+    flex: 1;
+    text-align: right;
   }
 
   .tx-note {
@@ -385,7 +405,7 @@
     font-weight: 500;
     cursor: pointer;
     background: var(--accent);
-    color: #111;
+    color: #fff;
   }
 
   .btn:hover {
@@ -606,9 +626,9 @@
 
 <!-- Section Tabs -->
 <div class="page-tabs">
-  <button class="page-tab active" id="tab-cc" onclick="switchTab('cc')">💳 信用卡{% if credit_cards %} ({{
+  <button class="page-tab active" id="tab-cc" onclick="switchTab('cc')">信用卡{% if credit_cards %} ({{
     credit_cards|length }}張){% endif %}</button>
-  <button class="page-tab" id="tab-loans" onclick="switchTab('loans')">📋 借貸{% if active_loans_count %} ({{
+  <button class="page-tab" id="tab-loans" onclick="switchTab('loans')">借貸{% if active_loans_count %} ({{
     active_loans_count }}筆){% endif %}</button>
 </div>
 
@@ -644,18 +664,20 @@
     {% set st = status_map.get(card.status, ['未繳', 'borrow']) %}
     <div class="debt-card" id="cc-card-{{ card.id }}">
       <div class="debt-header">
-        <div>
-          <div class="debt-title-row">
-            <span class="debt-icon">{{ card.icon }}</span>
-            <span class="debt-name">{{ card.name }}</span>
+        <div style="min-width:0;flex:1;">
+          <div class="debt-title-row cc-title-row">
+            <span class="debt-name cc-name">{{ card.name }}</span>
             <span class="badge cc">信用卡</span>
             <span class="badge {{ st[1] }}">{{ st[0] }}</span>
             {% if card.get('currency', 'TWD') != 'TWD' %}<span class="badge"
               style="background:rgba(74,138,240,.1);color:#4a8af0;">{{ card.currency }}</span>{% endif %}
           </div>
         </div>
-        <button class="icon-btn"
-          onclick="openCCModal({{ card.id }}, '{{ card.name }}', {{ card.get('billing_start_day', 1) }}, {{ card.get('credit_limit', 0)|float }}, {{ card.get('payment_due_day', 0) }}, {{ card.get('min_payment_pct', 10)|float }}, {{ card.get('min_payment_floor', 1000)|float }}, {{ card.get('apr', 0)|float }}, '{{ card.get('currency', 'TWD') }}')">✎</button>
+        <div style="display:flex;gap:6px;">
+          <button class="icon-btn"
+            onclick="openCCModal({{ card.id }}, '{{ card.name }}', {{ card.get('billing_start_day', 1) }}, {{ card.get('credit_limit', 0)|float }}, {{ card.get('payment_due_day', 0) }}, {{ card.get('min_payment_pct', 10)|float }}, {{ card.get('min_payment_floor', 1000)|float }}, {{ card.get('apr', 0)|float }}, '{{ card.get('currency', 'TWD') }}')">✎</button>
+          <button class="icon-btn del" onclick="deleteCC({{ card.id }}, '{{ card.name }}')">✕</button>
+        </div>
       </div>
 
       <div class="debt-stats">
@@ -719,7 +741,7 @@
               <span>{{ tx.title }}</span>
               {% if tx.note %}<span class="tx-note">{{ tx.note }}</span>{% endif %}
             </div>
-            <span class="tx-amount" style="color:var(--danger);">-NT$ {{ "%.0f"|format(tx.amount) }}</span>
+            <span class="tx-amount" style="color:var(--danger);"><span class="amt-sign">-NT$</span><span class="amt-digits">{{ "{:,.0f}".format(tx.amount) }}</span></span>
           </div>
         </div>
         {% endfor %}
@@ -796,20 +818,20 @@
           <span class="formula-label">借款本金</span>
         </div>
         {% if paid > 0 %}
-        <span class="formula-op">−</span>
+        <span class="formula-sep">−</span>
         <div class="formula-item">
           <span class="formula-value accent">NT$ {{ "%.0f"|format(paid) }}</span>
           <span class="formula-label">已還金額</span>
         </div>
         {% endif %}
         {% if loan.accrued_interest > 0 %}
-        <span class="formula-op">+</span>
+        <span class="formula-sep">+</span>
         <div class="formula-item">
           <span class="formula-value" style="color:#f0a84a;">NT$ {{ "%.0f"|format(loan.accrued_interest) }}</span>
           <span class="formula-label">推估利息（{{ loan.days_elapsed }} 天 / {{ loan.interest_rate }}%）</span>
         </div>
         {% endif %}
-        <span class="formula-eq">=</span>
+        <span class="formula-sep">=</span>
         <div class="formula-item">
           {% set total = loan.remaining + loan.accrued_interest %}
           <span class="formula-value {% if total > 0 %}danger{% else %}accent{% endif %}">NT$ {{ "%.0f"|format(total)
@@ -843,7 +865,7 @@
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
               <span class="tx-amount {% if loan.type == 'borrow' %}danger{% else %}accent{% endif %}">
-                {% if loan.type == 'borrow' %}-{% else %}+{% endif %}NT$ {{ "%.0f"|format(p.amount) }}
+                <span class="amt-sign">{% if loan.type == 'borrow' %}-{% else %}+{% endif %}NT$</span><span class="amt-digits">{{ "{:,.0f}".format(p.amount) }}</span>
               </span>
               <div class="tx-btns">
                 <button class="icon-btn del" onclick="deletePayment({{ p.id }})">✕</button>
@@ -908,11 +930,12 @@
     </div>
     <div class="field">
       <label>本期應繳</label>
-      <input type="text" id="repay-outstanding" readonly style="color:var(--danger);font-family:'DM Mono',monospace;">
+      <input type="text" id="repay-outstanding" readonly
+        style="color:var(--danger);font-family:'JetBrains Mono',monospace;">
     </div>
     <div class="field" id="repay-min-hint" style="margin-top:-8px;display:none;">
       <span style="font-size:.78rem;color:var(--muted);">最低應繳 <span id="repay-min-val"
-          style="color:var(--accent);font-family:'DM Mono',monospace;"></span></span>
+          style="color:var(--accent);font-family:'JetBrains Mono',monospace;"></span></span>
     </div>
     <div class="field">
       <label>還款來源帳戶</label>
@@ -936,7 +959,7 @@
       <input type="text" id="repay-note" placeholder="例：五月帳單" autocomplete="off">
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeRepayModal()">取消</button>
+      <button class="btn-ghost" onclick="closeRepayModal()">取消</button>
       <button class="btn" onclick="submitRepayment()">確認還款</button>
     </div>
   </div>
@@ -964,7 +987,7 @@
       <input type="text" id="interest-note" placeholder="例：五月帳單循環利息" autocomplete="off">
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeInterestModal()">取消</button>
+      <button class="btn-ghost" onclick="closeInterestModal()">取消</button>
       <button class="btn" onclick="submitInterest()">確認</button>
     </div>
   </div>
@@ -1014,7 +1037,7 @@
       <textarea id="loan-note" placeholder="例：緊急用途"></textarea>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeLoanModal()">取消</button>
+      <button class="btn-ghost" onclick="closeLoanModal()">取消</button>
       <button class="btn" onclick="submitLoan()">新增</button>
     </div>
   </div>
@@ -1046,7 +1069,7 @@
       <textarea id="loan-e-note"></textarea>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeLoanEditModal()">取消</button>
+      <button class="btn-ghost" onclick="closeLoanEditModal()">取消</button>
       <button class="btn" onclick="saveLoanEdit()">儲存</button>
     </div>
   </div>
@@ -1079,7 +1102,7 @@
       <input type="text" id="payment-note" placeholder="" autocomplete="off">
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closePaymentModal()">取消</button>
+      <button class="btn-ghost" onclick="closePaymentModal()">取消</button>
       <button class="btn" onclick="submitPayment()">確認</button>
     </div>
   </div>
@@ -1087,11 +1110,13 @@
 
 <!-- Confirm Modal -->
 <div class="modal-overlay" id="confirm-modal">
-  <div class="modal" style="max-width:360px;">
-    <h3 id="confirm-msg" style="font-size:1rem;margin-bottom:20px;"></h3>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" id="confirm-cancel">取消</button>
-      <button class="btn" id="confirm-ok" style="background:var(--danger);color:#fff;">確認刪除</button>
+  <div class="modal confirm-modal">
+    <div class="confirm-icon danger">🗑</div>
+    <h3 id="confirm-title">確認刪除？</h3>
+    <p id="confirm-msg"></p>
+    <div class="confirm-actions">
+      <button class="btn-ghost" id="confirm-cancel">取消</button>
+      <button class="btn-danger" id="confirm-ok">刪除</button>
     </div>
   </div>
 </div>
@@ -1112,7 +1137,7 @@
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.style.background = isError ? 'var(--danger)' : 'var(--accent)';
-    t.style.color = isError ? '#fff' : '#111';
+    t.style.color = isError ? '#fff' : '#fff';
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 2500);
   }
@@ -1120,7 +1145,11 @@
   // ── Confirm ────────────────────────────────────────────────────────────────
   function showConfirm(msg) {
     return new Promise(resolve => {
-      document.getElementById('confirm-msg').textContent = msg;
+      // 訊息以換行拆成標題（第一行）與副說明（其餘）；只有一行時標題用預設「確認刪除？」
+      const lines = String(msg).split('\n');
+      const titleEl = document.getElementById('confirm-title');
+      if (lines.length > 1) { titleEl.textContent = lines[0]; document.getElementById('confirm-msg').textContent = lines.slice(1).join(' '); }
+      else { titleEl.textContent = '確認刪除？'; document.getElementById('confirm-msg').textContent = lines[0]; }
       document.getElementById('confirm-modal').classList.add('open');
       const ok = document.getElementById('confirm-ok');
       const cancel = document.getElementById('confirm-cancel');
@@ -1391,6 +1420,33 @@
     if (res.ok) { closeCCModal(); toast(id ? '已更新' : '新增成功'); _reloadTabs('settings', 'home'); setTimeout(() => location.reload(), 800); }
     else { const d = await res.json().catch(() => ({})); toast(d.error || '儲存失敗', true); }
   }
+
+  // ── Delete Credit Card ──────────────────────────────────────────────────────
+  async function deleteCC(id, name) {
+    const res = await fetch('/api/accounts');
+    const accounts = await res.json();
+    const select = document.getElementById('cc-del-replace');
+    select.innerHTML = '<option value="" disabled selected>請選擇帳戶</option>';
+    let count = 0;
+    accounts.forEach(a => {
+      if (String(a.id) !== String(id)) {
+        select.innerHTML += `<option value="${a.id}">${a.icon || ''} ${a.name}</option>`;
+        count++;
+      }
+    });
+    if (count === 0) return toast('請至少保留一個帳戶', true);
+    document.getElementById('cc-del-id').value = id;
+    document.getElementById('cc-del-name').textContent = name;
+    document.getElementById('cc-del-overlay').classList.add('open');
+  }
+  async function confirmCCDelete() {
+    const id = document.getElementById('cc-del-id').value;
+    const replaceId = document.getElementById('cc-del-replace').value;
+    if (!replaceId) return toast('請選擇接手帳戶', true);
+    const res = await fetch(`/api/accounts/${id}?replace_with=${replaceId}`, { method: 'DELETE' });
+    if (res.ok) { document.getElementById('cc-del-overlay').classList.remove('open'); toast('已刪除'); _reloadTabs('settings', 'home'); setTimeout(() => location.reload(), 800); }
+    else { const d = await res.json().catch(() => ({})); toast(d.error || '刪除失敗', true); }
+  }
 </script>
 
 <!-- Credit Card Add/Edit Modal -->
@@ -1445,6 +1501,20 @@
     <div class="modal-actions">
       <button class="btn-ghost" onclick="closeCCModal()">取消</button>
       <button class="btn" id="cc-modal-save-btn" style="flex:1" onclick="saveCCModal()">新增</button>
+    </div>
+  </div>
+</div>
+
+<!-- Credit Card Delete Modal -->
+<div class="overlay" id="cc-del-overlay">
+  <div class="modal">
+    <h3>刪除信用卡：<span id="cc-del-name" style="color:var(--danger)"></span></h3>
+    <p style="font-size:0.9rem; color:var(--muted); margin-bottom:16px;">請選擇接手帳戶（此卡的消費紀錄將轉移過去）：</p>
+    <input type="hidden" id="cc-del-id" />
+    <div class="field"><select id="cc-del-replace"></select></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="document.getElementById('cc-del-overlay').classList.remove('open')">取消</button>
+      <button class="btn" style="flex:1; background:var(--danger); color:#fff;" onclick="confirmCCDelete()">刪除</button>
     </div>
   </div>
 </div>

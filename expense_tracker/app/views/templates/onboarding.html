@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 
 <head>
@@ -7,7 +7,11 @@
   <title>歡迎使用 · 帳本</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/globals.css') }}">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icon-192.png') }}">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="帳本">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0f0f11">
   <style>
     body {
@@ -86,7 +90,7 @@
 
     .btn-accent {
       background: var(--accent);
-      color: #111;
+      color: #fff;
       width: 100%;
     }
 
@@ -150,6 +154,50 @@
       display: none;
     }
 
+    .mode-btn {
+      flex: 1;
+      padding: 0.5rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .mode-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(200, 240, 74, .08);
+    }
+
+    .dual-zone {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .dual-zone .file-label {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .dual-zone-tag {
+      flex-shrink: 0;
+      width: 3.4em;
+      text-align: center;
+      font-size: 0.78rem;
+      padding: 0.3rem 0;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .dual-zone-tag.records {
+      color: var(--accent);
+      border-color: rgba(200, 240, 74, .4);
+    }
+
     .toast {
       position: fixed;
       bottom: 1.5rem;
@@ -184,7 +232,7 @@
       width: 14px;
       height: 14px;
       border: 2px solid rgba(0, 0, 0, 0.2);
-      border-top-color: #111;
+      border-top-color: #fff;
       border-radius: 50%;
       animation: spin .6s linear infinite;
     }
@@ -344,6 +392,17 @@
         <p>從其他記帳 App 的 CSV / TXT 匯入帳戶與類別設定，或從本應用程式備份 ZIP 完整還原。</p>
         <button class="btn btn-outline" onclick="goStep('step-import')">選擇檔案並匯入</button>
       </div>
+
+      <div class="ob-card">
+        <h3>⚷ 使用救援碼</h3>
+        <p>如果您先前在「設定」頁看過救援碼，輸入它即可認回原本的帳本。</p>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+          <input type="text" id="rescue-code-input" placeholder="例如 A2B4-C6D8" autocomplete="off"
+            style="flex:1;min-width:140px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.6rem .8rem;font-family:'DM Mono',monospace;font-size:.9rem;">
+          <button class="btn btn-outline" style="width:auto;" id="btn-rescue-restore"
+            onclick="obRestoreByCode()">認回</button>
+        </div>
+      </div>
     </div>
 
     <!-- ── Step 2: Import wizard ──────────────────────────────────────────── -->
@@ -355,15 +414,39 @@
 
       <!-- File picker -->
       <div class="ob-card">
-        <p style="margin-bottom:0.75rem;">支援 CSV / TXT（其他記帳 App 匯出）或 ZIP（本應用程式備份）。</p>
-        <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;">
-          <label class="file-label">
-            <span id="ob-chosen-name">點選選擇 CSV / TXT / ZIP</span>
-            <input type="file" id="ob-import-file" accept=".csv,.txt,.zip" onchange="obFileChosen(this)">
-          </label>
-          <button id="btn-ob-analyze" onclick="obAnalyze()" disabled
-            style="padding:0.6rem 1rem;border:none;border-radius:8px;background:var(--accent);color:#111;font-size:0.88rem;font-weight:500;cursor:pointer;opacity:0.4;white-space:nowrap;">分析檔案</button>
+        <p style="margin-bottom:0.75rem;">支援 CSV / TXT（其他記帳 App 匯出）或 ZIP（本應用程式備份）。
+          若您的 App 將收支與轉帳分開匯出成兩個檔案，請選擇「收支＋轉帳分開」。</p>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.85rem;">
+          <button type="button" id="ob-mode-single" class="mode-btn active" onclick="obSetMode('single')">單一檔案</button>
+          <button type="button" id="ob-mode-dual" class="mode-btn" onclick="obSetMode('dual')">收支＋轉帳分開</button>
         </div>
+
+        <div id="ob-zone-single" style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;">
+          <label class="file-label" style="flex:1;min-width:0;">
+            <span id="ob-chosen-name">點選選擇 CSV / TXT / ZIP</span>
+            <input type="file" id="ob-import-file" accept=".csv,.txt,.zip" onchange="obFileChosen()">
+          </label>
+        </div>
+
+        <div id="ob-zone-dual" style="display:none;flex-direction:column;gap:0.6rem;">
+          <div class="dual-zone">
+            <span class="dual-zone-tag records">收支</span>
+            <label class="file-label">
+              <span id="ob-chosen-name-records">點選選擇收支 CSV / TXT</span>
+              <input type="file" id="ob-import-file-records" accept=".csv,.txt" onchange="obFileChosen()">
+            </label>
+          </div>
+          <div class="dual-zone">
+            <span class="dual-zone-tag">轉帳</span>
+            <label class="file-label">
+              <span id="ob-chosen-name-transfers">點選選擇轉帳 CSV / TXT</span>
+              <input type="file" id="ob-import-file-transfers" accept=".csv,.txt" onchange="obFileChosen()">
+            </label>
+          </div>
+        </div>
+
+        <button id="btn-ob-analyze" onclick="obAnalyze()" disabled
+          style="margin-top:0.85rem;padding:0.6rem 1rem;border:none;border-radius:8px;background:var(--accent);color:#fff;font-size:0.88rem;font-weight:500;cursor:pointer;opacity:0.4;white-space:nowrap;">分析檔案</button>
       </div>
 
       <!-- Backup restore panel -->
@@ -372,7 +455,7 @@
         <p>還原將覆蓋現有全部資料。</p>
         <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
           <button id="btn-ob-restore" onclick="obDoRestore()"
-            style="padding:0.6rem 1.1rem;border:none;border-radius:8px;background:var(--accent);color:#111;font-size:0.88rem;font-weight:500;cursor:pointer;">還原備份</button>
+            style="padding:0.6rem 1.1rem;border:none;border-radius:8px;background:var(--accent);color:#fff;font-size:0.88rem;font-weight:500;cursor:pointer;">還原備份</button>
           <button onclick="obImportReset()"
             style="padding:0.6rem 1.1rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-size:0.88rem;cursor:pointer;">取消</button>
         </div>
@@ -380,13 +463,28 @@
 
       <!-- Column mapping panel -->
       <div id="ob-mapping-panel" style="display:none;" class="ob-card">
-        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.75rem;">
-          <p style="font-size:0.85rem;margin:0;">將您 CSV 的欄位對應到本應用程式的欄位：</p>
+        <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+          <p id="ob-mapping-title" style="font-size:0.85rem;margin:0;">檔案原始資料（隨機 5 筆）：</p>
           <span id="ob-ai-badge"
             style="display:none;background:rgba(200,240,74,.15);color:var(--accent);border:1px solid rgba(200,240,74,.3);border-radius:4px;padding:2px 8px;font-size:0.72rem;font-weight:600;white-space:nowrap;">✦
             AI 建議</span>
         </div>
-        <div style="overflow-x:auto;">
+        <div
+          style="overflow-x:auto;max-height:200px;overflow-y:auto;margin:0.75rem 0;border:1px solid var(--border);border-radius:6px;">
+          <table id="ob-preview-tbl" style="border-collapse:collapse;font-size:0.78rem;min-width:100%;"></table>
+        </div>
+
+        <div id="ob-map-auto-sum"
+          style="display:none;align-items:flex-start;justify-content:space-between;gap:0.6rem;margin-bottom:0.75rem;padding:0.5rem 0.65rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;">
+          <p id="ob-map-auto-txt"
+            style="font-size:0.78rem;color:var(--muted);margin:0;line-height:1.7;white-space:pre-line;"></p>
+          <button id="ob-map-toggle" onclick="obToggleMapRows()"
+            style="flex-shrink:0;padding:0.25rem 0.65rem;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--text);font-size:0.75rem;cursor:pointer;">調整</button>
+        </div>
+        <p id="ob-map-ask-hint" style="display:none;font-size:0.85rem;margin:0 0 0.5rem;color:var(--danger);">
+          以下欄位無法自動判斷，請選擇對應的 CSV 欄：</p>
+
+        <div id="ob-map-tblwrap" style="overflow-x:auto;">
           <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
             <thead>
               <tr>
@@ -395,24 +493,19 @@
                   欄位</th>
                 <th
                   style="text-align:left;padding:0.4rem 0.5rem;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500;">
-                  CSV 欄位</th>
+                  CSV 欄</th>
               </tr>
             </thead>
             <tbody id="ob-map-rows"></tbody>
           </table>
         </div>
-        <div id="ob-type-section" style="display:none;margin-top:1rem;">
-          <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.5rem;">「收支類型」的正確選項為使下方左側出現「支」和「收」字眼（「收支」不算）的選項。
-          </p>
-          <div id="ob-type-rows"></div>
-        </div>
-        <div
-          style="overflow-x:auto;max-height:160px;overflow-y:auto;margin:1rem 0;border:1px solid var(--border);border-radius:6px;">
-          <table id="ob-preview-tbl" style="border-collapse:collapse;font-size:0.78rem;min-width:100%;"></table>
-        </div>
-        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+        <div id="ob-type-rows"></div>
+
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:1rem;">
           <button id="btn-ob-next-review" onclick="obGoReview()"
-            style="padding:0.6rem 1.1rem;border:none;border-radius:8px;background:var(--accent);color:#111;font-size:0.88rem;font-weight:500;cursor:pointer;">下一步：確認設定</button>
+            style="padding:0.6rem 1.1rem;border:none;border-radius:8px;background:var(--accent);color:#fff;font-size:0.88rem;font-weight:500;cursor:pointer;">下一步：確認設定</button>
+          <button id="btn-ob-map-back" onclick="obShowMappingFor(_obFileIdx - 1)"
+            style="display:none;padding:0.6rem 1.1rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-size:0.88rem;cursor:pointer;">上一步</button>
           <button onclick="obImportReset()"
             style="padding:0.6rem 1.1rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-size:0.88rem;cursor:pointer;">取消</button>
         </div>
@@ -424,7 +517,7 @@
         <div id="ob-review-accs-wrap" style="display:none;margin-bottom:1.25rem;">
           <p style="font-size:0.85rem;font-weight:600;margin-bottom:0.25rem;">帳戶設定</p>
           <p style="font-size:0.78rem;color:var(--muted);margin-bottom:0.75rem;">
-            確認每個帳戶的類型與期初餘額（所有欄位必填；信用卡請輸入目前欠款金額）。設定完成後可至設定頁調整。</p>
+            確認每個帳戶的類型與期初餘額（所有欄位必填；信用卡請輸入目前欠款金額）。選「借入／借出」會自動建立借貸項目，方便後續在負債頁管理。設定完成後可至設定頁調整。</p>
           <div id="ob-accs-cards"></div>
         </div>
 
@@ -468,7 +561,7 @@
 
         <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
           <button id="btn-ob-do-import" onclick="obDoImport()"
-            style="padding:0.6rem 1.1rem;border:none;border-radius:8px;background:var(--accent);color:#111;font-size:0.88rem;font-weight:500;cursor:pointer;">確認匯入</button>
+            style="padding:0.6rem 1.1rem;border:none;border-radius:8px;background:var(--accent);color:#fff;font-size:0.88rem;font-weight:500;cursor:pointer;">確認匯入</button>
           <button onclick="obGoMapping()"
             style="padding:0.6rem 1.1rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-size:0.88rem;cursor:pointer;">上一步</button>
           <button onclick="obImportReset()"
@@ -481,6 +574,50 @@
   <div class="toast" id="toast"></div>
 
   <script>
+    // Auto-recover: this screen means no valid device cookie. Before making the user
+    // start over, check whether we mirrored a rescue code into localStorage on a
+    // previous visit (iOS home-screen PWAs routinely drop the cookie between launches)
+    // and silently re-attach to the original ledger.
+    (function autoRecover() {
+      var saved;
+      try { saved = localStorage.getItem('rescue_code'); } catch (e) { return; }
+      if (!saved) return;
+      // Attempt at most once per app session. If the saved code is stale or points at
+      // an emptied device, restore would bounce us straight back to onboarding — this
+      // guard stops that from looping the hidden page into a permanent blank screen.
+      try {
+        if (sessionStorage.getItem('autorecover_tried')) return;
+        sessionStorage.setItem('autorecover_tried', '1');
+      } catch (e) { }
+      var root = document.documentElement;
+      var reveal = function () { root.style.visibility = ''; };
+      root.style.visibility = 'hidden';           // avoid a flash of the chooser
+      var failsafe = setTimeout(reveal, 4000);    // never stay hidden, whatever happens
+      fetch('/api/onboarding/restore-device', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: saved })
+      }).then(function (res) {
+        if (res.ok) { window.location.replace('/'); return; }
+        try { localStorage.removeItem('rescue_code'); } catch (e) { }
+        clearTimeout(failsafe); reveal();
+      }).catch(function () { clearTimeout(failsafe); reveal(); });
+    })();
+
+    // Register the PWA service worker so the app is installable from this first screen.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function () { });
+      });
+      // Any code change gives sw.js new bytes, so the browser installs a new worker.
+      // This fires once when it takes over — reload so the page isn't left stale.
+      var _swReloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (_swReloaded) return;
+        _swReloaded = true;
+        window.location.reload();
+      });
+    }
+
     // ── Navigation ─────────────────────────────────────────────────────────────
     function goStep(id) {
       document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
@@ -505,28 +642,116 @@
       else { toast('建立失敗，請重試', 'error'); btn.textContent = '開始使用'; btn.disabled = false; }
     });
 
+    // ── Rescue code ────────────────────────────────────────────────────────────
+    async function obRestoreByCode() {
+      const input = document.getElementById('rescue-code-input');
+      const code = input.value.trim();
+      if (!code) { toast('請輸入救援碼', 'error'); return; }
+      const btn = document.getElementById('btn-rescue-restore');
+      btn.innerHTML = '<span class="spinner"></span> 認回中...'; btn.disabled = true;
+      try {
+        const res = await fetch('/api/onboarding/restore-device', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (res.ok) { toast('認回成功', 'success'); setTimeout(() => window.location.replace('/'), 600); }
+        else { toast(data.error || '救援碼無效', 'error'); btn.textContent = '認回'; btn.disabled = false; }
+      } catch (e) {
+        toast('認回失敗：' + e.message, 'error'); btn.textContent = '認回'; btn.disabled = false;
+      }
+    }
+
     // ── Import wizard ──────────────────────────────────────────────────────────
-    const IMPORT_FIELDS = [
-      { k: 'date', label: '日期', req: true },
-      { k: 'amount', label: '金額', req: true },
-      { k: 'category', label: '類別', req: false },
-      { k: 'account', label: '帳戶', req: false },
-      { k: 'type', label: '收支類型', req: false },
+    // Field sets per file role. Single-file mode may carry transfers in the same
+    // file (轉入帳戶 column, optional); dual mode splits 收支 and 轉帳 into two
+    // files, where the transfer file needs no category/type — every row is a transfer.
+    const FIELDS_RECORDS = [
+      { k: 'date', label: '日期' },
+      { k: 'amount', label: '金額' },
+      { k: 'category', label: '類別' },
+      { k: 'account', label: '帳戶' },
+      { k: 'type', label: '收支類型' },
     ];
-    const ACC_SUBTYPES = ['現金', '銀行', '預付儲值', '投資', '保單', '其他', '信用卡', '借貸', '負債其他'];
+    const FIELDS_SINGLE = [...FIELDS_RECORDS, { k: 'to_account', label: '轉入帳戶', optional: true }];
+    const FIELDS_TRANSFERS = [
+      { k: 'date', label: '日期' },
+      { k: 'amount', label: '金額' },
+      { k: 'account', label: '轉出帳戶' },
+      { k: 'to_account', label: '轉入帳戶' },
+    ];
+    let _obFields = FIELDS_SINGLE;   // field set of the file currently being mapped
+
+    // Mirrors app/models/importer.py's _TYPE_VALUE_HINTS / income-related hints —
+    // used client-side to detect whether a column's values can be unambiguously
+    // classified as expense/income/transfer without falling back to a guess.
+    const _TYPE_VALUE_HINTS = new Set([
+      '支出', '收入', '轉帳', '轉入', '轉出', '收', '支',
+      'expense', 'income', 'transfer', 'debit', 'credit', 'in', 'out',
+    ]);
+    function _classifyTypeValue(v) {
+      const t = (v || '').trim().toLowerCase();
+      if (!t) return null;
+      if (_TYPE_VALUE_HINTS.has(t)) {
+        if (t === '收入' || t === '收' || t === 'income' || t === 'credit' || t === 'in') return 'income';
+        if (t === '轉帳' || t === '轉入' || t === '轉出' || t === 'transfer') return 'transfer';
+        return 'expense';
+      }
+      if (t.includes('收入') || t === 'in') return 'income';
+      if (t.includes('轉')) return 'transfer';
+      if (t.includes('支出') || t.includes('費用') || t === 'out') return 'expense';
+      return null;
+    }
+    const ACC_SUBTYPE_GROUPS = [
+      { label: '資產', types: ['現金', '銀行', '預付儲值', '投資', '保單', '其他'] },
+      { label: '負債', types: ['信用卡', '借入', '借出', '負債其他'] },
+    ];
     const CURRENCIES = ['TWD', 'USD', 'JPY', 'KRW', 'CNY', 'EUR', 'GBP', 'HKD', 'AUD'];
 
-    let _obCols = [], _obPreview = [], _obTmp = '', _obRestoreFile = null;
+    let _obCols = [], _obMappableCols = [], _obPreview = [], _obTmp = '', _obRestoreFile = null;
     let _obMapping = {}, _obTypeMapping = {}, _obColValues = {};
     let _obAiEnhanced = false, _obAiTypeValues = {};
     let _obRestoreConfirming = false;
+    let _obTypeSourceCol = null, _obTypeOverrideCol = null;
     let _obAllCats = [], _obMergeRules = [];
+    let _obMode = 'single';          // 'single' | 'dual'（收支＋轉帳兩檔）
+    let _obFiles = [], _obFileIdx = 0; // per-file wizard state: {role, tmp, cols, ...}
+    let _obMapExpanded = false;      // 「調整」toggle: show auto-mapped field rows
 
-    function obFileChosen(input) {
-      const file = input.files[0];
-      document.getElementById('ob-chosen-name').textContent = file ? file.name : '點選選擇 CSV / TXT / ZIP';
+    function obSetMode(mode) {
+      if (mode === _obMode) return;
+      _obMode = mode;
+      document.getElementById('ob-mode-single').classList.toggle('active', mode === 'single');
+      document.getElementById('ob-mode-dual').classList.toggle('active', mode === 'dual');
+      document.getElementById('ob-zone-single').style.display = mode === 'single' ? 'flex' : 'none';
+      document.getElementById('ob-zone-dual').style.display = mode === 'dual' ? 'flex' : 'none';
+      obImportReset();
+    }
+
+    // Files required by the current mode, or null if the set is incomplete.
+    function _obSelectedFiles() {
+      if (_obMode === 'single') {
+        const f = document.getElementById('ob-import-file').files[0];
+        return f ? [{ file: f, role: 'single' }] : null;
+      }
+      const fr = document.getElementById('ob-import-file-records').files[0];
+      const ft = document.getElementById('ob-import-file-transfers').files[0];
+      return (fr && ft) ? [{ file: fr, role: 'records' }, { file: ft, role: 'transfers' }] : null;
+    }
+
+    function obFileChosen() {
+      const names = {
+        'ob-import-file': ['ob-chosen-name', '點選選擇 CSV / TXT / ZIP'],
+        'ob-import-file-records': ['ob-chosen-name-records', '點選選擇收支 CSV / TXT'],
+        'ob-import-file-transfers': ['ob-chosen-name-transfers', '點選選擇轉帳 CSV / TXT'],
+      };
+      for (const [inputId, [spanId, placeholder]] of Object.entries(names)) {
+        const f = document.getElementById(inputId).files[0];
+        document.getElementById(spanId).textContent = f ? f.name : placeholder;
+      }
+      const ready = !!_obSelectedFiles();
       const btn = document.getElementById('btn-ob-analyze');
-      btn.disabled = !file; btn.style.opacity = file ? '1' : '0.4';
+      btn.disabled = !ready; btn.style.opacity = ready ? '1' : '0.4';
       obImportReset(true);
     }
 
@@ -534,41 +759,82 @@
       ['ob-backup-panel', 'ob-mapping-panel', 'ob-review-panel'].forEach(id => {
         document.getElementById(id).style.display = 'none';
       });
-      _obCols = []; _obPreview = []; _obTmp = ''; _obRestoreFile = null;
+      _obCols = []; _obMappableCols = []; _obPreview = []; _obTmp = ''; _obRestoreFile = null;
       _obMapping = {}; _obTypeMapping = {}; _obColValues = {};
       _obAiEnhanced = false; _obAiTypeValues = {};
       _obRestoreConfirming = false;
+      _obTypeSourceCol = null; _obTypeOverrideCol = null;
+      _obFiles = []; _obFileIdx = 0;
       if (!keepFile) {
         document.getElementById('ob-import-file').value = '';
+        document.getElementById('ob-import-file-records').value = '';
+        document.getElementById('ob-import-file-transfers').value = '';
         document.getElementById('ob-chosen-name').textContent = '點選選擇 CSV / TXT / ZIP';
+        document.getElementById('ob-chosen-name-records').textContent = '點選選擇收支 CSV / TXT';
+        document.getElementById('ob-chosen-name-transfers').textContent = '點選選擇轉帳 CSV / TXT';
         const btn = document.getElementById('btn-ob-analyze');
         btn.disabled = true; btn.style.opacity = '0.4';
       }
     }
 
     async function obAnalyze() {
-      const file = document.getElementById('ob-import-file').files[0];
-      if (!file) return;
+      const selected = _obSelectedFiles();
+      if (!selected) return;
       const btn = document.getElementById('btn-ob-analyze');
       btn.textContent = '分析中...'; btn.disabled = true; btn.style.opacity = '0.6';
-      const fd = new FormData(); fd.append('file', file);
       try {
-        const res = await fetch('/api/import/preview', { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!res.ok) { toast(data.error || data.description || '分析失敗', 'error'); return; }
-        if (data.type === 'backup') {
-          _obRestoreFile = file;
-          document.getElementById('ob-backup-panel').style.display = 'block';
-        } else {
-          _obCols = data.columns; _obPreview = data.preview; _obTmp = data.tmp_filename;
-          _obColValues = data.column_values || {};
-          _obAiEnhanced = data.ai_enhanced || false;
-          _obAiTypeValues = data.ai_type_values || {};
-          obRenderMapping(data.suggested_mapping);
-          document.getElementById('ob-mapping-panel').style.display = 'block';
+        const parsed = [];
+        for (const { file, role } of selected) {
+          const fd = new FormData(); fd.append('file', file);
+          const res = await fetch('/api/import/preview', { method: 'POST', body: fd });
+          const data = await res.json();
+          if (!res.ok) { toast(data.error || data.description || '分析失敗', 'error'); return; }
+          if (data.type === 'backup') {
+            if (_obMode !== 'single') { toast('備份 ZIP 請使用「單一檔案」模式還原', 'error'); return; }
+            _obRestoreFile = file;
+            document.getElementById('ob-backup-panel').style.display = 'block';
+            return;
+          }
+          parsed.push({
+            role, tmp: data.tmp_filename, cols: data.columns, preview: data.preview,
+            colValues: data.column_values || {},
+            aiEnhanced: data.ai_enhanced || false,
+            aiTypeValues: data.ai_type_values || {},
+            suggested: data.suggested_mapping || {},
+            mapping: null, typeMapping: null,
+          });
         }
+        _obFiles = parsed;
+        obShowMappingFor(0);
       } catch (e) { toast('分析失敗：' + e.message, 'error'); }
       finally { btn.textContent = '分析檔案'; btn.disabled = false; btn.style.opacity = '1'; }
+    }
+
+    // Loads file #idx's preview + field set into the (single) mapping panel.
+    function obShowMappingFor(idx) {
+      _obFileIdx = idx;
+      const fd = _obFiles[idx];
+      _obCols = fd.cols; _obPreview = fd.preview; _obTmp = fd.tmp;
+      _obColValues = fd.colValues; _obAiEnhanced = fd.aiEnhanced; _obAiTypeValues = fd.aiTypeValues;
+      // A column with zero non-empty values anywhere in the file (e.g. an
+      // unused 標籤 tag column) can never be a useful mapping target for any
+      // field, so it's excluded from every mapping <select> below (it still
+      // shows up in the raw preview table — only mapping is restricted).
+      _obMappableCols = _obCols.filter(c => _obColValues[c] && _obColValues[c].length);
+      _obTypeSourceCol = null; _obTypeOverrideCol = null;
+      _obFields = fd.role === 'transfers' ? FIELDS_TRANSFERS
+        : fd.role === 'records' ? FIELDS_RECORDS : FIELDS_SINGLE;
+      document.getElementById('ob-mapping-title').textContent =
+        fd.role === 'transfers' ? '轉帳檔案原始資料（隨機 5 筆）：'
+          : fd.role === 'records' ? '收支檔案原始資料（隨機 5 筆）：'
+            : '檔案原始資料（隨機 5 筆）：';
+      const isLast = idx === _obFiles.length - 1;
+      document.getElementById('btn-ob-next-review').textContent = isLast ? '下一步：確認設定' : '下一步：轉帳檔案';
+      document.getElementById('btn-ob-map-back').style.display = idx > 0 ? '' : 'none';
+      obRenderRawPreview();
+      obRenderMapping(fd.mapping || fd.suggested);
+      document.getElementById('ob-review-panel').style.display = 'none';
+      document.getElementById('ob-mapping-panel').style.display = 'block';
     }
 
     function _selStyle() {
@@ -578,82 +844,184 @@
       return `padding:0.4rem 0.5rem;border-bottom:${last ? 'none' : '1px solid var(--border)'};`;
     }
 
+    // Optional fields (e.g. 單檔模式的轉入帳戶) get a selectable「不使用」blank
+    // option instead of the disabled placeholder, so they can stay unmapped.
+    function _optHeader(optional) {
+      return optional ? '<option value="">（不使用）</option>'
+        : '<option value="" disabled>請選擇欄位</option>';
+    }
+
+    // Only fields the auto-guess could NOT resolve are shown as selects; every
+    // confidently mapped field is summarized in a collapsed「已自動對應」box that
+    // the user can expand with 調整 if the normalized preview looks wrong.
     function obRenderMapping(suggested) {
       document.getElementById('ob-ai-badge').style.display = _obAiEnhanced ? 'inline-flex' : 'none';
       const tbody = document.getElementById('ob-map-rows');
       tbody.innerHTML = '';
-      const opts = '<option value="">（略過）</option>' + _obCols.map(c => `<option value="${c}">${c}</option>`).join('');
-      IMPORT_FIELDS.forEach(({ k, label, req }, idx) => {
+      const colOpts = _obMappableCols.map(c => `<option value="${c}">${c}</option>`).join('');
+      const autoPairs = []; let askedCount = 0;
+      _obFields.forEach(({ k, label, optional }, idx) => {
         const sel = document.createElement('select');
-        sel.id = 'obimap-' + k; sel.innerHTML = opts; sel.style.cssText = _selStyle();
-        if (suggested[k]) sel.value = suggested[k];
-        if (k === 'type') sel.addEventListener('change', obRenderTypeMapping);
-        const last = idx === IMPORT_FIELDS.length - 1;
+        sel.id = 'obimap-' + k; sel.style.cssText = _selStyle();
+        sel.innerHTML = _optHeader(optional) + colOpts;
+        sel.addEventListener('change', () => {
+          _obRefreshMappingOptions();
+          if (k === 'type') obRenderTypeMapping();
+        });
+        const last = idx === _obFields.length - 1;
+        const star = optional ? '<span style="color:var(--muted);font-size:0.75rem;">（選填）</span>'
+          : '<span style="color:var(--danger)">*</span>';
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td style="${_cellStyle(last)}white-space:nowrap;">${label}${req ? ' <span style="color:var(--danger)">*</span>' : ''}</td><td style="${_cellStyle(last)}"></td>`;
+        tr.innerHTML = `<td style="${_cellStyle(last)}white-space:nowrap;">${label} ${star}</td>`
+          + `<td style="${_cellStyle(last)}"></td>`;
         tr.cells[1].appendChild(sel);
+        const isAuto = !!suggested[k] && _obCols.includes(suggested[k]);
+        // Auto-mapped + unmapped optional fields stay collapsed; only required
+        // fields with no confident guess are surfaced as questions.
+        tr.dataset.autoRow = (isAuto || optional) ? '1' : '0';
         tbody.appendChild(tr);
+        if (suggested[k]) sel.value = suggested[k];
+        if (isAuto) autoPairs.push(`${label} ←「${suggested[k]}」`);
+        else if (!optional) askedCount++;
       });
+      const sum = document.getElementById('ob-map-auto-sum');
+      if (autoPairs.length) {
+        document.getElementById('ob-map-auto-txt').textContent = '已自動對應：\n' + autoPairs.join('\n');
+        sum.style.display = 'flex';
+      } else {
+        sum.style.display = 'none';
+      }
+      document.getElementById('ob-map-ask-hint').style.display = askedCount ? 'block' : 'none';
+      _obMapExpanded = false;
+      _obApplyMapVisibility(askedCount);
+      _obRefreshMappingOptions();
       obRenderTypeMapping();
-      obRenderPreview();
+    }
+
+    function _obApplyMapVisibility(askedCount) {
+      document.querySelectorAll('#ob-map-rows tr').forEach(tr => {
+        tr.style.display = (tr.dataset.autoRow === '1' && !_obMapExpanded) ? 'none' : '';
+      });
+      const anyVisible = _obMapExpanded || askedCount > 0;
+      document.getElementById('ob-map-tblwrap').style.display = anyVisible ? '' : 'none';
+      document.getElementById('ob-map-toggle').textContent = _obMapExpanded ? '收合' : '調整';
+    }
+
+    function obToggleMapRows() {
+      _obMapExpanded = !_obMapExpanded;
+      const askedCount = [...document.querySelectorAll('#ob-map-rows tr')]
+        .filter(tr => tr.dataset.autoRow === '0').length;
+      _obApplyMapVisibility(askedCount);
+    }
+
+    // Rebuilds every mapping <select>'s option list so a CSV column already chosen
+    // by another field can't be picked again — each column may only map once.
+    function _obRefreshMappingOptions() {
+      const selected = {};
+      for (const { k } of _obFields) {
+        const sel = document.getElementById('obimap-' + k);
+        if (sel && sel.value) selected[k] = sel.value;
+      }
+      for (const { k, optional } of _obFields) {
+        const sel = document.getElementById('obimap-' + k);
+        if (!sel) continue;
+        const takenByOthers = new Set(Object.entries(selected).filter(([fk]) => fk !== k).map(([, v]) => v));
+        const available = _obMappableCols.filter(c => !takenByOthers.has(c));
+        const current = sel.value;
+        sel.innerHTML = _optHeader(optional)
+          + available.map(c => `<option value="${c}">${c}</option>`).join('');
+        if (current && available.includes(current)) sel.value = current;
+      }
+    }
+
+    // _obTypeSourceCol: which CSV column currently supplies expense/income/transfer
+    // classification — normally the user's "收支類型" mapping, but can be overridden
+    // to a different column when that one turns out to be ambiguous.
+    function _valuesOf(col) {
+      return (_obColValues[col] && _obColValues[col].length)
+        ? _obColValues[col]
+        : [...new Set(_obPreview.map(r => r[col]).filter(Boolean))];
+    }
+
+    // Returns the subset of `vals` that _classifyTypeValue (or the AI hint) cannot
+    // resolve to expense/income/transfer — i.e. values with no unambiguous meaning.
+    function _unresolvedTypeValues(vals) {
+      return vals.filter(v => !_classifyTypeValue(v) && !_obAiTypeValues[v]);
     }
 
     function obRenderTypeMapping() {
       const typeCol = document.getElementById('obimap-type')?.value;
-      const sec = document.getElementById('ob-type-section');
-      if (!typeCol) { sec.style.display = 'none'; return; }
-      const vals = (_obColValues[typeCol] && _obColValues[typeCol].length)
-        ? _obColValues[typeCol]
-        : [...new Set(_obPreview.map(r => r[typeCol]).filter(Boolean))];
-      if (!vals.length) { sec.style.display = 'none'; return; }
-      sec.style.display = 'block';
-      const container = document.getElementById('ob-type-rows');
-      container.innerHTML = '';
-      for (const v of vals) {
-        const row = document.createElement('div');
-        row.style.cssText = 'display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;font-size:0.85rem;';
-        row.innerHTML = `<span style="flex:1;color:var(--muted);">${v}</span><span>→</span>
-          <select id="obtypemap-${encodeURIComponent(v)}" style="flex:1;${_selStyle()}">
-            <option value="expense">支出</option>
-            <option value="income">收入</option>
-            <option value="transfer">轉帳</option>
-          </select>`;
-        container.appendChild(row);
-        const lower = v.toLowerCase();
-        const sel = row.querySelector('select');
-        if (lower.includes('收入') || lower === 'income' || lower === 'in') sel.value = 'income';
-        else if (lower.includes('轉') || lower === 'transfer') sel.value = 'transfer';
-        if (_obAiTypeValues[v]) sel.value = _obAiTypeValues[v];
-      }
+      _obTypeSourceCol = typeCol || null;
+      _renderTypeWarning();
     }
 
-    function obRenderPreview() {
-      if (!_obPreview.length) return;
+    function _renderTypeWarning() {
+      const container = document.getElementById('ob-type-rows');
+      if (!_obTypeSourceCol) { container.innerHTML = ''; return; }
+
+      const vals = _valuesOf(_obTypeSourceCol);
+      const unresolved = _unresolvedTypeValues(vals);
+      if (!unresolved.length) { container.innerHTML = ''; return; }
+
+      // Exclude columns already claimed by other fields — a column may only map once.
+      const takenByOtherFields = new Set(
+        _obFields.filter(({ k }) => k !== 'type')
+          .map(({ k }) => document.getElementById('obimap-' + k)?.value)
+          .filter(Boolean)
+      );
+      const otherCols = _obMappableCols.filter(c => c !== _obTypeSourceCol && !takenByOtherFields.has(c));
+      const colOpts = '<option value="" disabled selected>選擇欄位</option>'
+        + otherCols.map(c => `<option value="${c}">${c}</option>`).join('');
+      container.innerHTML = `
+        <div style="padding:0.5rem 0.65rem;background:rgba(255,95,95,0.07);border:1px solid rgba(255,95,95,0.25);border-radius:6px;font-size:0.8rem;color:var(--danger);line-height:1.6;">
+          「${_obTypeSourceCol}」欄位中的值無法明確判斷為收入或支出，
+          請改選一個能明確區分收入/支出的 CSV 欄位作為收支類型依據
+        </div>`;
+    }
+
+    // Raw preview of the current file's own rows, unmapped — a random sample
+    // (server picks 5 via reservoir sampling in preview_file()) shown in
+    // original row order, so the user can confirm the file looks as expected
+    // before choosing column mappings.
+    function obRenderRawPreview() {
       const tbl = document.getElementById('ob-preview-tbl');
-      const cols = _obCols.slice(0, 8);
+      if (!_obPreview.length) {
+        tbl.innerHTML = '<tbody><tr><td style="padding:0.6rem 0.8rem;color:var(--muted);font-size:0.8rem;">此檔案沒有資料列。</td></tr></tbody>';
+        return;
+      }
+      const cols = _obCols;
       const th = s => `<th style="background:var(--surface);color:var(--muted);padding:0.3rem 0.5rem;border:1px solid var(--border);white-space:nowrap;">${s}</th>`;
       const td = s => `<td style="padding:0.3rem 0.5rem;border:1px solid var(--border);white-space:nowrap;">${s}</td>`;
       tbl.innerHTML = '<thead><tr>' + cols.map(th).join('') + '</tr></thead>'
-        + '<tbody>' + _obPreview.map(r => '<tr>' + cols.map(c => td(r[c] || '')).join('') + '</tr>').join('') + '</tbody>';
+        + '<tbody>' + _obPreview.map(r => '<tr>' + cols.map(c => td(r[c] ?? '')).join('') + '</tr>').join('') + '</tbody>';
     }
 
+    // `unresolved` is empty if every type value maps cleanly (using the override
+    // column if one was picked); otherwise it lists the values still ambiguous.
     function _obCollectMapping() {
       const mapping = {}, typeMapping = {};
-      for (const { k } of IMPORT_FIELDS) {
+      for (const { k } of _obFields) {
         const sel = document.getElementById('obimap-' + k);
         if (sel && sel.value) mapping[k] = sel.value;
       }
+      let unresolved = [];
       const typeCol = mapping.type;
       if (typeCol) {
-        const vals = (_obColValues[typeCol] && _obColValues[typeCol].length)
-          ? _obColValues[typeCol]
-          : [...new Set(_obPreview.map(r => r[typeCol]).filter(Boolean))];
+        let sourceCol = typeCol;
+        let vals = _valuesOf(sourceCol);
+        let stillUnresolved = _unresolvedTypeValues(vals);
+        if (stillUnresolved.length && _obTypeOverrideCol) {
+          sourceCol = _obTypeOverrideCol;
+          mapping.type = sourceCol;
+          vals = _valuesOf(sourceCol);
+          stillUnresolved = _unresolvedTypeValues(vals);
+        }
+        unresolved = stillUnresolved;
         for (const v of vals) {
-          const sel = document.getElementById(`obtypemap-${encodeURIComponent(v)}`);
-          if (sel) typeMapping[v] = sel.value;
+          typeMapping[v] = _obAiTypeValues[v] || _classifyTypeValue(v) || 'expense';
         }
       }
-      return { mapping, typeMapping };
+      return { mapping, typeMapping, unresolved };
     }
 
     function _saveReviewState() {
@@ -704,17 +1072,44 @@
     }
 
     async function obGoReview() {
-      const { mapping, typeMapping } = _obCollectMapping();
-      if (!mapping.date) { toast('請先設定「日期」欄位', 'error'); return; }
-      if (!mapping.amount) { toast('請先設定「金額」欄位', 'error'); return; }
-      _obMapping = mapping; _obTypeMapping = typeMapping;
+      const { mapping, typeMapping, unresolved } = _obCollectMapping();
+      for (const { k, label, optional } of _obFields) {
+        if (!optional && !mapping[k]) { toast(`請先設定「${label}」欄位`, 'error'); return; }
+      }
+      if (unresolved.length) {
+        toast('收支類型欄位仍有值無法明確判斷，請先改選欄位', 'error');
+        return;
+      }
+      const fdata = _obFiles[_obFileIdx];
+      fdata.mapping = mapping; fdata.typeMapping = typeMapping;
+
+      // Dual mode: next file's mapping first, merge only after the last one.
+      if (_obFileIdx < _obFiles.length - 1) { obShowMappingFor(_obFileIdx + 1); return; }
 
       const btn = document.getElementById('btn-ob-next-review');
       btn.textContent = '載入中...'; btn.disabled = true;
       try {
+        // 1. Merge every mapped file into the canonical CSV
+        //    (日期/類別/帳戶1/帳戶2/金額/收支, sorted by date).
+        const normRes = await fetch('/api/import/normalize', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            files: _obFiles.map(f => ({
+              tmp_filename: f.tmp, mapping: f.mapping,
+              type_mapping: f.typeMapping, role: f.role,
+            }))
+          })
+        });
+        const norm = await normRes.json();
+        if (!normRes.ok) { toast(norm.description || '檔案合併失敗', 'error'); return; }
+        _obTmp = norm.tmp_filename;
+        _obMapping = norm.mapping;
+        _obTypeMapping = norm.type_mapping;
+
+        // 2. Analyze the canonical file
         const res = await fetch('/api/import/analyze', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tmp_filename: _obTmp, mapping, type_mapping: typeMapping })
+          body: JSON.stringify({ tmp_filename: _obTmp, mapping: _obMapping, type_mapping: _obTypeMapping })
         });
         const data = await res.json();
         if (!res.ok) { toast(data.description || '分析失敗', 'error'); return; }
@@ -728,8 +1123,7 @@
     }
 
     function obGoMapping() {
-      document.getElementById('ob-review-panel').style.display = 'none';
-      document.getElementById('ob-mapping-panel').style.display = 'block';
+      obShowMappingFor(_obFiles.length - 1);
     }
 
     function catChipHtml(c) {
@@ -744,7 +1138,9 @@
       const accsWrap = document.getElementById('ob-review-accs-wrap');
       const accsCards = document.getElementById('ob-accs-cards');
       if (data.accounts && data.accounts.length) {
-        const subOpts = `<option value="" disabled selected>請選擇類型</option>` + ACC_SUBTYPES.map(s => `<option value="${s}">${s}</option>`).join('');
+        const subOpts = `<option value="" disabled selected>請選擇類型</option>` + ACC_SUBTYPE_GROUPS.map(g =>
+          `<optgroup label="${g.label}">${g.types.map(s => `<option value="${s}">${s}</option>`).join('')}</optgroup>`
+        ).join('');
         const ss = _selStyle();
         accsCards.innerHTML = data.accounts.map(a => {
           const safeKey = encodeURIComponent(a.name);
@@ -764,7 +1160,7 @@
                 <select id="obiacc-cur-${safeKey}" onchange="checkAccCardDone('${safeKey}')" style="${ss}">${curSel}</select>
               </div>
               <div class="acc-field acc-field-full">
-                <label>期初餘額 <span style="color:var(--danger)">*</span></label>
+                <label id="obiacc-bal-lbl-${safeKey}">期初餘額 <span style="color:var(--danger)">*</span></label>
                 <input type="number" id="obiacc-bal-${safeKey}" placeholder="請輸入金額（可為 0）" step="0.01"
                   oninput="checkAccCardDone('${safeKey}')"
                   style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);color:#fff;padding:0.35rem 0.5rem;border-radius:6px;font-family:inherit;font-size:0.85rem;">
@@ -880,6 +1276,8 @@
     }
 
     // ── Investment account warning ─────────────────────────────────────────────
+    const BAL_LABELS = { '信用卡': '目前欠款金額', '借入': '尚欠金額（未還部分）', '借出': '待收回金額（未收部分）' };
+
     function onAccSubTypeChange(sel) {
       const key = sel.id.replace('obiacc-sub-', '');
       const isInvest = sel.value === '投資';
@@ -887,6 +1285,7 @@
       const skipLbl = document.getElementById('obiacc-skip-lbl-' + key);
       const curSel = document.getElementById('obiacc-cur-' + key);
       const balInput = document.getElementById('obiacc-bal-' + key);
+      const balLbl = document.getElementById('obiacc-bal-lbl-' + key);
       if (warn) warn.style.display = isInvest ? 'block' : 'none';
       if (skipLbl) skipLbl.style.display = isInvest ? 'inline' : 'none';
       if (curSel) { curSel.disabled = isInvest; curSel.style.opacity = isInvest ? '0.35' : '1'; }
@@ -894,6 +1293,7 @@
         balInput.disabled = isInvest; balInput.style.opacity = isInvest ? '0.35' : '1';
         if (isInvest) balInput.style.borderColor = '';
       }
+      if (balLbl) balLbl.innerHTML = `${BAL_LABELS[sel.value] || '期初餘額'} <span style="color:var(--danger)">*</span>`;
       checkAccCardDone(key);
     }
 
@@ -957,7 +1357,7 @@
           return;
         }
         const bal = parseFloat(balInput.value) || 0;
-        const is_liab = ['信用卡', '借貸', '負債其他'].includes(sub_type);
+        const is_liab = ['信用卡', '借入', '負債其他'].includes(sub_type);
         accounts_config.push({ name, sub_type, currency, is_asset: is_liab ? 0 : 1, opening_balance: bal });
       });
       if (!accsValid) return;
@@ -1005,6 +1405,7 @@
           const parts = [];
           if (data.accounts_created) parts.push(`${data.accounts_created} 個帳戶`);
           if (data.categories_created) parts.push(`${data.categories_created} 個類別`);
+          if (data.loans_created) parts.push(`${data.loans_created} 筆借貸`);
           if (data.history_months) parts.push(`${data.history_months} 個月統計`);
           toast('已匯入：' + (parts.join('、') || '設定完成'), 'success');
           setTimeout(() => window.location.replace('/'), 1200);

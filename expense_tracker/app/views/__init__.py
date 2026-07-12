@@ -21,8 +21,10 @@ def create_app():
 
     @app.before_request
     def bind_device():
-        # Static assets don't touch per-device data.
-        if request.endpoint == "static":
+        # Static assets don't touch per-device data. The rescue-code restore endpoint
+        # resolves its own device_id from the code and sets the cookie itself — it
+        # must not have a throwaway device auto-created for it here first.
+        if request.endpoint in ("static", "onboarding.restore_device"):
             return
         device_id = user.resolve_device_id(request)
         new_device = device_id is None
@@ -42,15 +44,7 @@ def create_app():
         response.headers["Expires"] = "0"
         new_device = g.get("new_device")
         if new_device:
-            response.set_cookie(
-                user.COOKIE_NAME,
-                user.sign(new_device),
-                max_age=app.config["DEVICE_COOKIE_MAX_AGE"],
-                httponly=True,
-                samesite="Lax",
-                secure=False,
-                path="/",
-            )
+            user.set_device_cookie(response, new_device)
         return response
 
     from app.controllers.main_routes import main_bp

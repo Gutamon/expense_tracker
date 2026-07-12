@@ -1,4 +1,0 @@
-﻿id,title,amount,category,date,note,created_at,type,account_id,to_account_id,to_amount,stock_transaction_id,loan_id,loan_payment_id
-1,買入 2330,2332.0,股票交易,2026-06-27,,2026-06-28 00:51:07,expense,3,0,0.0,1,0,0
-2,賣出 2330,2338.0,股票交易,2026-06-27,,2026-06-28 00:51:59,income,3,0,0.0,2,0,0
-4,還款：iPhone,100.0,借款還款,2026-06-27,,2026-06-28 01:26:52,expense,1,0,0.0,0,0,1

@@ -1,4 +1,5 @@
 import re
+from datetime import date
 from flask import Blueprint, render_template, request, jsonify, abort
 from app.models.stock import StockModel
 from app.models.account import AccountModel
@@ -40,11 +41,18 @@ def api_create_position():
     symbol = data.get("symbol", "").upper().strip()
     name = data.get("name", "").strip()
     account_id = data.get("account_id")
+    init_shares = int(data.get("init_shares") or 0)
+    init_cost = float(data.get("init_cost") or 0)
+    init_date = (data.get("init_date") or "").strip()
 
     if not symbol or not name or not account_id:
         abort(400, "缺少必要欄位 (代號、名稱、交割帳號)")
     if not re.match(r"^[A-Z0-9.]+$", symbol):
         abort(400, "代號只能包含大寫英文字母、數字與點")
+    if init_shares < 0 or init_cost < 0:
+        abort(400, "初始股數與總成本不可為負數")
+    if init_cost > 0 and init_shares <= 0:
+        abort(400, "設定初始總成本時必須填寫初始股數")
 
     if _YF_AVAILABLE:
         candidates = ([symbol + ".TW", symbol + ".TWO", symbol]
@@ -73,6 +81,17 @@ def api_create_position():
             r["linked_account_id"] = int(linked_acc_id)
             break
     csv_store.write_csv("stocks.csv", rows, csv_store.SCHEMA["stocks.csv"])
+
+    if init_shares > 0:
+        stock_model.add_transaction(
+            stock_id=int(new_id),
+            t_type="opening",
+            date=init_date or date.today().isoformat(),
+            shares=init_shares,
+            price=round(init_cost / init_shares, 4),
+            fee=0,
+            note="期初持股",
+        )
 
     return jsonify({"success": True, "id": new_id}), 201
 

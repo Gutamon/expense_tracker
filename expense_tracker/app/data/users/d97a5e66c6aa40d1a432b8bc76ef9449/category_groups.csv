@@ -1,0 +1,8 @@
+﻿id,name,sort_order,type
+1,生活,0,expense
+2,休閒,1,expense
+3,健康,2,expense
+4,學習,3,expense
+5,主要收入,4,income
+6,額外收入,5,income
+7,其他,6,expense

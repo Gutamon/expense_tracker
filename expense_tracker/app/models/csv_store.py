@@ -14,6 +14,7 @@ INT_FIELDS = {
     "loan_payments.csv": {"id", "loan_id"},
     "monthly_budgets.csv": {"id", "year", "month"},
     "cat_monthly_budgets.csv": {"id", "category_id", "year", "month"},
+    "group_monthly_budgets.csv": {"id", "group_id", "year", "month"},
     "monthly_history.csv": {"id", "year", "month"},
     "settings.csv": set(),
 }
@@ -29,6 +30,7 @@ FLOAT_FIELDS = {
     "loan_payments.csv": {"amount"},
     "monthly_budgets.csv": {"amount"},
     "cat_monthly_budgets.csv": {"amount"},
+    "group_monthly_budgets.csv": {"amount"},
     "monthly_history.csv": {"amount"},
     "settings.csv": set(),
 }
@@ -70,6 +72,7 @@ SCHEMA = {
     "loan_payments.csv": ["id", "loan_id", "amount", "date", "note", "created_at"],
     "monthly_budgets.csv": ["id", "year", "month", "amount"],
     "cat_monthly_budgets.csv": ["id", "category_id", "year", "month", "amount"],
+    "group_monthly_budgets.csv": ["id", "group_id", "year", "month", "amount"],
     "monthly_history.csv": ["id", "year", "month", "category", "type", "amount"],
     "settings.csv": ["key", "value"],
 }
@@ -207,8 +210,8 @@ def init_current_user():
 def init_data_dir():
     """Ensure the root data dir and its users/ subfolder exist.
 
-    Called at startup. Data is now per-device, so this no longer seeds the CSV files
-    at the root — per-device seeding happens via init_current_user().
+    Called at startup. Data is per-device, so this does not seed the CSV files at the
+    root — per-device seeding happens via init_current_user().
     """
     from config import Config
     os.makedirs(os.path.join(root_dir(), Config.USERS_SUBDIR), exist_ok=True)
