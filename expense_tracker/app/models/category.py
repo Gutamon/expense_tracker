@@ -58,16 +58,39 @@ class CategoryModel:
     def update(self, cat_id, name, type="expense", is_asset=1, in_budget=1, group_name="") -> bool:
         rows = read_csv("categories.csv")
         cat_id = str(cat_id)
+        old_name = None
         for r in rows:
             if str(r.get("id")) == cat_id:
+                old_name = r["name"]
                 r["name"] = name
                 r["type"] = type
                 r["is_asset"] = int(is_asset)
                 r["in_budget"] = int(in_budget)
                 r["group_name"] = group_name
                 write_csv("categories.csv", rows, SCHEMA["categories.csv"])
-                return True
-        return False
+                break
+        if old_name is None:
+            return False
+
+        # Refresh the denormalized category name cached on rows bound to this id, so
+        # exports/legacy readers see the new name too. Display already resolves live
+        # by id, so this is just keeping the cached copy honest — only rewrite when
+        # the name actually changed.
+        if name != old_name:
+            self._rename_cached_name(int(cat_id), name)
+        return True
+
+    @staticmethod
+    def _rename_cached_name(cat_id: int, new_name: str):
+        for fname in ("expenses.csv", "monthly_history.csv"):
+            data = read_csv(fname)
+            changed = False
+            for r in data:
+                if int(r.get("category_id") or 0) == cat_id and r.get("category") != new_name:
+                    r["category"] = new_name
+                    changed = True
+            if changed:
+                write_csv(fname, data, SCHEMA[fname])
 
     def update_sort_orders(self, id_order_list) -> bool:
         rows = read_csv("categories.csv")
@@ -81,18 +104,37 @@ class CategoryModel:
     def delete(self, cat_id, replace_with_id=None) -> bool:
         rows = read_csv("categories.csv")
         cat_id = str(cat_id)
-        old_name = next((r["name"] for r in rows if str(r.get("id")) == cat_id), None)
-        if old_name is None:
+        old = next((r for r in rows if str(r.get("id")) == cat_id), None)
+        if old is None:
             return False
+        old_name = old["name"]
 
         if replace_with_id:
-            new_name = next((r["name"] for r in rows if str(r.get("id")) == str(replace_with_id)), None)
-            if new_name:
+            target = next((r for r in rows if str(r.get("id")) == str(replace_with_id)), None)
+            if target:
+                new_name, new_id = target["name"], int(target["id"])
+                # Reassign by id when the row carries one (post-migration), else by
+                # the legacy name match. Update both id and cached name together.
                 exp_rows = read_csv("expenses.csv")
                 for e in exp_rows:
-                    if e.get("category") == old_name:
+                    matches = (int(e.get("category_id") or 0) == int(cat_id)) or \
+                              (not int(e.get("category_id") or 0) and e.get("category") == old_name)
+                    if matches:
                         e["category"] = new_name
+                        e["category_id"] = new_id
                 write_csv("expenses.csv", exp_rows, SCHEMA["expenses.csv"])
+
+                hist_rows = read_csv("monthly_history.csv")
+                changed = False
+                for h in hist_rows:
+                    matches = (int(h.get("category_id") or 0) == int(cat_id)) or \
+                              (not int(h.get("category_id") or 0) and h.get("category") == old_name)
+                    if matches:
+                        h["category"] = new_name
+                        h["category_id"] = new_id
+                        changed = True
+                if changed:
+                    write_csv("monthly_history.csv", hist_rows, SCHEMA["monthly_history.csv"])
 
         rows = [r for r in rows if str(r.get("id")) != cat_id]
         write_csv("categories.csv", rows, SCHEMA["categories.csv"])

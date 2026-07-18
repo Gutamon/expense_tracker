@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 
 <head>
@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>歡迎使用 · 帳本</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/globals.css') }}">
+  <script src="{{ url_for('static', filename='js/custom_select.js') }}" defer></script>
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
   <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icon-192.png') }}">
@@ -394,13 +395,13 @@
       </div>
 
       <div class="ob-card">
-        <h3>⚷ 使用救援碼</h3>
-        <p>如果您先前在「設定」頁看過救援碼，輸入它即可認回原本的帳本。</p>
+        <h3>⚷ 使用識別碼</h3>
+        <p>如果您先前在「設定」頁看過識別碼，輸入它即可認回原本的帳本，或加入其他裝置的同步。</p>
         <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
-          <input type="text" id="rescue-code-input" placeholder="例如 A2B4-C6D8" autocomplete="off"
+          <input type="text" id="sync-code-input" placeholder="例如 A2B4-C6D8" autocomplete="off"
             style="flex:1;min-width:140px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.6rem .8rem;font-family:'DM Mono',monospace;font-size:.9rem;">
-          <button class="btn btn-outline" style="width:auto;" id="btn-rescue-restore"
-            onclick="obRestoreByCode()">認回</button>
+          <button class="btn btn-outline" style="width:auto;" id="btn-sync-join"
+            onclick="obJoinByCode()">認回</button>
         </div>
       </div>
     </div>
@@ -575,15 +576,15 @@
 
   <script>
     // Auto-recover: this screen means no valid device cookie. Before making the user
-    // start over, check whether we mirrored a rescue code into localStorage on a
-    // previous visit (iOS home-screen PWAs routinely drop the cookie between launches)
-    // and silently re-attach to the original ledger.
+    // start over, check whether we mirrored a 識別碼 into localStorage on a previous
+    // visit (iOS home-screen PWAs routinely drop the cookie between launches) and
+    // silently re-attach to the original ledger.
     (function autoRecover() {
       var saved;
-      try { saved = localStorage.getItem('rescue_code'); } catch (e) { return; }
+      try { saved = localStorage.getItem('sync_code'); } catch (e) { return; }
       if (!saved) return;
       // Attempt at most once per app session. If the saved code is stale or points at
-      // an emptied device, restore would bounce us straight back to onboarding — this
+      // a wiped ledger, restore would bounce us straight back to onboarding — this
       // guard stops that from looping the hidden page into a permanent blank screen.
       try {
         if (sessionStorage.getItem('autorecover_tried')) return;
@@ -593,12 +594,12 @@
       var reveal = function () { root.style.visibility = ''; };
       root.style.visibility = 'hidden';           // avoid a flash of the chooser
       var failsafe = setTimeout(reveal, 4000);    // never stay hidden, whatever happens
-      fetch('/api/onboarding/restore-device', {
+      fetch('/api/onboarding/join-by-code', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: saved })
       }).then(function (res) {
-        if (res.ok) { window.location.replace('/'); return; }
-        try { localStorage.removeItem('rescue_code'); } catch (e) { }
+        if (res.ok) { goToApp(); return; }
+        try { localStorage.removeItem('sync_code'); } catch (e) { }
         clearTimeout(failsafe); reveal();
       }).catch(function () { clearTimeout(failsafe); reveal(); });
     })();
@@ -616,6 +617,22 @@
         _swReloaded = true;
         window.location.reload();
       });
+    }
+
+    // Bfcache restore (mobile back-swipe / app-switcher resume) re-shows the DOM
+    // exactly as it was, bypassing any network request — force a real reload so
+    // a stale pre-restore/pre-import chooser screen isn't left showing.
+    window.addEventListener('pageshow', function (e) {
+      if (e.persisted) window.location.reload();
+    });
+
+    // Reaching here always means a fresh/restored/imported/rejoined ledger is about
+    // to replace whatever was open before — drop any remembered shell tab so the
+    // next shell.html load lands on 記帳專區/記帳明細 instead of resuming a stale
+    // tab (e.g. 設定) left over from a previous session.
+    function goToApp() {
+      try { sessionStorage.removeItem('shell_tab'); } catch (e) { }
+      window.location.replace('/');
     }
 
     // ── Navigation ─────────────────────────────────────────────────────────────
@@ -638,25 +655,25 @@
       btn.innerHTML = '<span class="spinner"></span> 建立中...';
       btn.disabled = true;
       const res = await fetch('/api/onboarding/fresh', { method: 'POST' });
-      if (res.ok) window.location.replace('/');
+      if (res.ok) goToApp();
       else { toast('建立失敗，請重試', 'error'); btn.textContent = '開始使用'; btn.disabled = false; }
     });
 
-    // ── Rescue code ────────────────────────────────────────────────────────────
-    async function obRestoreByCode() {
-      const input = document.getElementById('rescue-code-input');
+    // ── Sync code ──────────────────────────────────────────────────────────────
+    async function obJoinByCode() {
+      const input = document.getElementById('sync-code-input');
       const code = input.value.trim();
-      if (!code) { toast('請輸入救援碼', 'error'); return; }
-      const btn = document.getElementById('btn-rescue-restore');
+      if (!code) { toast('請輸入識別碼', 'error'); return; }
+      const btn = document.getElementById('btn-sync-join');
       btn.innerHTML = '<span class="spinner"></span> 認回中...'; btn.disabled = true;
       try {
-        const res = await fetch('/api/onboarding/restore-device', {
+        const res = await fetch('/api/onboarding/join-by-code', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code })
         });
         const data = await res.json();
-        if (res.ok) { toast('認回成功', 'success'); setTimeout(() => window.location.replace('/'), 600); }
-        else { toast(data.error || '救援碼無效', 'error'); btn.textContent = '認回'; btn.disabled = false; }
+        if (res.ok) { toast('認回成功', 'success'); setTimeout(() => goToApp(), 600); }
+        else { toast(data.error || '識別碼無效', 'error'); btn.textContent = '認回'; btn.disabled = false; }
       } catch (e) {
         toast('認回失敗：' + e.message, 'error'); btn.textContent = '認回'; btn.disabled = false;
       }
@@ -1318,7 +1335,7 @@
       const data = await res.json();
       if (res.ok) {
         toast('還原成功', 'success');
-        setTimeout(() => window.location.replace('/'), 1000);
+        setTimeout(() => goToApp(), 1000);
       } else {
         toast(data.error || data.description || '還原失敗', 'error');
         btn.textContent = '還原備份'; btn.style.background = ''; btn.disabled = false;
@@ -1408,7 +1425,7 @@
           if (data.loans_created) parts.push(`${data.loans_created} 筆借貸`);
           if (data.history_months) parts.push(`${data.history_months} 個月統計`);
           toast('已匯入：' + (parts.join('、') || '設定完成'), 'success');
-          setTimeout(() => window.location.replace('/'), 1200);
+          setTimeout(() => goToApp(), 1200);
         } else {
           toast(data.error || data.description || '匯入失敗', 'error');
           btn.textContent = '確認匯入'; btn.disabled = false;

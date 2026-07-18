@@ -80,80 +80,163 @@
     color: var(--positive);
   }
 
-  /* ── Time mode & window nav ── */
-  .time-filter-bar {
-    display: flex;
+  /* ── Trend head: 區間按鈕（左）+ 月/年/全 toggle（右），同列垂直置中 ── */
+  .trend-head {
     align-items: center;
-    gap: 8px;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
+    margin-bottom: 20px;
   }
 
-  .time-btn {
+  .range-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     background: var(--surface);
     border: 1px solid var(--border);
-    color: var(--muted);
-    font-family: inherit;
-    font-size: .82rem;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .78rem;
     cursor: pointer;
     padding: 5px 12px;
     border-radius: 6px;
     transition: all .2s;
   }
 
-  .time-btn.active {
+  .range-btn:hover {
     border-color: var(--accent);
     color: var(--accent);
   }
 
-  .win-nav {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
+  .range-tilde {
+    color: var(--muted);
   }
 
-  .win-btn {
-    background: var(--surface);
+  /* 月／年／全 toggle */
+  .unit-toggle {
+    display: inline-flex;
     border: 1px solid var(--border);
-    color: var(--muted);
     border-radius: 6px;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    overflow: hidden;
+  }
+
+  .unit-opt {
+    background: var(--surface);
+    border: none;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: .82rem;
     cursor: pointer;
-    padding: 0;
+    padding: 5px 12px;
     transition: all .2s;
   }
 
-  .win-btn:hover:not(:disabled) {
-    border-color: var(--accent);
+  .unit-opt + .unit-opt {
+    border-left: 1px solid var(--border);
+  }
+
+  .unit-opt.active {
+    background: var(--accent-dim);
     color: var(--accent);
   }
 
-  .win-btn:disabled {
-    opacity: .35;
-    cursor: default;
+  /* ── 區間選擇彈窗 ── */
+  .range-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, .55);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
   }
 
-  .win-btn svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+  .range-overlay.open {
+    display: flex;
   }
 
-  .win-label {
+  .range-dialog {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    width: 100%;
+    max-width: 340px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .5);
+  }
+
+  .range-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .range-row .mfilter {
+    position: relative;
+    flex: 1;
+  }
+
+  .range-sel {
+    width: 100%;
+    justify-content: space-between;
     font-family: 'JetBrains Mono', monospace;
-    font-size: .8rem;
-    color: var(--muted);
-    min-width: 130px;
+  }
+
+  .range-row .mfilter-menu {
+    left: 0;
+    right: 0;
+    min-width: 0;
+  }
+
+  .range-hint {
     text-align: center;
+    font-size: .75rem;
+    color: var(--muted);
+    min-height: 1.1em;
+    margin-top: 12px;
+  }
+
+  .range-hint.error {
+    color: var(--danger);
+  }
+
+  .range-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .range-actions button {
+    flex: 1;
+    font-family: inherit;
+    font-size: .9rem;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 8px;
+    transition: all .2s;
+  }
+
+  .range-cancel {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .range-cancel:hover {
+    border-color: var(--text);
+    color: var(--text);
+  }
+
+  .range-confirm {
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    color: #0f0f11;
+    font-weight: 600;
+  }
+
+  .range-confirm:disabled {
+    opacity: .4;
+    cursor: default;
   }
 
   /* ── Cards ── */
@@ -402,27 +485,23 @@
   </div>
 </div>
 
-<div class="time-filter-bar">
-  <button class="time-btn" data-mode="month" onclick="setTimeFilter('month')">近月</button>
-  <button class="time-btn" data-mode="year" onclick="setTimeFilter('year')">近年</button>
-  <div class="win-nav" id="win-nav" style="display:none">
-    <button class="win-btn" id="win-prev" onclick="shiftWindow(-1)" aria-label="較早">
-      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-    </button>
-    <span class="win-label" id="win-label"></span>
-    <button class="win-btn" id="win-next" onclick="shiftWindow(1)" aria-label="較晚">
-      <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-    </button>
-  </div>
-</div>
-
 <div class="charts-grid">
 
   <!-- 收支趨勢 + 總資產趨勢線 -->
-  <div class="card full">
-    <div class="card-head">
-      <h2 id="chart-title">收支趨勢</h2>
-      <span class="scope" id="chart-scope"></span>
+  <div class="trend-block">
+    <div class="card-head trend-head">
+      <!-- 時間切換（區間按鈕）靠左 -->
+      <button class="range-btn" id="range-btn" onclick="openRangeDialog()">
+        <span id="range-start">—</span>
+        <span class="range-tilde">～</span>
+        <span id="range-end">—</span>
+      </button>
+      <!-- 月／年／全 toggle 靠右 -->
+      <div class="unit-toggle" id="unit-toggle">
+        <button class="unit-opt" data-mode="month" onclick="setMode('month')">月</button>
+        <button class="unit-opt" data-mode="year" onclick="setMode('year')">年</button>
+        <button class="unit-opt" data-mode="all" onclick="setMode('all')">全</button>
+      </div>
     </div>
     <div class="swipe-area" id="trend-swipe">
       <canvas id="trend-chart"></canvas>
@@ -438,6 +517,34 @@
     <div class="rank-grid" id="rank-container"></div>
   </div>
 
+</div>
+
+<!-- 區間選擇彈窗（單位隨月／年 toggle 變動；最多 12 期） -->
+<div class="range-overlay" id="range-overlay" onclick="onOverlayClick(event)">
+  <div class="range-dialog">
+    <div class="range-row">
+      <div class="mfilter" data-kind="rstart">
+        <button class="mfilter-btn range-sel" onclick="toggleMenu(event,'rstart')">
+          <span id="rstart-label">—</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="mfilter-menu" id="mf-menu-rstart"></div>
+      </div>
+      <span class="range-tilde">～</span>
+      <div class="mfilter" data-kind="rend">
+        <button class="mfilter-btn range-sel" onclick="toggleMenu(event,'rend')">
+          <span id="rend-label">—</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="mfilter-menu" id="mf-menu-rend"></div>
+      </div>
+    </div>
+    <div class="range-hint" id="range-hint"></div>
+    <div class="range-actions">
+      <button class="range-cancel" onclick="closeRangeDialog()">取消</button>
+      <button class="range-confirm" onclick="confirmRange()">確認</button>
+    </div>
+  </div>
 </div>
 
 <script>

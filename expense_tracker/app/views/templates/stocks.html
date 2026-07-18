@@ -4,26 +4,25 @@
 
 {% block head %}
 <style>
-  .summary-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 28px;
+  .summary-bar {
+    width: 100%;
+    box-sizing: border-box;
     margin-bottom: 24px;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
   }
 
   .summary-stats {
     display: flex;
-    gap: 32px;
+    flex-wrap: wrap;
   }
 
   .s-item {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
+    margin-bottom: 10px;
+    margin-right: 30px;
   }
 
   .s-label {
@@ -40,7 +39,7 @@
   }
 
   .profit {
-    color: var(--accent);
+    color: #4ade80;
   }
 
   .loss {
@@ -50,6 +49,52 @@
   .stock-list {
     display: grid;
     gap: 20px;
+  }
+
+  /* 持倉排序切換：兩段式滑動膠囊，直接標示「自訂／成本」，靠 .active 對應目前狀態 */
+  .stock-sort-toggle {
+    position: relative;
+    display: inline-flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+
+  .stock-sort-toggle::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(50% - 2px);
+    height: calc(100% - 4px);
+    border-radius: 999px;
+    background: var(--accent);
+    transition: transform .2s ease;
+  }
+
+  .stock-sort-toggle.active::before {
+    transform: translateX(100%);
+  }
+
+  .stock-sort-opt {
+    position: relative;
+    z-index: 1;
+    min-width: 40px;
+    text-align: center;
+    padding: 4px 10px;
+    font-size: .68rem;
+    color: var(--muted);
+    transition: color .2s ease;
+  }
+
+  .stock-sort-toggle:not(.active) .stock-sort-opt[data-mode="sort"],
+  .stock-sort-toggle.active .stock-sort-opt[data-mode="cost"] {
+    color: var(--bg);
+    font-weight: 600;
   }
 
   .stock-card {
@@ -195,9 +240,9 @@
 
   .tx-item {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 10px 0;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 4px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   }
 
@@ -205,43 +250,40 @@
     border-bottom: none;
   }
 
-  .tx-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 8px;
+  .tx-item .badge {
+    flex-shrink: 0;
   }
 
-  .tx-meta {
+  .tx-body {
     display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-    font-size: .85rem;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
     min-width: 0;
   }
 
   .tx-date {
     color: var(--muted);
     white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .75rem;
   }
 
   .tx-amount {
     font-family: 'JetBrains Mono', monospace;
-    font-size: .85rem;
-    text-align: right;
-    flex-shrink: 0;
+    font-size: .9rem;
   }
 
   .tx-fee {
-    font-size: .7rem;
+    font-size: .75rem;
     color: var(--muted);
-    margin-top: 2px;
+    font-family: 'JetBrains Mono', monospace;
   }
 
   .tx-btns {
     display: flex;
     gap: 6px;
+    flex-shrink: 0;
   }
 
   .icon-btn {
@@ -249,10 +291,10 @@
     border: 1px solid var(--border);
     color: var(--muted);
     border-radius: 6px;
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     cursor: pointer;
-    font-size: .8rem;
+    font-size: .75rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -402,6 +444,130 @@
     border-color: var(--accent);
   }
 
+  .import-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .import-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .import-row:last-child {
+    border-bottom: none;
+  }
+
+  .import-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+  }
+
+  .import-row-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .import-row-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .import-row-name {
+    font-size: .9rem;
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .import-code {
+    width: 92px;
+    flex-shrink: 0;
+    background: var(--bg) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+    color: var(--text) !important;
+    padding: 5px 8px !important;
+    font-size: .8rem !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    outline: none;
+    text-align: center;
+  }
+
+  .import-code:focus {
+    border-color: var(--accent) !important;
+  }
+
+  .import-code::placeholder {
+    color: var(--danger);
+    opacity: .6;
+  }
+
+  .import-row-sub {
+    font-size: .72rem;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .field-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .field-row .field {
+    flex: 1;
+    margin-bottom: 0;
+    min-width: 0;
+  }
+
+  .field-row-sep {
+    color: var(--muted);
+    padding-bottom: 12px;
+    flex-shrink: 0;
+  }
+
+  .price-input {
+    display: flex;
+    align-items: center;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0 14px;
+    transition: border-color .15s;
+  }
+
+  .price-input:focus-within {
+    border-color: var(--accent);
+  }
+
+  .price-prefix {
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .price-input input {
+    border: none !important;
+    padding: 10px 0 10px 6px !important;
+    background: transparent !important;
+  }
+
   .modal-actions {
     display: flex;
     gap: 12px;
@@ -430,35 +596,6 @@
     color: var(--muted);
     white-space: nowrap;
     flex-shrink: 0;
-  }
-
-  .account-select {
-    font-size: .75rem;
-    color: var(--muted);
-    background: transparent;
-    border: none;
-    border-bottom: 1px dashed transparent;
-    padding: 1px 2px;
-    outline: none;
-    font-family: inherit;
-    cursor: pointer;
-    transition: all .15s;
-    max-width: 130px;
-  }
-
-  .account-select:hover {
-    border-bottom-color: var(--border);
-    color: var(--text);
-  }
-
-  .account-select:focus {
-    border-bottom-color: var(--accent);
-    color: var(--text);
-  }
-
-  .account-select option {
-    background: #18181c;
-    color: #e8e8e8;
   }
 
   .zero-section-header {
@@ -492,17 +629,6 @@
 
     nav span {
       display: none;
-    }
-
-    .summary-card {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 20px;
-    }
-
-    .summary-stats {
-      flex-direction: column;
-      gap: 16px;
     }
 
     .stock-header {
@@ -566,29 +692,36 @@
 {% endblock %}
 
 {% block content %}
-<div class="summary-card">
+<div class="summary-bar">
   <div class="summary-stats">
     <div class="s-item">
       <span class="s-label">總投入成本</span>
-      <span class="s-value">${{ "%.0f" | format(total_cost) }}</span>
+      <span class="s-value">${{ total_cost | money }}</span>
     </div>
     <div class="s-item">
       <span class="s-label">總市值</span>
-      <span class="s-value">${{ "%.0f" | format(total_value) }}</span>
+      <span class="s-value">${{ total_value | money }}</span>
     </div>
     <div class="s-item">
       <span class="s-label">總未實現損益</span>
       {% set total_pct = (total_pl / total_cost * 100) if total_cost > 0 else 0 %}
       <span class="s-value {% if total_pl >= 0 %}profit{% else %}loss{% endif %}">
-        {% if total_pl >= 0 %}+{% endif %}${{ "%.0f" | format(total_pl) }}
+        {% if total_pl >= 0 %}+{% endif %}${{ total_pl | money }}
         <span style="font-size:1rem;">({{ "%.1f" | format(total_pct) }}%)</span>
       </span>
     </div>
   </div>
-  <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;">
-    <button class="btn btn-ghost" id="btn-refresh-prices" onclick="updateAllPrices()">↻ 更新現價</button>
-    <button class="btn" onclick="openPosModal()">新增倉位</button>
+  <div style="display:flex;flex-wrap:wrap;width:100%;gap:8px;n ">
+    <button class="btn btn-ghost" style="flex:1;" id="btn-refresh-prices" onclick="updateAllPrices()">↻ 更新現價</button>
+    <button class="btn btn-ghost" style="flex:1;" onclick="openImportModal()">匯入對帳單</button>
+    <button class="btn" style="flex:1;" onclick="openPosModal()">新增倉位</button>
   </div>
+</div>
+
+<div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:12px;">
+  <button class="stock-sort-toggle" id="stock-sort-toggle" onclick="toggleStockSort()" title="切換排序方式">
+    <span class="stock-sort-opt" data-mode="sort">自訂排序</span><span class="stock-sort-opt" data-mode="cost">成本最高</span>
+  </button>
 </div>
 
 {% if stocks %}
@@ -604,7 +737,7 @@
   {% set spl = svalue - scost %}
   {% set spct = (spl / scost * 100) if scost > 0 else 0 %}
   {% set stock_txs = transactions | selectattr("stock_id", "equalto", s.id) | list %}
-  <div class="stock-card">
+  <div class="stock-card" data-cost="{{ scost }}">
     <div class="stock-header">
       <div class="stock-info">
         <div class="stock-symbol">{{ s.symbol }}</div>
@@ -612,7 +745,7 @@
           data-stock-id="{{ s.id }}" data-original="{{ s.name | e }}">
         <div class="account-row">
           <span class="account-label">交割戶</span>
-          <select class="account-select" data-stock-id="{{ s.id }}" onchange="changeStockAccount(this)">
+          <select class="account-select" data-cs-compact data-stock-id="{{ s.id }}" onchange="changeStockAccount(this)">
             {% for a in accounts if a.icon == '🏦' %}
             <option value="{{ a.id }}" {% if a.id==s.account_id %}selected{% endif %}>{{ a.icon }} {{ a.name }}</option>
             {% endfor %}
@@ -626,12 +759,12 @@
         </div>
         <div class="stat-item">
           <span class="stat-label">均價 / 現價</span>
-          <span class="stat-value">${{ "%.2f" | format(s.avg_price) }} / ${{ "%.2f" | format(s.current_price) }}</span>
+          <span class="stat-value">${{ s.avg_price | money(2) }} / ${{ s.current_price | money(2) }}</span>
         </div>
         <div class="stat-item">
           <span class="stat-label">損益</span>
           <span class="stat-value {% if spl >= 0 %}profit{% else %}loss{% endif %}">
-            {% if spl >= 0 %}+{% endif %}${{ "%.0f" | format(spl) }} ({{ "%.1f" | format(spct) }}%)
+            {% if spl >= 0 %}+{% endif %}${{ spl | money }} ({{ "%.1f" | format(spct) }}%)
           </span>
         </div>
       </div>
@@ -649,33 +782,29 @@
       {% if stock_txs %}
       {% for t in stock_txs %}
       <div class="tx-item">
-        <div class="tx-row">
-          <div class="tx-meta">
-            <span class="badge {{ t.type }}">{% if t.type == 'opening' %}期初{% else %}{{ t.type | upper }}{% endif %}</span>
-            <span class="tx-date">{{ t.date }}</span>
-          </div>
+        <span class="badge {{ t.type }}">{% if t.type == 'opening' %}期初{% else %}{{ t.type | upper }}{% endif %}</span>
+        <div class="tx-body">
+          <span class="tx-date">{{ t.date }}</span>
           <div class="tx-amount">
             {% if t.type == 'buy' or t.type == 'sell' %}
-            {{ "%.0f" | format(t.shares) }} 股 @ ${{ "%.2f" | format(t.price) }}
-            <div class="tx-fee">手續費: ${{ t.fee }}</div>
+            ${{ t.price | money(2) }} × {{ "%.0f" | format(t.shares) }}
             {% elif t.type == 'opening' %}
-            {{ "%.0f" | format(t.shares) }} 股 @ ${{ "%.2f" | format(t.price) }}
+            ${{ t.price | money(2) }} × {{ "%.0f" | format(t.shares) }}
             {% elif t.type == 'dividend' %}
-            <span style="color:#4a8af0">+ ${{ "%.2f" | format(t.price) }}</span>
+            <span style="color:#4a8af0">+ ${{ t.price | money(2) }}</span>
             {% elif t.type == 'split' %}
             <span style="color:#f04ac8">比例: {{ t.price }}</span>
             {% endif %}
           </div>
+          {% if t.type == 'buy' or t.type == 'sell' %}
+          <span class="tx-fee">手續費: ${{ t.fee | money }}</span>
+          {% endif %}
         </div>
-        {% if loop.first %}
-        <div class="tx-row">
-          <div class="tx-btns">
-            <button class="icon-btn edit" data-id="{{ t.id }}" data-type="{{ t.type }}" data-date="{{ t.date }}"
-              data-shares="{{ t.shares }}" data-price="{{ t.price }}" data-fee="{{ t.fee }}">✎</button>
-            <button class="icon-btn del" onclick="deleteTx({{ t.id }})">✕</button>
-          </div>
+        <div class="tx-btns">
+          <button class="icon-btn edit" data-id="{{ t.id }}" data-type="{{ t.type }}" data-date="{{ t.date }}"
+            data-shares="{{ t.shares }}" data-price="{{ t.price }}" data-fee="{{ t.fee }}">✎</button>
+          <button class="icon-btn del" onclick="deleteTx({{ t.id }})">✕</button>
         </div>
-        {% endif %}
       </div>
       {% endfor %}
       {% else %}
@@ -711,7 +840,7 @@
           data-stock-id="{{ s.id }}" data-original="{{ s.name | e }}">
         <div class="account-row">
           <span class="account-label">交割戶</span>
-          <select class="account-select" data-stock-id="{{ s.id }}" onchange="changeStockAccount(this)">
+          <select class="account-select" data-cs-compact data-stock-id="{{ s.id }}" onchange="changeStockAccount(this)">
             {% for a in accounts if a.icon == '🏦' %}
             <option value="{{ a.id }}" {% if a.id==s.account_id %}selected{% endif %}>{{ a.icon }} {{ a.name }}</option>
             {% endfor %}
@@ -725,12 +854,12 @@
         </div>
         <div class="stat-item">
           <span class="stat-label">均價 / 現價</span>
-          <span class="stat-value">${{ "%.2f" | format(s.avg_price) }} / ${{ "%.2f" | format(s.current_price) }}</span>
+          <span class="stat-value">${{ s.avg_price | money(2) }} / ${{ s.current_price | money(2) }}</span>
         </div>
         <div class="stat-item">
           <span class="stat-label">損益</span>
           <span class="stat-value {% if spl >= 0 %}profit{% else %}loss{% endif %}">
-            {% if spl >= 0 %}+{% endif %}${{ "%.0f" | format(spl) }} ({{ "%.1f" | format(spct) }}%)
+            {% if spl >= 0 %}+{% endif %}${{ spl | money }} ({{ "%.1f" | format(spct) }}%)
           </span>
         </div>
       </div>
@@ -749,33 +878,29 @@
       {% if stock_txs %}
       {% for t in stock_txs %}
       <div class="tx-item">
-        <div class="tx-row">
-          <div class="tx-meta">
-            <span class="badge {{ t.type }}">{% if t.type == 'opening' %}期初{% else %}{{ t.type | upper }}{% endif %}</span>
-            <span class="tx-date">{{ t.date }}</span>
-          </div>
+        <span class="badge {{ t.type }}">{% if t.type == 'opening' %}期初{% else %}{{ t.type | upper }}{% endif %}</span>
+        <div class="tx-body">
+          <span class="tx-date">{{ t.date }}</span>
           <div class="tx-amount">
             {% if t.type == 'buy' or t.type == 'sell' %}
-            {{ "%.0f" | format(t.shares) }} 股 @ ${{ "%.2f" | format(t.price) }}
-            <div class="tx-fee">手續費: ${{ t.fee }}</div>
+            ${{ t.price | money(2) }} × {{ "%.0f" | format(t.shares) }}
             {% elif t.type == 'opening' %}
-            {{ "%.0f" | format(t.shares) }} 股 @ ${{ "%.2f" | format(t.price) }}
+            ${{ t.price | money(2) }} × {{ "%.0f" | format(t.shares) }}
             {% elif t.type == 'dividend' %}
-            <span style="color:#4a8af0">+ ${{ "%.2f" | format(t.price) }}</span>
+            <span style="color:#4a8af0">+ ${{ t.price | money(2) }}</span>
             {% elif t.type == 'split' %}
             <span style="color:#f04ac8">比例: {{ t.price }}</span>
             {% endif %}
           </div>
+          {% if t.type == 'buy' or t.type == 'sell' %}
+          <span class="tx-fee">手續費: ${{ t.fee | money }}</span>
+          {% endif %}
         </div>
-        {% if loop.first %}
-        <div class="tx-row">
-          <div class="tx-btns">
-            <button class="icon-btn edit" data-id="{{ t.id }}" data-type="{{ t.type }}" data-date="{{ t.date }}"
-              data-shares="{{ t.shares }}" data-price="{{ t.price }}" data-fee="{{ t.fee }}">✎</button>
-            <button class="icon-btn del" onclick="deleteTx({{ t.id }})">✕</button>
-          </div>
+        <div class="tx-btns">
+          <button class="icon-btn edit" data-id="{{ t.id }}" data-type="{{ t.type }}" data-date="{{ t.date }}"
+            data-shares="{{ t.shares }}" data-price="{{ t.price }}" data-fee="{{ t.fee }}">✎</button>
+          <button class="icon-btn del" onclick="deleteTx({{ t.id }})">✕</button>
         </div>
-        {% endif %}
       </div>
       {% endfor %}
       {% else %}
@@ -817,22 +942,67 @@
         {% endfor %}
       </select>
     </div>
-    <div class="field">
-      <label>初始股數（選填，已持有的股票）</label>
-      <input type="number" id="pos-init-shares" step="1" min="0" placeholder="0" autocomplete="off"
-        oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+    <div class="field-row">
+      <div class="field" id="wrap-pos-cost">
+        <label>總成本</label>
+        <div class="price-input">
+          <span class="price-prefix">$</span>
+          <input type="number" id="pos-init-cost" step="0.01" min="0" placeholder="0" autocomplete="off">
+        </div>
+      </div>
+      <div class="field" id="wrap-pos-shares">
+        <label>總股數</label>
+        <input type="number" id="pos-init-shares" step="1" min="0" placeholder="0" autocomplete="off"
+          oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+      </div>
     </div>
     <div class="field">
-      <label>初始總成本（選填）</label>
-      <input type="number" id="pos-init-cost" step="0.01" min="0" placeholder="0" autocomplete="off">
-    </div>
-    <div class="field">
-      <label>取得日期（選填）</label>
+      <label>最近交易日</label>
       <input type="date" id="pos-init-date" autocomplete="off">
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closePosModal()">取消</button>
       <button class="btn" onclick="submitPosition()">建立</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal">
+    <h3>匯入券商對帳單</h3>
+
+    <div id="import-step-upload">
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:16px;line-height:1.6;">
+        上傳券商匯出的成交明細 CSV，系統會依買賣別自動累計每支股票的總成本（含手續費）與股數，建立初始倉位。
+      </p>
+      <div class="field">
+        <label>交割帳號 (資金進出帳戶)</label>
+        <select id="import-account">
+          <option value="" disabled selected>請選擇交割帳號</option>
+          {% for a in accounts if a.icon == '🏦' %}
+          <option value="{{ a.id }}">{{ a.icon }} {{ a.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>對帳單檔案 (CSV)</label>
+        <input type="file" id="import-file" accept=".csv" autocomplete="off">
+      </div>
+    </div>
+
+    <div id="import-step-preview" style="display:none;">
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:12px;">
+        以下為聚合後的初始倉位，取消勾選可排除該股票：
+      </p>
+      <div id="import-list" class="import-list"></div>
+      <p id="import-skipped" style="font-size:.75rem;color:var(--muted);margin-top:10px;"></p>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeImportModal()">取消</button>
+      <button class="btn" id="import-next-btn" onclick="importPreview()">解析</button>
+      <button class="btn" id="import-confirm-btn" style="display:none;" onclick="importConfirm()">建立倉位</button>
     </div>
   </div>
 </div>
@@ -861,14 +1031,20 @@
       <label>日期</label>
       <input type="date" id="tx-date" autocomplete="off">
     </div>
-    <div class="field" id="wrap-shares">
-      <label>股數 (整數)</label>
-      <input type="number" id="tx-shares" step="1" min="1" placeholder="0" autocomplete="off"
-        oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-    </div>
-    <div class="field" id="wrap-price">
-      <label id="lbl-price">成交單價</label>
-      <input type="number" id="tx-price" step="0.01" min="0" placeholder="0" autocomplete="off">
+    <div class="field-row" id="wrap-price-shares">
+      <div class="field" id="wrap-price">
+        <label id="lbl-price">成交單價</label>
+        <div class="price-input">
+          <span class="price-prefix">$</span>
+          <input type="number" id="tx-price" step="0.01" min="0" placeholder="0" autocomplete="off">
+        </div>
+      </div>
+      <span class="field-row-sep" id="price-shares-sep">×</span>
+      <div class="field" id="wrap-shares">
+        <label>股數</label>
+        <input type="number" id="tx-shares" step="1" min="1" placeholder="0" autocomplete="off"
+          oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+      </div>
     </div>
     <div class="field" id="wrap-fee">
       <label>手續費</label>
@@ -945,6 +1121,31 @@
     document.getElementById(id).classList.toggle('open');
   }
 
+  // ── 持倉排序：'sort' 依伺服器預設（自訂）順序，'cost' 依持倉成本由高至低 ──
+  let stockSortMode = localStorage.getItem('stockSortMode') || 'sort';
+  const ORIGINAL_STOCK_ORDER = Array.from(document.querySelectorAll('.stock-list > .stock-card[data-cost]'));
+
+  function applyStockSort() {
+    const toggleBtn = document.getElementById('stock-sort-toggle');
+    if (toggleBtn) toggleBtn.classList.toggle('active', stockSortMode === 'cost');
+
+    const list = document.querySelector('.stock-list');
+    if (!list || !ORIGINAL_STOCK_ORDER.length) return;
+
+    const ordered = stockSortMode === 'cost'
+      ? [...ORIGINAL_STOCK_ORDER].sort((a, b) => parseFloat(b.dataset.cost) - parseFloat(a.dataset.cost))
+      : ORIGINAL_STOCK_ORDER;
+    ordered.forEach(c => list.appendChild(c));
+  }
+
+  function toggleStockSort() {
+    stockSortMode = stockSortMode === 'sort' ? 'cost' : 'sort';
+    localStorage.setItem('stockSortMode', stockSortMode);
+    applyStockSort();
+  }
+
+  applyStockSort();
+
   // Inline stock name editing
   document.querySelectorAll('.stock-name-input').forEach(input => {
     input.addEventListener('keydown', function (e) {
@@ -980,11 +1181,12 @@
     const symbol = document.getElementById('pos-symbol').value;
     const name = document.getElementById('pos-name').value;
     const account_id = document.getElementById('pos-account').value;
-    if (!symbol || !name || !account_id) return toast("請填寫完整資訊");
     const init_shares = parseInt(document.getElementById('pos-init-shares').value || 0, 10);
     const init_cost = parseFloat(document.getElementById('pos-init-cost').value || 0);
     const init_date = document.getElementById('pos-init-date').value;
-    if (init_cost > 0 && !init_shares) return toast("填寫初始總成本時，請一併填寫初始股數");
+    if (!symbol || !name || !account_id || !init_shares || !init_cost || !init_date) {
+      return toast("請填寫完整資訊");
+    }
     const res = await fetch("/api/stocks", {
       method: "POST",
       body: JSON.stringify({ symbol, name, account_id, init_shares, init_cost, init_date })
@@ -993,20 +1195,125 @@
     else { const err = await res.json(); toast(err.error || "建立失敗"); }
   }
 
+  // Import Modal
+  let _importPositions = [];
+
+  function openImportModal() {
+    _importPositions = [];
+    document.getElementById('import-step-upload').style.display = 'block';
+    document.getElementById('import-step-preview').style.display = 'none';
+    document.getElementById('import-next-btn').style.display = 'block';
+    document.getElementById('import-confirm-btn').style.display = 'none';
+    document.getElementById('import-file').value = '';
+    document.getElementById('import-account').selectedIndex = 0;
+    document.getElementById('import-list').innerHTML = '';
+    document.getElementById('import-skipped').textContent = '';
+    document.getElementById('import-modal').classList.add('open');
+  }
+  function closeImportModal() { document.getElementById('import-modal').classList.remove('open'); }
+
+  async function importPreview() {
+    const account_id = document.getElementById('import-account').value;
+    const file = document.getElementById('import-file').files[0];
+    if (!account_id) return toast("請選擇交割帳號");
+    if (!file) return toast("請選擇對帳單檔案");
+
+    const btn = document.getElementById('import-next-btn');
+    btn.textContent = '解析中...'; btn.disabled = true;
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/stocks/import/preview', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) { toast(data.error || '解析失敗'); return; }
+      const allPositions = data.positions || [];
+      // 只列出尚未建倉的股票；已存在的持股不重複顯示，僅在下方提示筆數。
+      _importPositions = allPositions.filter(p => !p.existing);
+      if (!allPositions.length) { toast('找不到可建立的倉位'); return; }
+      if (!_importPositions.length) { toast('對帳單中的股票皆已建倉，無新增項目'); return; }
+
+      const list = document.getElementById('import-list');
+      list.innerHTML = _importPositions.map((p, i) => `
+        <div class="import-row">
+          <input type="checkbox" class="import-check" data-idx="${i}" checked>
+          <div class="import-row-info">
+            <div class="import-row-top">
+              <span class="import-row-name">${p.name}</span>
+              <input type="text" class="import-code" data-idx="${i}" value="${p.symbol || ''}"
+                placeholder="代碼" maxlength="12" autocomplete="off"
+                oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9.]/g,'')">
+            </div>
+            <span class="import-row-sub">${p.shares} 股 · 均價 $${p.avg_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · $${Math.round(p.total_cost).toLocaleString()}</span>
+          </div>
+        </div>
+      `).join('');
+      const missing = _importPositions.filter(p => !p.symbol).length;
+      let note = '';
+      if (data.existing_count) note += `已略過 ${data.existing_count} 支已建倉的股票。`;
+      if (data.skipped) note += `已略過 ${data.skipped} 筆無法解析的資料列。`;
+      if (missing) note += `${missing} 支未自動對應到代碼，請手動輸入才能查詢即時報價。`;
+      document.getElementById('import-skipped').textContent = note;
+
+      document.getElementById('import-step-upload').style.display = 'none';
+      document.getElementById('import-step-preview').style.display = 'block';
+      document.getElementById('import-next-btn').style.display = 'none';
+      document.getElementById('import-confirm-btn').style.display = 'block';
+    } catch (e) {
+      toast('解析失敗，請確認檔案格式');
+    } finally {
+      btn.textContent = '解析'; btn.disabled = false;
+    }
+  }
+
+  async function importConfirm() {
+    const account_id = document.getElementById('import-account').value;
+    // 把使用者可能修改過的代碼寫回各倉位
+    document.querySelectorAll('#import-list .import-code').forEach(inp => {
+      _importPositions[parseInt(inp.dataset.idx, 10)].symbol = inp.value.trim();
+    });
+    const checked = [...document.querySelectorAll('#import-list .import-check:checked')]
+      .map(cb => _importPositions[parseInt(cb.dataset.idx, 10)]);
+    if (!checked.length) return toast("請至少勾選一支股票");
+
+    const btn = document.getElementById('import-confirm-btn');
+    btn.textContent = '建立中...'; btn.disabled = true;
+    try {
+      const res = await fetch('/api/stocks/import', {
+        method: 'POST',
+        body: JSON.stringify({ account_id, positions: checked })
+      });
+      const data = await res.json();
+      if (!res.ok) { toast(data.error || '匯入失敗'); return; }
+      let msg = `已建立 ${data.created} 支倉位`;
+      if (data.skipped) msg += `，略過 ${data.skipped} 支（已存在）`;
+      toast(msg);
+      _reloadTabs('settings', 'home');
+      setTimeout(() => location.reload(), 700);
+    } catch (e) {
+      toast('匯入失敗');
+    } finally {
+      btn.textContent = '建立倉位'; btn.disabled = false;
+    }
+  }
+
   // Transaction Modal
   function _configureTxFields(type) {
     const wShares = document.getElementById('wrap-shares');
     const wPrice = document.getElementById('wrap-price');
     const wFee = document.getElementById('wrap-fee');
     const lPrice = document.getElementById('lbl-price');
+    const sep = document.getElementById('price-shares-sep');
+    const prefix = document.querySelector('.price-prefix');
     wShares.style.display = 'block'; wPrice.style.display = 'block'; wFee.style.display = 'block';
+    sep.style.display = 'block'; prefix.style.display = 'inline';
     if (type === 'buy' || type === 'sell') {
       lPrice.textContent = '成交單價';
     } else if (type === 'dividend') {
-      wShares.style.display = 'none'; wFee.style.display = 'none';
+      wShares.style.display = 'none'; wFee.style.display = 'none'; sep.style.display = 'none';
       lPrice.textContent = '股利總額';
     } else if (type === 'split') {
-      wShares.style.display = 'none'; wFee.style.display = 'none';
+      wShares.style.display = 'none'; wFee.style.display = 'none'; sep.style.display = 'none';
+      prefix.style.display = 'none';
       lPrice.textContent = '分割比例 (例: 1變2 輸入 2)';
     } else if (type === 'opening') {
       wFee.style.display = 'none';
@@ -1058,7 +1365,7 @@
   });
 
   async function deleteTx(id) {
-    if (!await showConfirm('確定要刪除這筆交易？只能刪除最新一筆交易。')) return;
+    if (!await showConfirm('確定要刪除這筆交易？')) return;
     const res = await fetch(`/api/stocks/transactions/${id}`, { method: 'DELETE' });
     if (res.ok) { toast('已刪除'); _reloadTabs('home'); setTimeout(() => location.reload(), 500); }
     else { const err = await res.json(); toast('錯誤: ' + (err.error || '刪除失敗')); }

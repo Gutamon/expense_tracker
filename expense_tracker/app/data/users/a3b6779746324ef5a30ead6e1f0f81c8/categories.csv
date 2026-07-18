@@ -1,0 +1,11 @@
+﻿id,name,type,is_asset,in_budget,group_name,sort_order,monthly_budget
+1,餐飲,expense,1,1,生活,0,0
+2,交通,expense,1,1,生活,1,0
+3,娛樂,expense,1,1,休閒,2,0
+4,購物,expense,1,1,生活,3,0
+5,醫療,expense,1,1,健康,4,0
+6,住宿,expense,1,1,生活,5,0
+7,教育,expense,1,1,學習,6,0
+8,薪水,income,1,0,主要收入,7,0
+9,獎金,income,1,0,額外收入,8,0
+10,其他,expense,1,1,其他,9,0

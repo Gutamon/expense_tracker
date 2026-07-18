@@ -1,0 +1,2 @@
+﻿id,name,type,principal,remaining,interest_rate,start_date,due_date,account_id,linked_account_id,status,note,created_at
+1,討債時間！,lend,10000.0,10000.0,0,2026-07-16,,11,11,active,匯入建立,2026-07-16 18:38:27

@@ -21,11 +21,15 @@ def shell():
         # Render the 全新開始 / 匯入還原 chooser directly — a redirect here would create
         # a second device before the browser stores the cookie from the first response.
         return render_template("onboarding.html")
-    # Hand the device's rescue code to the shell so it can be mirrored into
-    # localStorage — the iOS home-screen PWA drops the httponly cookie between cold
-    # launches, and this lets the onboarding screen silently re-attach on next open.
-    rescue_code = user.ensure_rescue_code(csv_store.root_dir(), g.device_id)
-    return render_template("shell.html", rescue_code=rescue_code)
+    # Hand the device's 識別碼 to the shell so it can be mirrored into localStorage —
+    # the iOS home-screen PWA drops the httponly cookie between cold launches, and
+    # this lets the onboarding screen silently re-attach on next open. Read-only: the
+    # shell loads several tabs as concurrent same-origin iframes, and generating a
+    # code here (which can move the device's data folder on disk — see
+    # user.ensure_sync_code) would race with those sibling requests. A code only
+    # exists once the device has visited 設定, which mints it there instead.
+    sync_code = user.sync_code_if_exists(csv_store.root_dir(), g.device_id) or ""
+    return render_template("shell.html", sync_code=sync_code)
 
 
 def _assets_version() -> str:
@@ -67,6 +71,15 @@ def index():
     account_map = {a["id"]: a for a in accounts}
 
     cat_dict = {c["name"]: c for c in categories}
+    cat_by_id = {int(c["id"]): c for c in categories if c.get("id")}
+
+    # Resolve each row's display category live from its category_id, so a rename在
+    # 設定頁 shows immediately without rewriting expenses. Legacy rows (no id) keep
+    # their stored name. cat_info below is looked up by id first for the same reason.
+    for e in expenses:
+        cid = int(e.get("category_id") or 0)
+        if cid and cid in cat_by_id:
+            e["category"] = cat_by_id[cid]["name"]
 
     total_balance = 0
     budget_used = 0
@@ -81,7 +94,8 @@ def index():
             total_balance += ob
 
     for e in expenses:
-        cat_info = cat_dict.get(e["category"], {})
+        cid = int(e.get("category_id") or 0)
+        cat_info = cat_by_id.get(cid) or cat_dict.get(e["category"], {})
         is_asset = int(cat_info.get("is_asset", 1) or 1)
         in_budget = int(cat_info.get("in_budget", 0) or 0) if cat_info else 0
 
@@ -257,7 +271,36 @@ def api_adjust_balance(account_id):
 
 @main_bp.route("/api/expenses", methods=["GET"])
 def api_list():
-    return jsonify(expense_model.get_all())
+    # Resolve the display category name live from category_id (mirrors /home), so a
+    # rename在設定頁 shows on the next client refresh without touching stored rows.
+    rows = expense_model.get_all()
+    cat_by_id = {int(c["id"]): c for c in category_model.get_all() if c.get("id")}
+    for r in rows:
+        cid = int(r.get("category_id") or 0)
+        if cid in cat_by_id:
+            r["category"] = cat_by_id[cid]["name"]
+    return jsonify(rows)
+
+
+def _resolve_category(data: dict, req_type: str) -> tuple:
+    """Return (name, id) for an expense/income row from the request payload.
+
+    Prefers an explicit category_id (the select now carries the id); falls back to
+    resolving name+type against categories.csv. Storing both means identity travels
+    with the id (filters, same-name 收入/支出) while the name stays for display/export.
+    Transfers have no category."""
+    if req_type == "transfer":
+        return "", 0
+    cats = category_model.get_all()
+    by_id = {str(c["id"]): c for c in cats}
+    cid = str(data.get("category_id") or "").strip()
+    if cid and cid in by_id:
+        return by_id[cid]["name"], int(cid)
+    # No id given: match by name + type (the type keeps 同名不同型別 apart).
+    name = (data.get("category") or "").strip()
+    match = next((c for c in cats if c.get("name") == name and c.get("type") == req_type), None)
+    match = match or next((c for c in cats if c.get("name") == name), None)
+    return (name, int(match["id"]) if match else 0)
 
 
 @main_bp.route("/api/expenses", methods=["POST"])
@@ -287,10 +330,12 @@ def api_create():
                 if from_cur != to_cur and (from_acc.get("type") == "liability" or to_acc.get("type") == "liability"):
                     abort(400, description="跨幣別轉帳只允許在現金類帳戶之間進行")
 
+    cat_name, cat_id = _resolve_category(data, req_type)
     new_id = expense_model.create(
         title=data["title"],
         amount=data["amount"],
-        category=data["category"] if req_type != "transfer" else "",
+        category=cat_name,
+        category_id=cat_id,
         date=data["date"],
         note=data.get("note", ""),
         type=req_type,
@@ -320,6 +365,13 @@ def api_update(expense_id):
     if req_type != "transfer":
         data["to_account_id"] = 0
         data["to_amount"] = None
+
+    # Re-resolve category so an edited name/type also updates the stored id (and a
+    # transfer clears both). Only when the payload actually references a category.
+    if req_type == "transfer":
+        data["category"], data["category_id"] = "", 0
+    elif "category" in data or "category_id" in data:
+        data["category"], data["category_id"] = _resolve_category(data, req_type)
 
     if not expense_model.update(expense_id, data):
         abort(404, description="更新失敗或找不到此筆明細")

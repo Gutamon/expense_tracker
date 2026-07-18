@@ -98,28 +98,6 @@
     color: var(--accent);
   }
 
-  /* ── Asset proportion bar ── */
-  .prop-bar {
-    display: flex;
-    height: 14px;
-    border-radius: 7px;
-    overflow: hidden;
-    background: var(--border);
-  }
-
-  .prop-seg {
-    height: 100%;
-    transition: width .35s ease;
-    min-width: 2px;
-  }
-
-  .prop-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 3px;
-    flex-shrink: 0;
-  }
-
   /* ── 資產總覽（資產 / 負債 / 股票，垂直排列，無底框，純文字） ──
      用 grid 讓「NT$」欄與「數字」欄在所有列之間共用同一欄寬，
      才能讓符號真正貼齊、數字尾端真正對齊（各列 flex 各自獨立無法做到）。 */
@@ -264,24 +242,6 @@
   optgroup {
     background: #1e1e24;
     color: var(--text);
-  }
-
-  .type-switch input[value="expense"]:checked+label {
-    background: var(--danger-dim);
-    color: var(--danger);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
-  }
-
-  .type-switch input[value="income"]:checked+label {
-    background: var(--positive-dim);
-    color: var(--positive);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
-  }
-
-  .type-switch input[value="transfer"]:checked+label {
-    background: var(--accent-dim);
-    color: var(--accent);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
   }
 
   .btn {
@@ -601,6 +561,10 @@
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
       z-index: 10;
       transition: transform .15s, opacity .15s;
+    }
+
+    .shell {
+      padding-bottom: calc(64px + 40px + env(safe-area-inset-bottom) + 1.25rem);
     }
 
     .fab-add:active {
@@ -946,14 +910,14 @@
     padding: 2px 0;
   }
 
-  /* 資產組成的帳戶列：用 grid 讓「圓點 / 名稱 / % / NT$ / 數字」五欄跨列共用欄寬，
+  /* 資產組成的帳戶列：用 grid 讓「名稱 / % / NT$ / 數字」四欄跨列共用欄寬，
      金額欄寬自動長到最寬那筆（位數再多也不截斷、仍對齊）。
      .bd-row 為 display:contents，把子欄攤平成 grid 的直接子項；hover 背景改由父列
      偵測後套用到各子欄（contents 元素本身無法有背景）。 */
   .bd-rows {
     margin-top: 10px;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
     align-items: center;
     column-gap: 10px;
     row-gap: 0;
@@ -1157,15 +1121,14 @@
         {% for group, cats in grouped_categories.items() %}
         <optgroup label="{{ group }}">
           {% for cat in cats %}
-          <option value="{{ cat.name }}" data-type="{{ cat.type }}">{{ cat.name }}</option>
+          <option value="{{ cat.id }}" data-type="{{ cat.type }}" data-name="{{ cat.name }}">{{ cat.name }}</option>
           {% endfor %}
         </optgroup>
         {% endfor %}
       </select>
     </div>
     <div class="field">
-      <label id="f-account-label">帳戶 <a href="/settings?tab=accounts"
-          style="font-size:0.625rem;float:right;cursor:pointer;color:var(--accent);text-decoration:none;">管理</a></label>
+      <label id="f-account-label">帳戶</label>
       <select id="f-account">
 
         {% for a in accounts %}
@@ -1234,10 +1197,10 @@
     <!-- Month Navigator -->
     <div class="month-nav" id="month-nav">
       <div class="month-nav-controls">
-        <button class="month-btn" onclick="changeMonth(-1)">&#8249;</button>
+        <button class="month-btn tap-repeat" onclick="changeMonth(-1)">&#8249;</button>
         <span id="month-display" onclick="openMonthPicker()" style="cursor:pointer;user-select:none"
           title="點擊跳轉"></span>
-        <button class="month-btn" onclick="changeMonth(1)">&#8250;</button>
+        <button class="month-btn tap-repeat" onclick="changeMonth(1)">&#8250;</button>
       </div>
     </div>
     <div id="date-range-bar" style="display:none">
@@ -1292,7 +1255,7 @@
       </div>
       {% endfor %}
       {% else %}
-      <div class="empty">尚無明細，請從左側新增。</div>
+      <div class="empty">本月尚無明細</div>
       {% endif %}
     </div>
 
@@ -1341,7 +1304,7 @@
           {% for group, cats in grouped_categories.items() %}
           <optgroup label="{{ group }}">
             {% for cat in cats %}
-            <option value="{{ cat.name }}" data-type="{{ cat.type }}">{{ cat.name }}</option>
+            <option value="{{ cat.id }}" data-type="{{ cat.type }}" data-name="{{ cat.name }}">{{ cat.name }}</option>
             {% endfor %}
           </optgroup>
           {% endfor %}
@@ -1415,7 +1378,7 @@
           {% for group, cats in grouped_categories.items() %}
           <optgroup label="{{ group }}">
             {% for cat in cats %}
-            <option value="{{ cat.name }}" data-type="{{ cat.type }}">{{ cat.name }}</option>
+            <option value="{{ cat.id }}" data-type="{{ cat.type }}" data-name="{{ cat.name }}">{{ cat.name }}</option>
             {% endfor %}
           </optgroup>
           {% endfor %}
@@ -1681,7 +1644,7 @@
   document.getElementById("f-date").value = today;
   document.getElementById("m-date").value = today;
 
-  const allExpenses = {{ expenses | tojson | safe }};
+  let allExpenses = {{ expenses | tojson | safe }};
   const accountMapData = {{ account_map | tojson | safe }};
   const allCategories = {{ categories | tojson | safe }};
   const CC_ACCOUNT_IDS = new Set({{ cc_account_ids | tojson | safe }});
@@ -1694,29 +1657,6 @@
   const STOCK_VALUE = {{ stock_value | tojson | safe }};
   const LOAN_LEND_NET = {{ lend_net | default (0) | tojson }};
   const LOAN_BORROW_NET = {{ borrow_net | default (0) | tojson }};
-
-  // 資產／負債長條的配色改為「依序漸層」：沿著固定色相帶均勻取樣，
-  // 段數越多、色相間距越細，讀起來是一條連續光譜而非隨機色塊。
-  // hueStart→hueEnd 為色相範圍（HSL 角度），冷色帶給資產、暖色帶給負債。
-  function hsl(h, s, l) { return `hsl(${h}, ${s}%, ${l}%)`; }
-  function rampPalette(n, hueStart, hueEnd, sat, lightStart, lightEnd) {
-    if (n <= 0) return [];
-    if (n === 1) return [hsl((hueStart + hueEnd) / 2, sat, (lightStart + lightEnd) / 2)];
-    const out = [];
-    for (let i = 0; i < n; i++) {
-      const t = i / (n - 1);
-      out.push(hsl(
-        Math.round(hueStart + (hueEnd - hueStart) * t),
-        sat,
-        Math.round(lightStart + (lightEnd - lightStart) * t)
-      ));
-    }
-    return out;
-  }
-  // 冷色帶：黃綠(70°) → 綠 → 青 → 藍 → 紫(300°)，跨度加大、亮度也拉開讓每段更好區分
-  const PROP_RAMP_COOL = n => rampPalette(n, 70, 300, 68, 72, 52);
-  // 暖色帶：紅(-8°) → 橘 → 琥珀黃(52°)，跨度加大並拉開亮度
-  const PROP_RAMP_WARM = n => rampPalette(n, -8, 52, 82, 56, 66);
 
   function fmtTWD(n) { return 'NT$ ' + Math.round(n).toLocaleString(); }
   function fmtTWDHtml(n) {
@@ -1795,7 +1735,7 @@
       document.getElementById(prefix + '-title-field').style.display = 'none';
       document.getElementById(prefix + '-category-field').style.display = 'none';
       document.getElementById(prefix + '-to-account-field').style.display = 'block';
-      document.getElementById(prefix + '-account-label').innerHTML = `轉出帳戶 <a href="/settings?tab=accounts" style="font-size:0.625rem;float:right;cursor:pointer;color:var(--accent);text-decoration:none;">管理</a>`;
+      document.getElementById(prefix + '-account-label').innerHTML = `轉出帳戶`;
       document.getElementById(prefix + '-title').value = '轉帳';
       document.getElementById(`${prefix}-account`).onchange = () => updateTransferAmountFields(prefix);
       document.getElementById(`${prefix}-to-account`).onchange = () => { updateTransferAmountFields(prefix); checkCCTransfer(prefix); };
@@ -1806,7 +1746,7 @@
       document.getElementById(prefix + '-category-field').style.display = 'block';
       document.getElementById(prefix + '-to-account-field').style.display = 'none';
       document.getElementById(`${prefix}-to-amount-field`).style.display = 'none';
-      document.getElementById(prefix + '-account-label').innerHTML = `帳戶 <a href="/settings?tab=accounts" style="font-size:0.625rem;float:right;cursor:pointer;color:var(--accent);text-decoration:none;">管理</a>`;
+      document.getElementById(prefix + '-account-label').innerHTML = `帳戶`;
       document.getElementById(`${prefix}-account`).onchange = () => updateAmountLabel(prefix);
       document.getElementById(`${prefix}-to-account`).onchange = null;
       const hint = document.getElementById(`${prefix}-cc-transfer-hint`);
@@ -1856,10 +1796,11 @@
       og.label = gname;
       cats.forEach(cat => {
         const opt = document.createElement('option');
-        opt.value = cat.name;
+        opt.value = String(cat.id);
         opt.textContent = cat.name;
         opt.dataset.type = cat.type;
-        if (!firstValue) firstValue = cat.name;
+        opt.dataset.name = cat.name;
+        if (!firstValue) firstValue = String(cat.id);
         og.appendChild(opt);
       });
       select.appendChild(og);
@@ -1900,6 +1841,22 @@
     </div>`;
   }
 
+  // Re-fetch expenses in the background so the budget chart reflects a just-added
+  // entry immediately, without reloading the page (which would close the add overlay).
+  async function refreshExpensesData() {
+    try {
+      const res = await fetch("/api/expenses");
+      if (!res.ok) return;
+      allExpenses = await res.json();
+      updateBudgetDisplay();
+      if (calendar && document.getElementById('calendar-view').style.display !== 'none') {
+        initCalendar(isAllFilterActive() ? null : getActiveAccountIds());
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   // Budget display (fetches per-month data from API)
   let _budgetCache = {};
 
@@ -1911,8 +1868,10 @@
   }
 
   async function updateBudgetDisplay() {
+    // Expense-only map: an income category sharing a name with an expense one
+    // (e.g. 清點差額) must never shadow the expense category's in_budget flag.
     const catMap = {};
-    allCategories.forEach(c => { catMap[c.name] = c; });
+    allCategories.filter(c => c.type === 'expense').forEach(c => { catMap[c.name] = c; });
 
     const catSpent = {};
     let totalSpent = 0;
@@ -1943,12 +1902,13 @@
       }
     }
 
-    // 依群組彙總已花費金額（用於群組預算條）
+    // 依群組彙總已花費金額（用於群組預算條）。以 groupIdOfCat 解析，
+    // 同名的收入群組不會吃走支出類別的花費。
     const groupSpent = {};
     allCategories.filter(c => c.type === 'expense').forEach(cat => {
-      const g = ALL_GROUPS.find(x => x.name === cat.group_name);
-      if (!g) return;
-      groupSpent[String(g.id)] = (groupSpent[String(g.id)] || 0) + (catSpent[cat.name] || 0);
+      const gid = groupIdOfCat(cat);
+      if (gid === '未分類') return;
+      groupSpent[gid] = (groupSpent[gid] || 0) + (catSpent[cat.name] || 0);
     });
 
     let html = '';
@@ -1964,7 +1924,7 @@
       html += buildBudgetBar(g.name, spent, b, pct, spent > b);
     });
     allCategories.filter(c => c.type === 'expense').forEach(cat => {
-      if (advFilter.cats.length > 0 && !advFilter.cats.includes(cat.name)) return;
+      if (advFilter.cats.length > 0 && !advFilter.cats.map(String).includes(String(cat.id))) return;
       const b = catBudgetMap[String(cat.id)] || 0;
       if (b <= 0) return;
       const spent = catSpent[cat.name] || 0;
@@ -1984,11 +1944,14 @@
   async function addExpenseFrom(prefix, keepOpen = false) {
     const type = document.querySelector(`input[name="${prefix}-type"]:checked`).value;
     const titleValue = document.getElementById(`${prefix}-title`).value.trim();
+    const catSel = document.getElementById(`${prefix}-category`);
+    const catOpt = catSel.selectedOptions[0];
     const body = {
       type,
       title: type === 'transfer' ? (titleValue || "轉帳") : titleValue,
       amount: parseFloat(document.getElementById(`${prefix}-amount`).value),
-      category: document.getElementById(`${prefix}-category`).value,
+      category: catOpt ? (catOpt.dataset.name || catOpt.textContent.trim()) : '',
+      category_id: parseInt(catSel.value) || 0,
       date: document.getElementById(`${prefix}-date`).value,
       note: document.getElementById(`${prefix}-note`).value.trim(),
       account_id: parseInt(document.getElementById(`${prefix}-account`).value) || 0,
@@ -2015,6 +1978,7 @@
         if (document.getElementById(`${prefix}-to-amount`)) document.getElementById(`${prefix}-to-amount`).value = '';
         toast("新增成功 ✓ 可繼續輸入");
         pendingReload = true;
+        refreshExpensesData();
       } else {
         toast("新增成功 ✓");
         location.reload();
@@ -2040,7 +2004,17 @@
       document.getElementById("e-title").value = d.title || '';
       document.getElementById("e-amount").value = d.amount || 0;
       setTimeout(() => {
-        if (d.type !== 'transfer') document.getElementById("e-category").value = d.category;
+        if (d.type !== 'transfer') {
+          const catSel = document.getElementById("e-category");
+          // Options are keyed by id now. Prefer the stored id; fall back to matching
+          // by name (legacy rows without a category_id) using the option's data-name.
+          if (d.category_id && [...catSel.options].some(o => o.value === String(d.category_id))) {
+            catSel.value = String(d.category_id);
+          } else {
+            const byName = [...catSel.options].find(o => (o.dataset.name || '') === d.category);
+            if (byName) catSel.value = byName.value;
+          }
+        }
         document.getElementById("e-account").value = d.account_id || 0;
         if (d.type === 'transfer') {
           document.getElementById("e-to-account").value = d.to_account_id || 0;
@@ -2063,11 +2037,14 @@
     const id = document.getElementById("e-id").value;
     const type = document.querySelector('input[name="e-type"]:checked').value;
     const titleValue = document.getElementById("e-title").value.trim();
+    const eCatSel = document.getElementById("e-category");
+    const eCatOpt = eCatSel.selectedOptions[0];
     const body = {
       type,
       title: type === 'transfer' ? (titleValue || "轉帳") : titleValue,
       amount: parseFloat(document.getElementById("e-amount").value),
-      category: document.getElementById("e-category").value,
+      category: eCatOpt ? (eCatOpt.dataset.name || eCatOpt.textContent.trim()) : '',
+      category_id: parseInt(eCatSel.value) || 0,
       date: document.getElementById("e-date").value,
       note: document.getElementById("e-note").value.trim(),
       account_id: parseInt(document.getElementById("e-account").value) || 0,
@@ -2120,24 +2097,43 @@
   const ADV_LABEL = { acc: ['全部帳戶', '帳戶'], grp: ['全部群組', '群組'], cat: ['全部類別', '類別'] };
 
   // 群組/類別 helpers
-  const groupNameSet = new Set(ALL_GROUPS.map(g => g.name));
-  function groupTypeOfName(name) {
-    const g = ALL_GROUPS.find(x => x.name === name);
-    return g && g.type === 'income' ? 'income' : 'expense';
+  // 群組篩選一律以「group id」為鍵（'未分類' 為哨兵值）——收入與支出群組
+  // 可以同名（如 其他），用名稱當鍵會把兩個群組合併成一顆按鈕。
+  const groupById = new Map(ALL_GROUPS.map(g => [String(g.id), g]));
+  function groupTypeOf(g) { return g && g.type === 'income' ? 'income' : 'expense'; }
+  // 類別 → 群組 id：categories 只存 group_name 字串，同名群組靠
+  // 「群組 type 必須等於類別 type」消歧，找不到同型別的才退回純名稱比對。
+  function groupIdOfCat(c) {
+    if (!c || !c.group_name) return '未分類';
+    const t = c.type === 'income' ? 'income' : 'expense';
+    const g = ALL_GROUPS.find(x => x.name === c.group_name && groupTypeOf(x) === t) ||
+      ALL_GROUPS.find(x => x.name === c.group_name);
+    return g ? String(g.id) : '未分類';
   }
-  function catGroupOf(catName) {
-    const c = allCategories.find(x => x.name === catName);
-    const gn = c && c.group_name;
-    return gn && groupNameSet.has(gn) ? gn : '未分類';
+  function catGroupOf(catName, catType) {
+    // A name alone is ambiguous when income and expense share a category name
+    // (e.g. 清點差額) — disambiguate by type when the caller has it.
+    const c = catType
+      ? (allCategories.find(x => x.name === catName && x.type === catType) ||
+        allCategories.find(x => x.name === catName))
+      : allCategories.find(x => x.name === catName);
+    return groupIdOfCat(c);
+  }
+  // Category-filter selections are ids now (name collisions made names unusable as
+  // keys). These resolve an id back to its group id.
+  function catGroupOfId(catId) {
+    return groupIdOfCat(allCategories.find(x => String(x.id) === String(catId)));
   }
 
   function expenseMatchesAdvFilter(e) {
     if (advFilter.types.length > 0 && !advFilter.types.includes(e.type)) return false;
     if (advFilter.grps.length > 0) {
       if (e.type === 'transfer') return false;
-      if (!advFilter.grps.includes(catGroupOf(e.category))) return false;
+      if (!advFilter.grps.includes(catGroupOf(e.category, e.type))) return false;
     }
-    if (advFilter.cats.length > 0 && !advFilter.cats.includes(e.category)) return false;
+    // Match categories by id, not name — a 收入「匯入」and a 支出「匯入」are distinct
+    // categories that happen to share a name, so name-based matching merged them.
+    if (advFilter.cats.length > 0 && !advFilter.cats.map(String).includes(String(e.category_id))) return false;
     if (advFilter.keyword && !(e.title && e.title.toLowerCase().includes(advFilter.keyword.toLowerCase()))) return false;
     return true;
   }
@@ -2388,8 +2384,8 @@
 
     const events = [];
     for (const [date, data] of Object.entries(agg)) {
-      if (data.income > 0) events.push({ title: `+${Math.round(data.income)}`, start: date, color: 'transparent', textColor: 'var(--accent)' });
-      if (data.expense > 0) events.push({ title: `-${Math.round(data.expense)}`, start: date, color: 'transparent', textColor: 'var(--danger)' });
+      if (data.income > 0) events.push({ title: `+${Math.round(data.income).toLocaleString()}`, start: date, color: 'transparent', textColor: 'var(--accent)' });
+      if (data.expense > 0) events.push({ title: `-${Math.round(data.expense).toLocaleString()}`, start: date, color: 'transparent', textColor: 'var(--danger)' });
     }
 
     if (calendar) calendar.destroy();
@@ -2584,12 +2580,12 @@
     let html = advOptHtml('grp', '', '全部') + '<div class="mfilter-sep"></div>';
     ADV_TYPE_SECTIONS.forEach(([t, label]) => {
       if (!showTypes.includes(t)) return;
-      const names = ALL_GROUPS.filter(g => groupTypeOfName(g.name) === t).map(g => g.name);
-      if (!names.length) return;
+      const gs = ALL_GROUPS.filter(g => groupTypeOf(g) === t);
+      if (!gs.length) return;
       html += `<div class="mfilter-type-label ${t}">${label}</div>` +
-        names.map(n => advOptHtml('grp', n, esc(n))).join('');
+        gs.map(g => advOptHtml('grp', g.id, esc(g.name))).join('');
     });
-    const hasUngrouped = allCategories.some(c => showTypes.includes(c.type) && catGroupOf(c.name) === '未分類');
+    const hasUngrouped = allCategories.some(c => showTypes.includes(c.type) && groupIdOfCat(c) === '未分類');
     if (hasUngrouped) html += '<div class="mfilter-sep"></div>' + advOptHtml('grp', '未分類', '未分類');
     document.getElementById('adv-grp-menu').innerHTML = html;
   }
@@ -2600,14 +2596,17 @@
     let html = advOptHtml('cat', '', '全部') + '<div class="mfilter-sep"></div>';
     ADV_TYPE_SECTIONS.forEach(([t, label]) => {
       if (!showTypes.includes(t)) return;
-      const grpOrder = [...ALL_GROUPS.filter(g => groupTypeOfName(g.name) === t).map(g => g.name), '未分類'];
+      const grpOrder = [
+        ...ALL_GROUPS.filter(g => groupTypeOf(g) === t).map(g => ({ id: String(g.id), name: g.name })),
+        { id: '未分類', name: '未分類' }
+      ];
       let body = '';
       grpOrder.forEach(g => {
-        if (selGrps.length && !selGrps.includes(g)) return;
-        const cats = allCategories.filter(c => c.type === t && catGroupOf(c.name) === g);
+        if (selGrps.length && !selGrps.includes(g.id)) return;
+        const cats = allCategories.filter(c => c.type === t && groupIdOfCat(c) === g.id);
         if (!cats.length) return;
-        body += `<div class="mfilter-group-label">${esc(g)}</div>` +
-          cats.map(c => advOptHtml('cat', c.name, esc(c.name))).join('');
+        body += `<div class="mfilter-group-label">${esc(g.name)}</div>` +
+          cats.map(c => advOptHtml('cat', c.id, esc(c.name))).join('');
       });
       if (body) html += `<div class="mfilter-type-label ${t}">${label}</div>` + body;
     });
@@ -2634,7 +2633,7 @@
     }
     // 群組變動：類別選單只留所選群組的類別，已選但不再允許的一併剔除
     if (kind === 'grp') {
-      if (advSel.grp.length) advSel.cat = advSel.cat.filter(n => advSel.grp.includes(catGroupOf(n)));
+      if (advSel.grp.length) advSel.cat = advSel.cat.filter(id => advSel.grp.includes(catGroupOfId(id)));
       buildAdvCatMenu();
       syncAdvMenuUI('cat');
     }
@@ -2685,9 +2684,9 @@
     }
     if (group === 'type') {
       const showTypes = advShowTypes();
-      advSel.grp = advSel.grp.filter(n => n === '未分類' || showTypes.includes(groupTypeOfName(n)));
-      advSel.cat = advSel.cat.filter(n => {
-        const c = allCategories.find(x => x.name === n);
+      advSel.grp = advSel.grp.filter(v => v === '未分類' || showTypes.includes(groupTypeOf(groupById.get(String(v)))));
+      advSel.cat = advSel.cat.filter(id => {
+        const c = allCategories.find(x => String(x.id) === String(id));
         return c && showTypes.includes(c.type);
       });
       buildAdvGrpMenu();
@@ -2741,7 +2740,7 @@
   }
 
   // ── 資產組成（現金 / 負債 / 股票現值，各自的帳戶佔比；帳戶列可點開明細） ──
-  function bdSectionHtml(title, totalStr, valClass, rows, rampFn, sortByMag = true) {
+  function bdSectionHtml(title, totalStr, valClass, rows, sortByMag = true) {
     let inner;
     const total = rows.reduce((s, r) => s + Math.abs(r.value), 0);
     if (!rows.length || total <= 0) {
@@ -2750,25 +2749,20 @@
       const sorted = rows
         .map(r => ({ ...r, mag: Math.abs(r.value) }))
         .sort((a, b) => sortByMag ? b.mag - a.mag : 0);
-      const palette = rampFn(sorted.length);
-      const colored = sorted.map((r, i) => ({ ...r, color: palette[i] }));
-      const bar = colored.map(r =>
-        `<div class="prop-seg" style="width:${r.mag / total * 100}%;background:${r.color};"></div>`).join('');
-      const list = colored.map(r => {
+      const list = sorted.map(r => {
         const pct = (r.mag / total * 100).toFixed(1);
         const neg = r.value < 0 ? '-' : '';
         const digits = neg + fmtDigitsShort(r.mag);
         const full = 'NT$ ' + neg + Math.round(r.mag).toLocaleString();
         const clickable = r.id !== undefined;
         return `<div class="bd-row${clickable ? ' clickable' : ''}"${clickable ? ` onclick="openAccModal('${r.id}')"` : ''}>
-          <span class="prop-dot" style="background:${r.color};"></span>
           <span class="bd-row-name">${esc(r.name)}</span>
           <span class="bd-row-pct">${pct}%</span>
           <span class="bd-row-amt-sign amt-sign" title="${full}">NT$</span>
           <span class="bd-row-amt-digits amt-digits" title="${full}">${digits}</span>
         </div>`;
       }).join('');
-      inner = `<div class="prop-bar">${bar}</div><div class="bd-rows">${list}</div>`;
+      inner = `<div class="bd-rows">${list}</div>`;
     }
     return `<div class="bd-section">
       <div class="bd-head"><span class="bd-name">${title}</span><span class="bd-val ${valClass}">${totalStr}</span></div>
@@ -2836,14 +2830,14 @@
 
     if (breakdownGroupMode === 'category') {
       el.innerHTML =
-        bdSectionHtml('現金', fmtTWD(cashTotal), cashTotal >= 0 ? 'green' : 'red', sortByAccType(cashRows), PROP_RAMP_COOL, false) +
-        bdSectionHtml('負債', fmtTWD(liabTotal), liabTotal < 0 ? 'red' : 'green', sortByAccType(liabRows), PROP_RAMP_WARM, false) +
-        bdSectionHtml('股票現值', fmtTWD(STOCK_VALUE), 'green', stockRows, PROP_RAMP_COOL);
+        bdSectionHtml('現金', fmtTWD(cashTotal), cashTotal >= 0 ? 'green' : 'red', sortByAccType(cashRows), false) +
+        bdSectionHtml('負債', fmtTWD(liabTotal), liabTotal < 0 ? 'red' : 'green', sortByAccType(liabRows), false) +
+        bdSectionHtml('股票現值', fmtTWD(STOCK_VALUE), 'green', stockRows);
     } else {
       el.innerHTML =
-        bdSectionHtml('現金', fmtTWD(cashTotal), cashTotal >= 0 ? 'green' : 'red', cashRows, PROP_RAMP_COOL, false) +
-        bdSectionHtml('負債', fmtTWD(liabTotal), liabTotal < 0 ? 'red' : 'green', liabRows, PROP_RAMP_WARM, false) +
-        bdSectionHtml('股票現值', fmtTWD(STOCK_VALUE), 'green', stockRows, PROP_RAMP_COOL);
+        bdSectionHtml('現金', fmtTWD(cashTotal), cashTotal >= 0 ? 'green' : 'red', cashRows, false) +
+        bdSectionHtml('負債', fmtTWD(liabTotal), liabTotal < 0 ? 'red' : 'green', liabRows, false) +
+        bdSectionHtml('股票現值', fmtTWD(STOCK_VALUE), 'green', stockRows);
     }
   }
 

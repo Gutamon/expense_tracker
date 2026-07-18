@@ -2,6 +2,31 @@ import os
 from flask import Flask, g, request
 from app.models import csv_store, user
 
+
+def start_rate_scheduler(app):
+    """Daily 00:00 job that refreshes FX rates into every device's settings.csv.
+
+    Call this from run.py, not create_app(): under the Werkzeug debug reloader,
+    create_app() runs once in the parent "watcher" process (just to build the app
+    for reload-inspection) and again in the child worker that actually serves
+    requests — starting the scheduler there would double-fire the job. run.py's
+    __main__ guard plus Werkzeug's own reloader-child guard (WERKZEUG_RUN_MAIN) give
+    us a single, correct call site regardless of debug/reloader settings.
+    """
+    if app.config.get("TESTING"):
+        return
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from app.models import rates
+
+    def _job():
+        with app.app_context():
+            rates.refresh_all_devices()
+
+    scheduler = BackgroundScheduler(timezone="Asia/Taipei", daemon=True)
+    scheduler.add_job(_job, "cron", hour=0, minute=0, id="daily_fx_refresh")
+    scheduler.start()
+
+
 def create_app():
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -15,16 +40,20 @@ def create_app():
     from config import Config
     app.config.from_object(Config)
 
+    @app.template_filter("money")
+    def money_filter(value, decimals=0):
+        return "{:,.{}f}".format(float(value or 0), decimals)
+
     root_dir = app.config["DATA_DIR"]
     csv_store.set_data_dir(root_dir)
     csv_store.init_data_dir()
 
     @app.before_request
     def bind_device():
-        # Static assets don't touch per-device data. The rescue-code restore endpoint
+        # Static assets don't touch per-device data. The sync-code join endpoint
         # resolves its own device_id from the code and sets the cookie itself — it
         # must not have a throwaway device auto-created for it here first.
-        if request.endpoint in ("static", "onboarding.restore_device"):
+        if request.endpoint in ("static", "onboarding.join_by_code"):
             return
         device_id = user.resolve_device_id(request)
         new_device = device_id is None
@@ -32,10 +61,17 @@ def create_app():
             device_id = user.adopt_or_create(root_dir)
             g.new_device = device_id
         g.device_id = device_id
-        g.data_dir = user.user_data_dir(root_dir, device_id)
+        # A synced device's data lives in its sync group's shared folder, not its
+        # own device_id folder — see user.effective_data_id.
+        g.data_dir = user.resolve_data_dir(root_dir, device_id)
         # Seed + migrate the folder for new devices (and re-seed if it went missing).
         if new_device or not os.path.isdir(g.data_dir):
             csv_store.init_current_user()
+        else:
+            # Existing devices: run one-time backfill of expenses/history.category_id.
+            # Guarded by a settings flag so it costs one cheap check per request, not
+            # a full CSV rewrite. New devices are already migrated by init_current_user.
+            csv_store.ensure_category_id_migrated()
 
     @app.after_request
     def add_header(response):

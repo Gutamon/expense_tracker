@@ -24,7 +24,8 @@ class StockModel:
 
     def create_position(self, symbol: str, name: str, account_id: int):
         rows = read_csv("stocks.csv")
-        if any(r.get("symbol") == symbol for r in rows):
+        # 只在代碼非空時以代碼去重；空代碼（尚未設定）不算重複
+        if symbol and any(r.get("symbol") == symbol for r in rows):
             return False
         new_id = next_id(rows)
         rows.append({
@@ -51,6 +52,23 @@ class StockModel:
                 return True
         return False
 
+    def update_prices_bulk(self, price_by_id: dict) -> int:
+        """一次讀寫 stocks.csv 更新多筆現價，避免逐檔 read/write 造成的 I/O 疊加。"""
+        if not price_by_id:
+            return 0
+        rows = read_csv("stocks.csv")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        updated = 0
+        for r in rows:
+            price = price_by_id.get(str(r.get("id")))
+            if price is not None:
+                r["current_price"] = float(price)
+                r["updated_at"] = now
+                updated += 1
+        if updated:
+            write_csv("stocks.csv", rows, SCHEMA["stocks.csv"])
+        return updated
+
     def _update_stock_avg(self, stock_id):
         txs = read_csv("stock_transactions.csv")
         txs = [t for t in txs if str(t.get("stock_id")) == str(stock_id)]
@@ -62,9 +80,10 @@ class StockModel:
             t_type = t.get("type")
             t_shares = float(t.get("shares") or 0)
             t_price = float(t.get("price") or 0)
+            t_fee = float(t.get("fee") or 0)
             if t_type in ("buy", "opening"):
                 shares += t_shares
-                total_cost += t_shares * t_price
+                total_cost += t_shares * t_price + t_fee
             elif t_type == "sell":
                 if shares > 0:
                     avg_cost = total_cost / shares
@@ -151,14 +170,6 @@ class StockModel:
             return False
         stock_id = tx["stock_id"]
 
-        latest = max(
-            (t for t in tx_rows if str(t.get("stock_id")) == str(stock_id)),
-            key=lambda t: (t.get("created_at", ""), t.get("id", "")),
-            default=None
-        )
-        if latest and str(latest.get("id")) != tx_id:
-            raise ValueError("只能刪除最上層（最新）的交易紀錄")
-
         tx_rows = [t for t in tx_rows if str(t.get("id")) != tx_id]
         write_csv("stock_transactions.csv", tx_rows, SCHEMA["stock_transactions.csv"])
 
@@ -177,14 +188,6 @@ class StockModel:
             return False
         stock_id = tx["stock_id"]
         t_type = tx.get("type")
-
-        latest = max(
-            (t for t in tx_rows if str(t.get("stock_id")) == str(stock_id)),
-            key=lambda t: (t.get("created_at", ""), t.get("id", "")),
-            default=None
-        )
-        if latest and str(latest.get("id")) != tx_id:
-            raise ValueError("只能修改最上層（最新）的交易紀錄")
 
         for t in tx_rows:
             if str(t.get("id")) == tx_id:
@@ -214,6 +217,60 @@ class StockModel:
 
         self._update_stock_avg(stock_id)
         return True
+
+    def import_opening_positions(self, positions: list, account_id: int) -> dict:
+        """
+        從券商對帳單聚合結果批次建立期初倉位。
+        positions: [{name, symbol, shares, avg_price, last_date}, ...]
+
+        每支股票建立 stocks 倉位 + 連動投資帳戶（📈），並寫入一筆
+        opening 交易（不產生任何帳戶金流，符合期初持股語意）。
+        symbol 供 yfinance 查價；使用者未提供時留空，之後可在股票專區補上。
+        已存在（同 symbol）的股票會被跳過；無 symbol 者以股名去重。
+        """
+        stock_rows = read_csv("stocks.csv")
+        existing_symbols = {r.get("symbol") for r in stock_rows if r.get("symbol")}
+        existing_names = {r.get("name") for r in stock_rows}
+        created, skipped = 0, 0
+        for p in positions:
+            name = (p.get("name") or "").strip()
+            symbol = (p.get("symbol") or "").strip().upper()
+            shares = int(p.get("shares") or 0)
+            avg_price = float(p.get("avg_price") or 0)
+            date = (p.get("last_date") or "").strip() or datetime.now().strftime("%Y-%m-%d")
+            if not name or shares <= 0:
+                skipped += 1
+                continue
+            # 有代碼以代碼去重，否則以股名去重
+            if (symbol and symbol in existing_symbols) or \
+               (not symbol and name in existing_names):
+                skipped += 1
+                continue
+
+            new_id = self.create_position(symbol, name, account_id)
+            if not new_id:
+                skipped += 1
+                continue
+            if symbol:
+                existing_symbols.add(symbol)
+            existing_names.add(name)
+
+            linked_acc_id = AccountModel().create(
+                name=name, icon="📈", type="asset",
+                sub_type="投資", is_asset=1, currency="TWD")
+            rows = read_csv("stocks.csv")
+            for r in rows:
+                if str(r.get("id")) == str(new_id):
+                    r["linked_account_id"] = int(linked_acc_id)
+                    break
+            write_csv("stocks.csv", rows, SCHEMA["stocks.csv"])
+
+            self.add_transaction(
+                stock_id=int(new_id), t_type="opening", date=date,
+                shares=shares, price=avg_price, fee=0, note="券商對帳單匯入")
+            created += 1
+
+        return {"created": created, "skipped": skipped}
 
     def delete_position(self, stock_id: int) -> bool:
         stock_id = str(stock_id)

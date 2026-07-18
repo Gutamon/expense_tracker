@@ -36,17 +36,29 @@ def manage_settings():
         lid = int(r.get("linked_account_id") or 0)
         if lid:
             linked_account_ids.add(lid)
-    rescue_code = user.ensure_rescue_code(csv_store.root_dir(), g.device_id)
+    sync_code = user.ensure_sync_code(csv_store.root_dir(), g.device_id)
+    linked_device_count = user.linked_device_count(csv_store.root_dir(), g.device_id)
     return render_template("settings.html", categories=categories, groups=groups,
                            accounts=accounts, username="", monthly_budget=monthly_budget,
                            linked_account_ids=linked_account_ids, device_id=g.device_id,
-                           rescue_code=rescue_code)
+                           sync_code=sync_code, linked_device_count=linked_device_count)
 
 
-@settings_bp.route("/api/rescue-code/regenerate", methods=["POST"])
-def api_regenerate_rescue_code():
-    code = user.regenerate_rescue_code(csv_store.root_dir(), g.device_id)
+@settings_bp.route("/api/sync-code/regenerate", methods=["POST"])
+def api_regenerate_sync_code():
+    code = user.regenerate_sync_code(csv_store.root_dir(), g.device_id)
     return jsonify({"code": code})
+
+
+@settings_bp.route("/api/sync-code/leave", methods=["POST"])
+def api_leave_sync_group():
+    """Detach this device from its sync group. Refuses if it's the only device left
+    in the group, since that would strand the 識別碼 with no device holding it."""
+    root = csv_store.root_dir()
+    if user.linked_device_count(root, g.device_id) <= 1:
+        return jsonify({"error": "此裝置未與其他裝置同步"}), 400
+    user.leave_sync_group(root, g.device_id)
+    return jsonify({"success": True})
 
 
 # ── Category API ─────────────────────────────────────────────────────────────
@@ -379,9 +391,13 @@ def api_import_settings():
 def api_data_wipe():
     for filename, fieldnames in csv_store.SCHEMA.items():
         csv_store.write_csv(filename, [], fieldnames)
-    # Invalidate this device's rescue code too — otherwise the onboarding auto-recover
-    # would re-attach to the now-empty device and loop back to onboarding forever.
-    user.clear_rescue_code(csv_store.root_dir(), g.device_id)
+    # Wiping clears the shared folder for every synced device at once (there's only
+    # one ledger). Invalidate the group's 識別碼 and detach every device in it too —
+    # otherwise onboarding's auto-recover would re-attach to the now-empty folder and
+    # loop back to onboarding forever.
+    root = csv_store.root_dir()
+    sync_id = user.effective_data_id(root, g.device_id)
+    user.clear_sync_code(root, sync_id)
     return jsonify({"success": True})
 
 

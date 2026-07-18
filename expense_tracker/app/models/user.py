@@ -19,12 +19,12 @@ from config import Config
 
 COOKIE_NAME = "device_id"
 REGISTRY_FILE = "registry.csv"
-REGISTRY_FIELDS = ["device_id", "display_name", "created_at"]
+REGISTRY_FIELDS = ["device_id", "display_name", "sync_id", "created_at"]
 
-RESCUE_FILE = "rescue_codes.csv"
-RESCUE_FIELDS = ["code", "device_id", "created_at"]
+SYNC_FILE = "sync_codes.csv"
+SYNC_FIELDS = ["code", "sync_id", "created_at"]
 # Excludes ambiguous chars (0/O, 1/I/L) since the user retypes this by hand.
-_RESCUE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+_SYNC_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 
 # App-data CSVs (from csv_store.SCHEMA) plus any stray top-level CSVs are moved into
 # the first device's folder on adoption. registry.csv itself lives in users/, so it
@@ -82,8 +82,16 @@ def _users_root(root: str) -> str:
     return os.path.join(root, Config.USERS_SUBDIR)
 
 
-def user_data_dir(root: str, device_id: str) -> str:
-    return os.path.join(_users_root(root), device_id)
+def user_data_dir(root: str, folder_id: str) -> str:
+    """Join the users/ root with a folder name (a device_id, or a sync_id shared by
+    multiple devices — see effective_data_id)."""
+    return os.path.join(_users_root(root), folder_id)
+
+
+def resolve_data_dir(root: str, device_id: str) -> str:
+    """The actual data folder for a request from this device — its own folder, or
+    the shared sync-group folder if it has joined one via a 識別碼."""
+    return user_data_dir(root, effective_data_id(root, device_id))
 
 
 def _registry_path(root: str) -> str:
@@ -114,8 +122,44 @@ def register(root: str, device_id: str, display_name: str = ""):
         writer.writerow({
             "device_id": device_id,
             "display_name": display_name,
+            "sync_id": "",
             "created_at": datetime.now().isoformat(timespec="seconds"),
         })
+
+
+def _load_registry_rows(root: str) -> list:
+    p = _registry_path(root)
+    if not os.path.exists(p):
+        return []
+    with open(p, "r", encoding="utf-8-sig", newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def _save_registry_rows(root: str, rows: list):
+    os.makedirs(_users_root(root), exist_ok=True)
+    with open(_registry_path(root), "w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=REGISTRY_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _registry_row(root: str, device_id: str) -> dict | None:
+    for row in _load_registry_rows(root):
+        if row.get("device_id") == device_id:
+            return row
+    return None
+
+
+def effective_data_id(root: str, device_id: str) -> str:
+    """Return the folder name this device's data actually lives under.
+
+    A device that has joined a 識別碼 sync group shares its folder (named by the
+    group's sync_id) with every other device in that group. An unsynced device is
+    simply keyed by its own device_id, exactly as before this feature existed.
+    """
+    row = _registry_row(root, device_id)
+    sync_id = (row or {}).get("sync_id") or ""
+    return sync_id or device_id
 
 
 def _legacy_csvs_at_root(root: str) -> list:
@@ -151,81 +195,188 @@ def adopt_or_create(root: str) -> str:
     return device_id
 
 
-# ── Rescue codes ─────────────────────────────────────────────────────────────
-# A device can generate a short, human-typeable code (shown in 設定) that maps back
-# to its folder. Losing the device_id cookie normally means starting fresh (see
-# adopt_or_create); typing this code into the onboarding screen re-attaches the
-# cookie to the original device without needing the ZIP backup.
+# ── Sync codes (識別碼) ────────────────────────────────────────────────────────
+# A 識別碼 identifies a shared ledger, not a single device. It serves two purposes:
+#   1. Cookie loss: typing it into onboarding re-attaches this browser to the ledger
+#      without needing the ZIP backup (replaces the old rescue-code cookie-swap).
+#   2. Multi-device sync: entering the same code on another device's onboarding
+#      screen makes both devices read/write the same folder — no primary/secondary,
+#      both have equal read/write access.
+#
+# Internally, a sync group's shared folder is named after a sync_id (a fresh UUID,
+# distinct from any device_id). registry.csv's sync_id column records which group
+# each device belongs to; effective_data_id() resolves it. A device with no sync_id
+# is simply keyed by its own device_id, unchanged from pre-sync behavior.
 
-def _rescue_path(root: str) -> str:
-    return os.path.join(_users_root(root), RESCUE_FILE)
+def _sync_codes_path(root: str) -> str:
+    return os.path.join(_users_root(root), SYNC_FILE)
 
 
-def _load_rescue_rows(root: str) -> list:
-    p = _rescue_path(root)
+def _load_sync_rows(root: str) -> list:
+    p = _sync_codes_path(root)
     if not os.path.exists(p):
         return []
     with open(p, "r", encoding="utf-8-sig", newline="") as f:
         return list(csv.DictReader(f))
 
 
-def _save_rescue_rows(root: str, rows: list):
+def _save_sync_rows(root: str, rows: list):
     os.makedirs(_users_root(root), exist_ok=True)
-    with open(_rescue_path(root), "w", encoding="utf-8-sig", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=RESCUE_FIELDS)
+    with open(_sync_codes_path(root), "w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=SYNC_FIELDS)
         writer.writeheader()
         writer.writerows(rows)
 
 
 def _generate_code() -> str:
-    raw = "".join(secrets.choice(_RESCUE_ALPHABET) for _ in range(8))
+    raw = "".join(secrets.choice(_SYNC_ALPHABET) for _ in range(8))
     return raw[:4] + "-" + raw[4:]
 
 
-def get_rescue_code(root: str, device_id: str) -> str | None:
-    for row in _load_rescue_rows(root):
+def _set_device_sync_id(root: str, device_id: str, sync_id: str):
+    rows = _load_registry_rows(root)
+    for row in rows:
         if row.get("device_id") == device_id:
+            row["sync_id"] = sync_id
+            break
+    _save_registry_rows(root, rows)
+
+
+def get_sync_code(root: str, sync_id: str) -> str | None:
+    for row in _load_sync_rows(root):
+        if row.get("sync_id") == sync_id:
             return row.get("code")
     return None
 
 
-def ensure_rescue_code(root: str, device_id: str) -> str:
-    """Return this device's rescue code, generating one on first use."""
-    existing = get_rescue_code(root, device_id)
+def _promote_to_sync_group(root: str, device_id: str) -> str:
+    """Turn an unsynced device into a sync group of one under a fresh sync_id.
+
+    A sync_id must never equal any device_id: leaving a group only clears that
+    device's own registry row, and if the group id and a member's device_id were
+    the same string, that member would still (wrongly) count as a group match after
+    leaving. So promotion always mints a new UUID and moves the device's existing
+    folder onto it, rather than reusing the device_id as its own group id.
+    """
+    old_dir = user_data_dir(root, device_id)
+    sync_id = new_device_id()
+    new_dir = user_data_dir(root, sync_id)
+    if os.path.isdir(old_dir):
+        os.replace(old_dir, new_dir)
+    else:
+        os.makedirs(new_dir, exist_ok=True)
+    _set_device_sync_id(root, device_id, sync_id)
+    return sync_id
+
+
+def sync_code_if_exists(root: str, device_id: str) -> str | None:
+    """Return this device's 識別碼 without creating one.
+
+    Read-only, no side effects — safe to call on every page load (e.g. the shell,
+    which loads several tabs as concurrent same-origin iframes). Promoting an
+    unsynced device moves its data folder on disk (see _promote_to_sync_group);
+    doing that from a handler that can race with sibling requests risks one of
+    them reading mid-move and seeing an empty folder. Only ensure_sync_code, called
+    from the standalone 設定 page, is allowed to promote.
+    """
+    sync_id = effective_data_id(root, device_id)
+    return get_sync_code(root, sync_id)
+
+
+def ensure_sync_code(root: str, device_id: str) -> str:
+    """Return this device's 識別碼, generating its sync group on first use.
+
+    An unsynced device is promoted to a sync group of one (see
+    _promote_to_sync_group) and a code is minted pointing at it. A device that
+    already belongs to a group just returns that group's existing code.
+
+    Only call this from a request that can't race with a sibling request for the
+    same device (see sync_code_if_exists) — e.g. the standalone 設定 page, not the
+    shell (which loads several tabs as concurrent same-origin iframes).
+    """
+    sync_id = effective_data_id(root, device_id)
+    existing = get_sync_code(root, sync_id)
     if existing:
         return existing
-    return regenerate_rescue_code(root, device_id)
-
-
-def regenerate_rescue_code(root: str, device_id: str) -> str:
-    """Issue a new rescue code for this device, invalidating any previous one."""
-    rows = [r for r in _load_rescue_rows(root) if r.get("device_id") != device_id]
+    if sync_id == device_id:
+        sync_id = _promote_to_sync_group(root, device_id)
     code = _generate_code()
+    rows = [r for r in _load_sync_rows(root) if r.get("sync_id") != sync_id]
     rows.append({
         "code": code,
-        "device_id": device_id,
+        "sync_id": sync_id,
         "created_at": datetime.now().isoformat(timespec="seconds"),
     })
-    _save_rescue_rows(root, rows)
+    _save_sync_rows(root, rows)
     return code
 
 
-def clear_rescue_code(root: str, device_id: str):
-    """Drop a device's rescue code. Called when its data is wiped, so a now-empty
-    device can't be silently auto-recovered back into a first-run loop."""
-    rows = _load_rescue_rows(root)
-    remaining = [r for r in rows if r.get("device_id") != device_id]
-    if len(remaining) != len(rows):
-        _save_rescue_rows(root, remaining)
+def regenerate_sync_code(root: str, device_id: str) -> str:
+    """Issue a new 識別碼 for this device's sync group, invalidating the previous one."""
+    sync_id = effective_data_id(root, device_id)
+    if sync_id == device_id:
+        sync_id = _promote_to_sync_group(root, device_id)
+    rows = [r for r in _load_sync_rows(root) if r.get("sync_id") != sync_id]
+    code = _generate_code()
+    rows.append({
+        "code": code,
+        "sync_id": sync_id,
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+    })
+    _save_sync_rows(root, rows)
+    return code
 
 
-def resolve_rescue_code(root: str, code: str) -> str | None:
-    """Return the device_id for a rescue code, or None if unknown."""
+def resolve_sync_code(root: str, code: str) -> str | None:
+    """Return the sync_id for a 識別碼, or None if unknown."""
     if not code:
         return None
     needle = code.strip().upper().replace(" ", "").replace("-", "")
-    for row in _load_rescue_rows(root):
+    for row in _load_sync_rows(root):
         haystack = (row.get("code") or "").upper().replace("-", "")
         if haystack == needle:
-            return row.get("device_id")
+            return row.get("sync_id")
     return None
+
+
+def join_sync_group(root: str, device_id: str, sync_id: str):
+    """Attach this (fresh, first-run) device to an existing sync group."""
+    _set_device_sync_id(root, device_id, sync_id)
+
+
+def linked_device_count(root: str, device_id: str) -> int:
+    """How many devices (including this one) share this device's effective data.
+
+    An unsynced device is always a group of one. A synced device's group size is
+    the count of registry rows carrying that same sync_id (never the device's own
+    device_id — see _promote_to_sync_group for why the two must never collide).
+    """
+    row = _registry_row(root, device_id)
+    sync_id = (row or {}).get("sync_id") or ""
+    if not sync_id:
+        return 1
+    return sum(1 for r in _load_registry_rows(root) if r.get("sync_id") == sync_id)
+
+
+def leave_sync_group(root: str, device_id: str):
+    """Detach this device from its sync group, giving it back its own private
+    folder (named by its own device_id, initially empty — onboarding runs again)."""
+    _set_device_sync_id(root, device_id, "")
+
+
+def clear_sync_code(root: str, sync_id: str):
+    """Drop a sync group's 識別碼 and detach every device in it. Called when the
+    group's data is wiped, so devices can't be silently auto-recovered back into a
+    first-run loop, and so a wiped shared folder isn't left reachable by a stale code."""
+    rows = _load_sync_rows(root)
+    remaining = [r for r in rows if r.get("sync_id") != sync_id]
+    if len(remaining) != len(rows):
+        _save_sync_rows(root, remaining)
+    registry_rows = _load_registry_rows(root)
+    changed = False
+    for row in registry_rows:
+        if row.get("sync_id") == sync_id:
+            row["sync_id"] = ""
+            changed = True
+    if changed:
+        _save_registry_rows(root, registry_rows)

@@ -1,9 +1,13 @@
+import os
 import re
+import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from flask import Blueprint, render_template, request, jsonify, abort
 from app.models.stock import StockModel
 from app.models.account import AccountModel
 from app.models import csv_store
+from app.models.stock_import import parse_broker_csv, mark_existing_positions
 
 try:
     import yfinance as yf
@@ -19,9 +23,14 @@ account_model = AccountModel()
 @stock_bp.route("/stocks")
 def manage_stocks():
     stocks = stock_model.get_all()
-    stocks.sort(key=lambda x: (int(x.get("shares") or 0) == 0, -int(x.get("id") or 0)))
-    transactions = stock_model.get_transactions()
     accounts = AccountModel().get_all()
+    acc_sort = {str(a["id"]): int(a.get("sort_order") or 0) for a in accounts}
+    # 自訂順序＝倉位連動帳戶（設定 > 帳戶）的 sort_order；未連動則排最後
+    stocks.sort(key=lambda x: (
+        int(x.get("shares") or 0) == 0,
+        acc_sort.get(str(x.get("linked_account_id")), len(acc_sort)),
+    ))
+    transactions = stock_model.get_transactions()
 
     total_cost = 0
     total_value = 0
@@ -101,7 +110,8 @@ def api_update_all_prices():
     if not _YF_AVAILABLE:
         return jsonify({"error": "yfinance 未安裝，請手動輸入現價"}), 503
 
-    stocks = stock_model.get_all()
+    # 只用股票代碼查價；沒有代碼的（例如匯入時未對應到）直接跳過，不嘗試用名稱查詢。
+    stocks = [s for s in stock_model.get_all() if s.get("symbol")]
     if not stocks:
         return jsonify({"updated": 0, "failed": []})
 
@@ -120,18 +130,20 @@ def api_update_all_prices():
                 continue
         return None
 
-    updated = 0
+    # 每支股票的查價是獨立的網路 I/O，平行處理大幅縮短總等待時間。
+    price_by_id = {}
     failed = []
-    for s in stocks:
-        symbol = s.get("symbol", "")
-        if not symbol:
-            continue
-        price = _fetch_price(symbol)
-        if price:
-            stock_model.update_price(s["id"], price)
-            updated += 1
-        else:
-            failed.append(symbol)
+    with ThreadPoolExecutor(max_workers=min(8, len(stocks))) as pool:
+        future_to_stock = {pool.submit(_fetch_price, s["symbol"]): s for s in stocks}
+        for future in as_completed(future_to_stock):
+            s = future_to_stock[future]
+            price = future.result()
+            if price:
+                price_by_id[str(s["id"])] = price
+            else:
+                failed.append(s["symbol"])
+
+    updated = stock_model.update_prices_bulk(price_by_id)
 
     return jsonify({"updated": updated, "failed": failed})
 
@@ -240,3 +252,46 @@ def api_delete_stock_transaction(tx_id):
         abort(404, "找不到此明細或刪除失敗")
     except ValueError as e:
         abort(400, str(e))
+
+
+@stock_bp.route("/api/stocks/import/preview", methods=["POST"])
+def api_stocks_import_preview():
+    """解析上傳的券商對帳單，回傳每支股票聚合後的初始倉位（不寫入）。"""
+    f = request.files.get("file")
+    if not f:
+        abort(400, "請上傳券商對帳單 CSV")
+    if not f.filename.lower().endswith(".csv"):
+        abort(400, "僅支援 CSV 格式")
+
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".csv")
+    try:
+        os.close(tmp_fd)
+        f.save(tmp_path)
+        result = parse_broker_csv(tmp_path)
+        existing_stocks = stock_model.get_all()
+        mark_result = mark_existing_positions(result["positions"], existing_stocks)
+        result["positions"] = mark_result["positions"]
+        result["existing_count"] = mark_result["existing_count"]
+    except ValueError as e:
+        abort(400, str(e))
+    except Exception as e:
+        abort(500, str(e))
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+    return jsonify(result)
+
+
+@stock_bp.route("/api/stocks/import", methods=["POST"])
+def api_stocks_import():
+    """依使用者確認的倉位清單批次建立期初倉位。"""
+    data = request.get_json(force=True)
+    account_id = data.get("account_id")
+    positions = data.get("positions", [])
+    if not account_id:
+        abort(400, "請選擇交割帳號")
+    if not positions:
+        abort(400, "沒有可匯入的倉位")
+    result = stock_model.import_opening_positions(positions, int(account_id))
+    return jsonify({"success": True, **result})

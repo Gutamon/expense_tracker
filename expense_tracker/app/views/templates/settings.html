@@ -189,36 +189,6 @@
     color: var(--text);
   }
 
-  .acc-section-label {
-    font-size: .75rem;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    padding: 4px 0 8px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 10px;
-  }
-
-  .scroll-container {
-    max-height: 500px;
-    overflow-y: auto;
-    padding-right: 8px;
-  }
-
-  .scroll-container::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .scroll-container::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .scroll-container::-webkit-scrollbar-thumb {
-    background: #2a2a30;
-    border-radius: 4px;
-  }
-
   .filter-bar {
     display: flex;
     align-items: center;
@@ -349,14 +319,8 @@
     box-sizing: border-box;
   }
 
-  .filter-bar select {
+  .filter-bar .cs {
     flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 8px 12px;
-    border-radius: 6px;
-    outline: none;
   }
 
   @media (max-width: 768px) {
@@ -382,9 +346,9 @@
     }
 
     .shell {
-      margin: 20px auto;
+      margin: 20px auto 0;
       padding: 0 16px;
-      padding-bottom: calc(64px + 12px + env(safe-area-inset-bottom) + 1.25rem);
+      padding-bottom: calc(64px + 16px + env(safe-area-inset-bottom) + 1.25rem);
     }
   }
 </style>
@@ -396,6 +360,7 @@
   <button id="main-tab-budget" class="page-tab" onclick="switchMainTab('budget')">月預算</button>
   <button id="main-tab-groups" class="page-tab" onclick="switchMainTab('groups')">群組</button>
   <button id="main-tab-categories" class="page-tab" onclick="switchMainTab('categories')">類別</button>
+  <button id="main-tab-sync" class="page-tab" onclick="switchMainTab('sync')">資料與同步</button>
 </div>
 
 <!-- Category Section -->
@@ -405,7 +370,7 @@
     <button class="btn-add-icon" title="新增類別"
       onclick="document.getElementById('mobile-cat-overlay').classList.add('open')">＋</button>
   </div>
-  <div class="segmented-control" style="margin-bottom:24px;">
+  <div class="type-switch" style="margin-bottom:24px;">
     <input type="radio" name="cat-list-filter" id="cat-list-exp" value="expense" checked
       onchange="switchCatListTab('expense')">
     <label for="cat-list-exp">支出類別</label>
@@ -417,7 +382,7 @@
       <option value="all">所有群組</option>
     </select>
   </div>
-  <div class="scroll-container" id="cat-list">
+  <div id="cat-list">
     {% for c in categories %}
     <div class="list-item cat-item" data-id="{{ c.id }}" data-type="{{ c.type }}" data-group="{{ c.group_name }}">
       <span class="drag-handle">⠿</span>
@@ -449,14 +414,14 @@
     <button class="btn-add-icon" title="新增群組"
       onclick="document.getElementById('mobile-grp-overlay').classList.add('open')">＋</button>
   </div>
-  <div class="segmented-control" style="margin-bottom:24px;">
+  <div class="type-switch" style="margin-bottom:24px;">
     <input type="radio" name="grp-list-filter" id="grp-list-exp" value="expense" checked
       onchange="switchGrpListTab('expense')">
     <label for="grp-list-exp">支出群組</label>
     <input type="radio" name="grp-list-filter" id="grp-list-inc" value="income" onchange="switchGrpListTab('income')">
     <label for="grp-list-inc">收入群組</label>
   </div>
-  <div class="scroll-container" id="grp-list">
+  <div id="grp-list">
     {% for g in groups %}
     <div class="list-item grp-item" data-id="{{ g.id }}" data-type="{{ g.get('type', 'expense') }}">
       <span class="drag-handle">⠿</span>
@@ -480,63 +445,44 @@
     <button class="btn-add-icon" title="新增帳戶"
       onclick="document.getElementById('mobile-acc-overlay').classList.add('open')">＋</button>
   </div>
-  <div class="scroll-container" id="acc-list">
-      {% set icon_sub = {'💵': '現金', '🏦': '銀行', '🪙': '預付儲值', '💳': '信用卡', '👝': '其他'} %}
-      {% set sub_disp_map = {'負債其他': '其他'} %}
-      <div class="acc-section-label">資產帳戶</div>
-      {% for a in accounts if a.type != 'liability' %}
-      {% set sub_type_val = a.get('sub_type') or icon_sub.get(a.icon, '其他') %}
-      {% set is_linked = a.id in linked_account_ids %}
-      <div class="list-item acc-item" data-id="{{ a.id }}">
-        <span class="drag-handle">⠿</span>
-        <div class="item-info">
-          <div class="item-name">{{ a.icon }} {{ a.name }}</div>
-          <div class="item-meta">
-            <span style="color:var(--accent);">{{ sub_disp_map.get(sub_type_val, sub_type_val) }}</span>
-            {% if a.get('currency', 'TWD') != 'TWD' %}<span style="color:#5bc0de;">{{ a.currency }}</span>{% endif %}
-            {% if a.is_asset %}<span>(列入資產)</span>{% endif %}
-            {% if is_linked %}<span style="color:var(--muted);">由系統管理</span>{% endif %}
-          </div>
-        </div>
-        <div class="item-actions">
-          {% if not is_linked %}
-          <button class="icon-btn"
-            onclick="openAccEdit({{ a.id }}, '{{ a.name }}', '{{ a.icon }}', '{{ a.type }}', {{ a.get('is_asset', 1) }}, '{{ a.get('currency', 'TWD') }}', '{{ sub_type_val }}')">✎</button>
-          <button class="icon-btn del" onclick="openAccDelete({{ a.id }}, '{{ a.name }}')">✕</button>
-          {% else %}
+  <div id="acc-list">
+    {% set icon_sub = {'💵': '現金', '🏦': '銀行', '🪙': '預付儲值', '💳': '信用卡', '👝': '其他'} %}
+    {% set sub_disp_map = {'負債其他': '其他'} %}
+    {% for a in accounts %}
+    {% set is_liability = a.type == 'liability' %}
+    {% set sub_type_val = a.get('sub_type') or (icon_sub.get(a.icon, '其他') if not is_liability else '信用卡') %}
+    {% set is_linked = a.id in linked_account_ids %}
+    <div class="list-item acc-item" data-id="{{ a.id }}">
+      <span class="drag-handle">⠿</span>
+      <div class="item-info">
+        <div class="item-name">{{ a.icon }} {{ a.name }}</div>
+        <div class="item-meta">
+          <span style="color:{{ 'var(--danger)' if is_liability else 'var(--accent)' }};">{{
+            sub_disp_map.get(sub_type_val, sub_type_val) }}</span>
+          {% if a.get('currency', 'TWD') != 'TWD' %}<span style="color:#5bc0de;">{{ a.currency }}</span>{% endif %}
+          {% if a.is_asset %}<span>列入資產</span>{% endif %}
+          {% if is_linked %}<span style="color:var(--muted);">由系統管理</span>{% endif %}
+          {% if is_liability and sub_type_val == '信用卡' %}
+          {% set bsd = a.get('billing_start_day', 1) %}
+          <span>每月 {{ bsd }} 號結帳</span>
+          {% if a.get('payment_due_day', 0) > 0 %}<span>繳款截止 {{ a.payment_due_day }} 號</span>{% endif %}
+          {% if a.get('credit_limit', 0) > 0 %}<span>額度 ${{ a.credit_limit | money }}</span>{% endif %}
+          {% if a.get('apr', 0)|float > 0 %}<span>年利率 {{ a.apr }}%</span>{% endif %}
           {% endif %}
         </div>
       </div>
-      {% else %}
-      <div style="text-align:center;padding:20px 0;color:var(--muted);font-size:.85rem;">尚無資產帳戶</div>
-      {% endfor %}
-
-      <div class="acc-section-label" style="margin-top:20px;">負債帳戶</div>
-      <p style="font-size:.78rem;color:var(--muted);margin:-4px 0 8px;">新增／編輯／刪除信用卡與借貸請至「負債」頁，此處僅可拖曳排序</p>
-      {% for a in accounts if a.type == 'liability' %}
-      {% set sub_type_val = a.get('sub_type') or '信用卡' %}
-      <div class="list-item acc-item" data-id="{{ a.id }}">
-        <span class="drag-handle">⠿</span>
-        <div class="item-info">
-          <div class="item-name">{{ a.icon }} {{ a.name }}</div>
-          <div class="item-meta">
-            <span style="color:var(--danger);">{{ sub_type_val }}</span>
-            {% if a.get('currency', 'TWD') != 'TWD' %}<span style="color:#5bc0de;">{{ a.currency }}</span>{% endif %}
-            {% if a.is_asset %}<span>(列入資產)</span>{% endif %}
-            {% if sub_type_val == '信用卡' %}
-            {% set bsd = a.get('billing_start_day', 1) %}
-            <span>每月 {{ bsd }} 號後消費計入下月帳單</span>
-            {% if a.get('payment_due_day', 0) > 0 %}<span>繳款截止 {{ a.payment_due_day }} 號</span>{% endif %}
-            {% if a.get('credit_limit', 0) > 0 %}<span>額度 ${{ "%.0f"|format(a.credit_limit) }}</span>{% endif %}
-            {% if a.get('apr', 0)|float > 0 %}<span>年利率 {{ a.apr }}%</span>{% endif %}
-            {% endif %}
-          </div>
-        </div>
+      <div class="item-actions">
+        {% if not is_liability and not is_linked %}
+        <button class="icon-btn"
+          onclick="openAccEdit({{ a.id }}, '{{ a.name }}', '{{ a.icon }}', '{{ a.type }}', {{ a.get('is_asset', 1) }}, '{{ a.get('currency', 'TWD') }}', '{{ sub_type_val }}')">✎</button>
+        <button class="icon-btn del" onclick="openAccDelete({{ a.id }}, '{{ a.name }}')">✕</button>
+        {% endif %}
       </div>
-      {% else %}
-      <div style="text-align:center;padding:20px 0;color:var(--muted);font-size:.85rem;">尚無負債帳戶</div>
-      {% endfor %}
     </div>
+    {% else %}
+    <div style="text-align:center;padding:20px 0;color:var(--muted);font-size:.85rem;">尚無帳戶</div>
+    {% endfor %}
+  </div>
 </div>
 
 <!-- Mobile Add Modals -->
@@ -558,7 +504,7 @@
         <option value="未分類" data-type="">未分類</option>
       </select>
     </div>
-    <div class="segmented-control">
+    <div class="type-switch">
       <input type="radio" name="mcat-new-type" id="mcat-new-type-exp" value="expense" checked
         onchange="filterCatGroupSelect('mcat-new-group','expense')">
       <label for="mcat-new-type-exp">支出類別</label>
@@ -585,7 +531,7 @@
       <label>群組名稱</label>
       <input type="text" id="mgrp-new-name" placeholder="例：生活" autocomplete="off">
     </div>
-    <div class="segmented-control">
+    <div class="type-switch">
       <input type="radio" name="mgrp-new-type" id="mgrp-new-type-exp" value="expense" checked>
       <label for="mgrp-new-type-exp">支出群組</label>
       <input type="radio" name="mgrp-new-type" id="mgrp-new-type-inc" value="income">
@@ -657,28 +603,37 @@
 <!-- Budget Section -->
 <div id="section-budget" style="display:none;">
   <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:24px;">
-    <button class="month-btn" onclick="budgetChangeMonth(-1)">&#8249;</button>
+    <button class="month-btn tap-repeat" onclick="budgetChangeMonth(-1)">&#8249;</button>
     <span id="budget-month-display" style="font-size:.95rem;font-weight:500;min-width:90px;text-align:center;"></span>
-    <button class="month-btn" onclick="budgetChangeMonth(1)">&#8250;</button>
+    <button class="month-btn tap-repeat" onclick="budgetChangeMonth(1)">&#8250;</button>
   </div>
-  <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px;">只要某年月存過非 0 的預算，之後未另行設定的年月會自動套用同一數字；按下方「清除本月預算」可移除本月的個別設定，改回沿用先前數字。</p>
 
-  <div class="card" style="margin-bottom:24px;">
-    <h2>月預算</h2>
+  <div style="margin-bottom:24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <h2>月預算</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn"
+          style="width:auto;padding:8px 20px;background:var(--surface);border:1px solid var(--border);color:var(--muted);"
+          onclick="clearAllBudgets()">清除本月預算</button>
+        <button class="btn" style="width:auto;padding:8px 20px;" onclick="saveAllBudgets()">存檔</button>
+      </div>
+    </div>
     <div class="field" style="max-width:280px;">
       <label>每月總預算 (NT$)</label>
       <input type="number" id="total-budget-input" placeholder="0" min="0" autocomplete="off">
     </div>
   </div>
 
-  <div class="card">
+  <div>
     <h2>細項預算</h2>
     <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px;">選擇要追蹤的群組／類別，下方會依此呈現各自的預算輸入欄位；設定 0 代表不追蹤</p>
 
     <div class="mfilter" id="budget-item-filter">
       <button class="mfilter-btn" id="budget-item-filter-btn" onclick="toggleBudgetItemMenu(event)">
         <span id="budget-item-filter-label">選擇項目</span>
-        <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        <svg viewBox="0 0 24 24">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </button>
       <div class="mfilter-menu" id="budget-item-filter-menu"></div>
     </div>
@@ -692,17 +647,14 @@
     <div id="budget-cat-source" style="display:none;">
       {% for c in categories %}
       {% if c.type == 'expense' %}
-      <span class="opt-src" data-id="{{ c.id }}" data-name="{{ c.name }}" data-group-name="{{ c.group_name or '未分類' }}"></span>
+      <span class="opt-src" data-id="{{ c.id }}" data-name="{{ c.name }}"
+        data-group-name="{{ c.group_name or '未分類' }}"></span>
       {% endif %}
       {% endfor %}
     </div>
 
     <div id="budget-amount-sections"></div>
     <p id="budget-amount-empty" style="font-size:.82rem;color:var(--muted);display:none;">尚未勾選任何群組或類別</p>
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:24px;">
-      <button class="btn" style="width:auto;padding:8px 20px;background:var(--surface);border:1px solid var(--border);color:var(--muted);" onclick="clearAllBudgets()">清除本月預算</button>
-      <button class="btn" style="width:auto;padding:8px 20px;" onclick="saveAllBudgets()">存檔</button>
-    </div>
   </div>
 </div>
 
@@ -722,7 +674,7 @@
         <option value="未分類" data-type="">未分類</option>
       </select>
     </div>
-    <div class="segmented-control">
+    <div class="type-switch">
       <input type="radio" name="cat-e-type" id="cat-e-type-exp" value="expense"
         onchange="filterCatGroupSelect('cat-e-group','expense')">
       <label for="cat-e-type-exp">支出類別</label>
@@ -762,7 +714,7 @@
     <h3>編輯群組</h3>
     <input type="hidden" id="grp-e-id" />
     <div class="field"><label>名稱</label><input type="text" id="grp-e-name" autocomplete="off" /></div>
-    <div class="segmented-control">
+    <div class="type-switch">
       <input type="radio" name="grp-e-type" id="grp-e-type-exp" value="expense">
       <label for="grp-e-type-exp">支出群組</label>
       <input type="radio" name="grp-e-type" id="grp-e-type-inc" value="income">
@@ -849,27 +801,38 @@
 
 <div id="toast"></div>
 
-<!-- ── 資料管理 ── -->
-<div class="card" style="margin-top:2rem;">
-  <h2>資料管理</h2>
-  <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem;">匯出所有資料為 ZIP 備份檔，可用於還原或搬移。</p>
-  <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;">
-    <button id="btn-export" onclick="exportZip()" class="btn" style="width:auto;">↓ 匯出備份 ZIP</button>
-    <button id="btn-wipe" onclick="wipeData()" class="btn" style="width:auto;background:#ff3b3b;color:#fff;">↓
-      匯出備份並刪除所有資料</button>
+<!-- Data & Sync Section -->
+<div id="section-sync" style="display:none;">
+  <!-- ── 資料管理 ── -->
+  <div class="card">
+    <h2>資料管理</h2>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem;">匯出所有資料為 ZIP 備份檔，可用於還原或搬移。</p>
+    <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;">
+      <button id="btn-export" onclick="exportZip()" class="btn" style="width:auto;">↓ 匯出備份 ZIP</button>
+      <button id="btn-wipe" onclick="wipeData()" class="btn" style="width:auto;background:#ff3b3b;color:#fff;">↓
+        匯出備份並刪除所有資料</button>
+    </div>
+    <p style="font-size:.75rem;color:var(--muted);margin-top:1rem;">此裝置 ID：{{ device_id[:8] }}</p>
   </div>
-  <p style="font-size:.75rem;color:var(--muted);margin-top:1rem;">此裝置 ID：{{ device_id[:8] }}</p>
-</div>
 
-<!-- ── 救援碼 ── -->
-<div class="card" style="margin-top:1.25rem;">
-  <h2>救援碼</h2>
-  <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem;">
-    清除瀏覽器資料或更換裝置後，在首頁輸入這組代碼即可認回目前的帳本，不必透過備份檔還原。請妥善保管，知道此代碼的人都能存取您的資料。</p>
-  <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;">
-    <span id="rescue-code-display"
-      style="font-family:'DM Mono',monospace;font-size:1.1rem;letter-spacing:.05rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.5rem 1rem;">{{ rescue_code }}</span>
-    <button id="btn-rescue-regen" onclick="regenRescueCode()" class="btn" style="width:auto;">重新產生</button>
+  <!-- ── 識別碼 ── -->
+  <div class="card" style="margin-top:1.25rem;">
+    <h2>識別碼</h2>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem;">
+      清除瀏覽器資料或更換裝置後，在首頁輸入這組代碼即可認回目前的帳本，不必透過備份檔還原。在其他裝置的首頁輸入相同代碼，即可讓多台裝置共同編輯同一份帳本。請妥善保管，知道此代碼的人都能存取您的資料；若清除所有資料，此代碼將失效。</p>
+    <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;">
+      <span id="sync-code-display"
+        style="font-family:'DM Mono',monospace;font-size:1.1rem;letter-spacing:.05rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.5rem 1rem;">{{
+        sync_code }}</span>
+      <button id="btn-sync-regen" onclick="regenSyncCode()" class="btn" style="width:auto;">重新產生</button>
+    </div>
+    <p id="sync-device-count" style="font-size:.75rem;color:var(--muted);margin-top:.75rem;"
+      data-count="{{ linked_device_count }}">
+      目前有 {{ linked_device_count }} 台裝置與此代碼同步{% if linked_device_count > 1 %}
+      <button id="btn-sync-leave" onclick="leaveSyncGroup()" class="btn btn-outline"
+        style="width:auto;margin-left:.5rem;padding:.3rem .8rem;font-size:.78rem;">將此裝置退出同步</button>
+      {% endif %}
+    </p>
   </div>
 </div>
 
@@ -883,14 +846,24 @@
     setTimeout(() => t.classList.remove("show"), 2500);
   }
 
-  // Keep the localStorage mirror of the rescue code current (used for silent
-  // cookie-loss recovery on the onboarding screen — see shell.html / onboarding.html).
-  try { localStorage.setItem('rescue_code', '{{ rescue_code }}'); } catch (e) {}
+  // Keep the localStorage mirror of the 識別碼 current (used for silent cookie-loss
+  // recovery on the onboarding screen — see shell.html / onboarding.html).
+  try { localStorage.setItem('sync_code', '{{ sync_code }}'); } catch (e) { }
+  // 任何寫入成功後通知 shell：其他分頁（記帳/圖表/股票/負債）標記為髒，
+  // 下次切過去時整頁重載，避免各頁抓著載入時的舊群組/類別/帳戶資料。
+  function notifyDataChanged() {
+    try {
+      if (window.parent !== window && window.parent.markDataDirty) window.parent.markDataDirty();
+    } catch (e) { }
+  }
+
   function reloadPage() {
+    notifyDataChanged();
     let tab = 'accounts';
     if (document.getElementById('main-tab-budget').classList.contains('active')) tab = 'budget';
     if (document.getElementById('main-tab-groups').classList.contains('active')) tab = 'groups';
     if (document.getElementById('main-tab-categories').classList.contains('active')) tab = 'categories';
+    if (document.getElementById('main-tab-sync').classList.contains('active')) tab = 'sync';
     const embed = new URLSearchParams(window.location.search).has('embed');
     window.location.replace('/settings?tab=' + tab + (embed ? '&embed=1' : ''));
   }
@@ -909,6 +882,7 @@
     document.getElementById('section-groups').style.display = tab === 'groups' ? 'grid' : 'none';
     document.getElementById('section-accounts').style.display = tab === 'accounts' ? 'grid' : 'none';
     document.getElementById('section-budget').style.display = tab === 'budget' ? 'block' : 'none';
+    document.getElementById('section-sync').style.display = tab === 'sync' ? 'block' : 'none';
     if (tab === 'categories') switchCatListTab(currentCatTab);
     if (tab === 'groups') switchGrpListTab(currentGrpTab);
     if (tab === 'budget') onBudgetTabActivated();
@@ -922,18 +896,21 @@
     handle: '.drag-handle', animation: 150, onEnd: async () => {
       const order = Array.from(document.querySelectorAll('#cat-list .cat-item')).map(el => el.dataset.id);
       await fetch('/api/categories/sort', { method: 'POST', body: JSON.stringify({ order }) });
+      notifyDataChanged();
     }
   });
   new Sortable(document.getElementById('grp-list'), {
     handle: '.drag-handle', animation: 150, onEnd: async () => {
       const order = Array.from(document.querySelectorAll('#grp-list .grp-item')).map(el => el.dataset.id);
       await fetch('/api/groups/sort', { method: 'POST', body: JSON.stringify({ order }) });
+      notifyDataChanged();
     }
   });
   new Sortable(document.getElementById('acc-list'), {
-    handle: '.drag-handle', filter: '.acc-section-label', animation: 150, onEnd: async () => {
+    handle: '.drag-handle', animation: 150, onEnd: async () => {
       const order = Array.from(document.querySelectorAll('#acc-list .acc-item')).map(el => el.dataset.id);
       await fetch('/api/accounts/sort', { method: 'POST', body: JSON.stringify({ order }) });
+      notifyDataChanged();
     }
   });
 
@@ -1270,7 +1247,7 @@
       method: 'POST',
       body: JSON.stringify({ year: budgetYear, month: budgetMonth, total_budget: total, categories, groups })
     });
-    if (res.ok) toast("儲存成功");
+    if (res.ok) { toast("儲存成功"); notifyDataChanged(); }
     else toast("儲存失敗");
   }
 
@@ -1279,7 +1256,7 @@
       method: 'POST',
       body: JSON.stringify({ year: budgetYear, month: budgetMonth })
     });
-    if (res.ok) { toast("已清除本月預算"); loadBudgetForMonth(); }
+    if (res.ok) { toast("已清除本月預算"); notifyDataChanged(); loadBudgetForMonth(); }
     else toast("清除失敗");
   }
 
@@ -1347,8 +1324,10 @@
       // timers, and leaves this button stuck on 處理中.
       await downloadBlob('/api/export/zip', backupFilename());
       await fetch('/api/data/wipe', { method: 'POST' });
-      try { localStorage.removeItem('rescue_code'); } catch (e) {}
-      window.location.replace('/onboarding');
+      notifyDataChanged();
+      try { localStorage.removeItem('sync_code'); } catch (e) { }
+      try { sessionStorage.removeItem('shell_tab'); } catch (e) { }
+      (window.top || window).location.replace('/onboarding');
     } catch (e) {
       toast('處理失敗，請重試');
       btn.textContent = '↓ 匯出備份並刪除所有資料'; btn.disabled = false;
@@ -1402,32 +1381,64 @@
     }
   }
 
-  let _rescueRegenConfirming = false;
+  let _syncRegenConfirming = false;
 
-  async function regenRescueCode() {
-    const btn = document.getElementById('btn-rescue-regen');
-    if (!_rescueRegenConfirming) {
-      _rescueRegenConfirming = true;
+  async function regenSyncCode() {
+    const btn = document.getElementById('btn-sync-regen');
+    if (!_syncRegenConfirming) {
+      _syncRegenConfirming = true;
       btn.textContent = '確認產生新代碼？舊代碼將失效';
       setTimeout(() => {
-        if (_rescueRegenConfirming) { _rescueRegenConfirming = false; btn.textContent = '重新產生'; }
+        if (_syncRegenConfirming) { _syncRegenConfirming = false; btn.textContent = '重新產生'; }
       }, 5000);
       return;
     }
-    _rescueRegenConfirming = false;
+    _syncRegenConfirming = false;
     btn.textContent = '處理中...'; btn.disabled = true;
     try {
-      const res = await fetch('/api/rescue-code/regenerate', { method: 'POST' });
+      const res = await fetch('/api/sync-code/regenerate', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        document.getElementById('rescue-code-display').textContent = data.code;
-        try { localStorage.setItem('rescue_code', data.code); } catch (e) {}
-        toast('已產生新救援碼');
+        document.getElementById('sync-code-display').textContent = data.code;
+        try { localStorage.setItem('sync_code', data.code); } catch (e) { }
+        toast('已產生新識別碼');
       } else {
         toast('產生失敗，請重試');
       }
     } finally {
       btn.textContent = '重新產生'; btn.disabled = false;
+    }
+  }
+
+  let _syncLeaveConfirming = false;
+
+  async function leaveSyncGroup() {
+    const btn = document.getElementById('btn-sync-leave');
+    if (!btn) return;
+    if (!_syncLeaveConfirming) {
+      _syncLeaveConfirming = true;
+      btn.textContent = '確認退出同步？';
+      setTimeout(() => {
+        if (_syncLeaveConfirming) { _syncLeaveConfirming = false; btn.textContent = '將此裝置退出同步'; }
+      }, 5000);
+      return;
+    }
+    _syncLeaveConfirming = false;
+    btn.textContent = '處理中...'; btn.disabled = true;
+    try {
+      const res = await fetch('/api/sync-code/leave', { method: 'POST' });
+      if (res.ok) {
+        try { localStorage.removeItem('sync_code'); } catch (e) { }
+        try { sessionStorage.removeItem('shell_tab'); } catch (e) { }
+        (window.top || window).location.replace('/onboarding');
+      } else {
+        const data = await res.json();
+        toast(data.error || '退出失敗，請重試');
+        btn.textContent = '將此裝置退出同步'; btn.disabled = false;
+      }
+    } catch (e) {
+      toast('退出失敗，請重試');
+      btn.textContent = '將此裝置退出同步'; btn.disabled = false;
     }
   }
 </script>

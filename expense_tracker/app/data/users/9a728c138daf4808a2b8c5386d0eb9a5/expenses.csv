@@ -1,0 +1,3 @@
+﻿id,title,amount,category,category_id,date,note,created_at,type,account_id,to_account_id,to_amount,stock_transaction_id,loan_id,loan_payment_id
+1,x,100.0,匯入支出,1,2026-07-01,,2026-07-15 23:11:55,expense,1,0,0.0,0,0,0
+2,y,200.0,匯入支出,2,2026-07-01,,2026-07-15 23:11:55,income,1,0,0.0,0,0,0

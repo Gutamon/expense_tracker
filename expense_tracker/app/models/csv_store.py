@@ -1,10 +1,13 @@
+import contextlib
 import csv
 import os
+import threading
+import time
 
 from flask import g, has_request_context
 
 INT_FIELDS = {
-    "expenses.csv": {"id", "account_id", "to_account_id", "stock_transaction_id", "loan_id", "loan_payment_id"},
+    "expenses.csv": {"id", "category_id", "account_id", "to_account_id", "stock_transaction_id", "loan_id", "loan_payment_id"},
     "categories.csv": {"id", "is_asset", "in_budget", "sort_order"},
     "category_groups.csv": {"id", "sort_order"},
     "accounts.csv": {"id", "sort_order", "is_asset", "billing_start_day", "payment_due_day"},
@@ -15,7 +18,7 @@ INT_FIELDS = {
     "monthly_budgets.csv": {"id", "year", "month"},
     "cat_monthly_budgets.csv": {"id", "category_id", "year", "month"},
     "group_monthly_budgets.csv": {"id", "group_id", "year", "month"},
-    "monthly_history.csv": {"id", "year", "month"},
+    "monthly_history.csv": {"id", "category_id", "year", "month"},
     "settings.csv": set(),
 }
 
@@ -54,7 +57,7 @@ def coerce_row(filename: str, row: dict) -> dict:
 
 
 SCHEMA = {
-    "expenses.csv": ["id", "title", "amount", "category", "date", "note", "created_at",
+    "expenses.csv": ["id", "title", "amount", "category", "category_id", "date", "note", "created_at",
                      "type", "account_id", "to_account_id", "to_amount",
                      "stock_transaction_id", "loan_id", "loan_payment_id"],
     "categories.csv": ["id", "name", "type", "is_asset", "in_budget", "group_name",
@@ -73,7 +76,7 @@ SCHEMA = {
     "monthly_budgets.csv": ["id", "year", "month", "amount"],
     "cat_monthly_budgets.csv": ["id", "category_id", "year", "month", "amount"],
     "group_monthly_budgets.csv": ["id", "group_id", "year", "month", "amount"],
-    "monthly_history.csv": ["id", "year", "month", "category", "type", "amount"],
+    "monthly_history.csv": ["id", "year", "month", "category", "category_id", "type", "amount"],
     "settings.csv": ["key", "value"],
 }
 
@@ -93,17 +96,39 @@ def root_dir() -> str:
     return os.path.join(os.path.dirname(__file__), "..", "data")
 
 
+_local = threading.local()
+
+
+@contextlib.contextmanager
+def use_data_dir(path: str):
+    """Temporarily target a specific device folder from outside a request context.
+
+    For background jobs (e.g. the daily FX-rate refresh) that must write into every
+    device's own settings.csv without a request to bind flask.g.data_dir to any one
+    of them. Thread-local so it's safe if a job ever runs in its own thread.
+    """
+    prev = getattr(_local, "data_dir", None)
+    _local.data_dir = path
+    try:
+        yield
+    finally:
+        _local.data_dir = prev
+
+
 def _data_dir() -> str:
     """Resolve the active data directory.
 
     During a request this is the current device's folder (bound to flask.g by the
-    before_request hook). Outside a request context (startup / CLI) it falls back to
-    the root directory.
+    before_request hook). Outside a request context, an explicit use_data_dir()
+    override takes precedence (background jobs); otherwise it falls back to the root.
     """
     if has_request_context():
         d = getattr(g, "data_dir", None)
         if d:
             return d
+    override = getattr(_local, "data_dir", None)
+    if override:
+        return override
     return root_dir()
 
 
@@ -131,7 +156,16 @@ def write_csv(filename: str, rows: list, fieldnames: list):
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
-    os.replace(tmp, p)
+    # Windows 上防毒/索引程式偶爾會短暫鎖住檔案，讓 os.replace 拋 PermissionError；
+    # 短暫重試即可，避免批次寫入（如匯入多筆倉位）中途失敗。
+    for attempt in range(5):
+        try:
+            os.replace(tmp, p)
+            return
+        except PermissionError:
+            if attempt == 4:
+                raise
+            time.sleep(0.1)
 
 
 def next_id(rows: list) -> int:
@@ -186,6 +220,79 @@ def _migrate_opening_balance():
     write_csv("expenses.csv", remaining, SCHEMA["expenses.csv"])
 
 
+def _category_lookup(cat_rows: list) -> dict:
+    """Map (name, type) -> id and name -> id (fallback) for backfilling category_id.
+    The (name, type) key is what disambiguates a 收入「匯入」from a 支出「匯入」."""
+    by_name_type = {}
+    by_name = {}
+    for c in cat_rows:
+        cid = int(c.get("id") or 0)
+        if not cid:
+            continue
+        name = c.get("name") or ""
+        ctype = c.get("type") or ""
+        by_name_type[(name, ctype)] = cid
+        by_name.setdefault(name, cid)  # first-seen wins for the loose fallback
+    return {"name_type": by_name_type, "name": by_name}
+
+
+def _resolve_cat_id(name: str, ctype: str, lookup: dict) -> int:
+    """Best-effort name(+type) -> category id. Returns 0 if unknown."""
+    return lookup["name_type"].get((name, ctype)) or lookup["name"].get(name, 0)
+
+
+def _migrate_category_id():
+    """Backfill expenses / monthly_history.category_id from the stored category name.
+
+    Once populated, category_id is the source of truth for identity (filters) and
+    display name is resolved live — so renaming a category在設定頁 reflects everywhere,
+    and 同名不同型別的類別（收入/支出「匯入」）不再被混為一談。 Idempotent: rows that already
+    carry a category_id are left untouched; rows whose name maps to nothing stay 0.
+    """
+    cat_rows = read_csv("categories.csv")
+    if not cat_rows:
+        return
+    lookup = _category_lookup(cat_rows)
+
+    exp_rows = read_csv("expenses.csv")
+    changed = False
+    for e in exp_rows:
+        if int(e.get("category_id") or 0):
+            continue
+        if e.get("type") == "transfer":
+            continue
+        cid = _resolve_cat_id(e.get("category") or "", e.get("type") or "", lookup)
+        if cid:
+            e["category_id"] = cid
+            changed = True
+    if changed:
+        write_csv("expenses.csv", exp_rows, SCHEMA["expenses.csv"])
+
+    hist_rows = read_csv("monthly_history.csv")
+    changed = False
+    for h in hist_rows:
+        if int(h.get("category_id") or 0):
+            continue
+        cid = _resolve_cat_id(h.get("category") or "", h.get("type") or "", lookup)
+        if cid:
+            h["category_id"] = cid
+            changed = True
+    if changed:
+        write_csv("monthly_history.csv", hist_rows, SCHEMA["monthly_history.csv"])
+
+
+def ensure_category_id_migrated():
+    """Run _migrate_category_id once per device, gated by a settings flag.
+
+    Called from the before_request hook for pre-existing device folders (new devices
+    are migrated by init_current_user). The flag check is a cheap settings read; the
+    expensive CSV rewrite only happens the first time."""
+    if get_setting("cat_id_migrated") == "true":
+        return
+    _migrate_category_id()
+    set_setting("cat_id_migrated", "true")
+
+
 def _init_dir(path: str):
     """Create a data directory and seed any missing CSV files (header only)."""
     os.makedirs(path, exist_ok=True)
@@ -205,6 +312,8 @@ def init_current_user():
     """
     _init_dir(_data_dir())
     _migrate_opening_balance()
+    _migrate_category_id()
+    set_setting("cat_id_migrated", "true")
 
 
 def init_data_dir():

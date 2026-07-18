@@ -357,10 +357,12 @@ def analyze_settings_import(file_path: str, mapping: dict, type_mapping: dict = 
         type_mapping = {}
 
     delimiter = _detect_delimiter(file_path)
-    existing_cats = {r["name"] for r in read_csv("categories.csv")}
+    # Keyed by (name, type): the same name can legitimately exist as both an
+    # income and an expense category (e.g. 借款 in vs out) — they're distinct.
+    existing_cats = {(r["name"], r["type"]) for r in read_csv("categories.csv")}
     existing_accs = {r["name"] for r in read_csv("accounts.csv")}
 
-    new_cats = {}    # name -> inferred type
+    new_cats = {}    # (name, type) -> inferred type
     new_accs = {}    # name -> currency
     monthly_agg = {}  # (year, month, category, type) -> amount
     date_range = []
@@ -401,8 +403,9 @@ def analyze_settings_import(file_path: str, mapping: dict, type_mapping: dict = 
                     new_accs[raw_to_acc] = "TWD"
                 continue
 
-            if raw_cat and raw_cat not in existing_cats and raw_cat not in new_cats:
-                new_cats[raw_cat] = mapped_type
+            cat_key = (raw_cat, mapped_type)
+            if raw_cat and cat_key not in existing_cats and cat_key not in new_cats:
+                new_cats[cat_key] = mapped_type
 
             if raw_date:
                 date = _parse_date(raw_date)
@@ -428,7 +431,7 @@ def analyze_settings_import(file_path: str, mapping: dict, type_mapping: dict = 
 
     return {
         "accounts":       [{"name": k, "currency": v} for k, v in new_accs.items()],
-        "categories":     [{"name": k, "type": v} for k, v in new_cats.items()],
+        "categories":     [{"name": k[0], "type": k[1]} for k in new_cats],
         "monthly_summary": monthly_summary,
         "months_count":   months_count,
         "date_from":      date_from,
@@ -476,12 +479,14 @@ def import_settings(file_path: str, mapping: dict, type_mapping: dict,
 
     # ── 2. Categories ────────────────────────────────────────────────────────
     cat_rows = read_csv("categories.csv")
-    existing_cat_names = {r["name"] for r in cat_rows}
+    # Keyed by (name, type): the same name can exist as both an income and an
+    # expense category — they're treated as two distinct categories.
+    existing_cat_keys = {(r["name"], r["type"]) for r in cat_rows}
     cats_created = 0
     for cfg in categories_config:
         name = cfg.get("name", "").strip()
         cat_type = cfg.get("type", "expense")
-        if not name or name in existing_cat_names:
+        if not name or (name, cat_type) in existing_cat_keys:
             continue
         if name in categories_merge:  # merged into another category — don't create
             continue
@@ -496,7 +501,7 @@ def import_settings(file_path: str, mapping: dict, type_mapping: dict,
             "sort_order": 90 + cats_created,
             "monthly_budget": 0,
         })
-        existing_cat_names.add(name)
+        existing_cat_keys.add((name, cat_type))
         cats_created += 1
     if cats_created:
         write_csv("categories.csv", cat_rows, SCHEMA["categories.csv"])
@@ -624,13 +629,26 @@ def import_settings(file_path: str, mapping: dict, type_mapping: dict,
                         pass
 
         if monthly_agg:
+            # Bind each history row to its category id (by name+type — merged names
+            # already point at the target). Once bound, renaming在設定頁 reflects in
+            # the charts, and 同名不同型別 categories stay distinct.
+            all_cats = read_csv("categories.csv")
+            cat_id_by_name_type = {(c.get("name"), c.get("type")): int(c["id"])
+                                   for c in all_cats if c.get("id")}
+            cat_id_by_name = {}
+            for c in all_cats:
+                if c.get("id"):
+                    cat_id_by_name.setdefault(c.get("name"), int(c["id"]))
+
             hist_rows = read_csv("monthly_history.csv")
             for (year, month, category, t), amount in monthly_agg.items():
+                cid = cat_id_by_name_type.get((category, t)) or cat_id_by_name.get(category, 0)
                 hist_rows.append({
                     "id": next_id(hist_rows),
                     "year": year,
                     "month": month,
                     "category": category,
+                    "category_id": cid,
                     "type": t,
                     "amount": round(amount, 2),
                 })

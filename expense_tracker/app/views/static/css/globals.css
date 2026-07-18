@@ -33,10 +33,15 @@ html::-webkit-scrollbar {
   display: none;
 }
 
+.amt-sign,
+.amt-digits {
+  font-family: 'Roboto Mono', 'Noto Sans TC', monospace;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Figtree', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
+  font-family: 'Cactus Classical Serif', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, serif;
   font-weight: 300;
   min-height: 100vh;
   overflow-x: hidden;
@@ -74,6 +79,9 @@ select {
   margin-bottom: 24px;
   border-bottom: 1px solid var(--border);
   padding-bottom: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .page-tab {
@@ -86,6 +94,8 @@ select {
   padding: 8px 16px;
   border-radius: 8px;
   transition: all .2s;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .page-tab.active {
@@ -210,6 +220,24 @@ select {
   transform: scale(.97);
 }
 
+.type-switch input[value="expense"]:checked+label {
+  background: var(--danger-dim);
+  color: var(--danger);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+}
+
+.type-switch input[value="income"]:checked+label {
+  background: var(--positive-dim);
+  color: var(--positive);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+}
+
+.type-switch input[value="transfer"]:checked+label {
+  background: var(--accent-dim);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+}
+
 /* ── Shared: Month/date nav arrow button ── */
 .month-btn {
   background: var(--surface);
@@ -297,6 +325,185 @@ select {
 }
 
 .mfilter-group-label {
+  font-size: .72rem;
+  color: var(--muted);
+  letter-spacing: .05em;
+  padding: 8px 10px 4px;
+}
+
+/* ── Shared: Custom select (single-choice dropdown styled like the chart-page filter buttons) ──
+   Wraps a real <select> (kept in the DOM, visually hidden, still holds the value) so every
+   existing script that reads/sets `.value`, rebuilds `innerHTML`, or listens for `change`
+   keeps working untouched; .cs renders the styled button + menu on top and stays in sync. */
+.cs {
+  position: relative;
+}
+
+.cs>select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cs-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: .9rem;
+  text-align: left;
+  cursor: pointer;
+  padding: 10px 14px;
+  transition: border-color .2s;
+}
+
+.cs-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform .2s;
+}
+
+.cs.open .cs-btn {
+  border-color: var(--accent);
+}
+
+.cs.open .cs-btn svg {
+  transform: rotate(180deg);
+}
+
+.cs-btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* Compact modifier: inline text-like trigger (no box) for tight spaces, e.g. an
+   account picker embedded in a card row. Put class="cs-compact" on the wrapping .cs. */
+.cs-compact {
+  display: inline-block;
+  width: auto;
+}
+
+.cs-compact .cs-btn {
+  width: auto;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  border-radius: 0;
+  padding: 1px 2px;
+  font-size: .75rem;
+  color: var(--muted);
+}
+
+.cs-compact .cs-btn:hover {
+  border-bottom-color: var(--border);
+  color: var(--text);
+}
+
+.cs-compact.open .cs-btn {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
+.cs-compact .cs-btn span {
+  max-width: 120px;
+}
+
+.cs-compact .cs-btn svg {
+  width: 11px;
+  height: 11px;
+}
+
+.cs-compact .cs-menu {
+  min-width: 160px;
+  left: auto;
+  right: 0;
+}
+
+.cs-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+}
+
+.cs.open .cs-menu {
+  display: block;
+}
+
+.cs-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: .85rem;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.cs-opt:hover {
+  background: rgba(255, 255, 255, .05);
+}
+
+.cs-opt.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.cs-opt .check {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  visibility: hidden;
+}
+
+.cs-opt.active .check {
+  visibility: visible;
+}
+
+.cs-group-label {
   font-size: .72rem;
   color: var(--muted);
   letter-spacing: .05em;

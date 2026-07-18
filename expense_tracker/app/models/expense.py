@@ -6,7 +6,7 @@ from app.models.csv_store import read_csv, write_csv, next_id, SCHEMA
 class ExpenseModel:
     def create(self, title: str, amount: float, category: str, date: str, note: str = "",
                type: str = "expense", account_id: int = 0, to_account_id: int = 0,
-               to_amount: float = None) -> str:
+               to_amount: float = None, category_id: int = 0) -> str:
         rows = read_csv("expenses.csv")
         new_id = next_id(rows)
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -15,6 +15,7 @@ class ExpenseModel:
             "title": title,
             "amount": float(amount),
             "category": category,
+            "category_id": int(category_id or 0),
             "date": date,
             "note": note or "",
             "created_at": created_at,
@@ -32,7 +33,8 @@ class ExpenseModel:
     def create_with_links(self, title: str, amount: float, category: str, date: str,
                           note: str = "", type: str = "expense", account_id: int = 0,
                           to_account_id: int = 0, to_amount: float = None,
-                          stock_transaction_id=None, loan_id=None, loan_payment_id=None) -> str:
+                          stock_transaction_id=None, loan_id=None, loan_payment_id=None,
+                          category_id: int = 0) -> str:
         rows = read_csv("expenses.csv")
         new_id = next_id(rows)
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -41,6 +43,7 @@ class ExpenseModel:
             "title": title,
             "amount": float(amount),
             "category": category,
+            "category_id": int(category_id or 0),
             "date": date,
             "note": note or "",
             "created_at": created_at,
@@ -104,7 +107,17 @@ class ExpenseModel:
                 for k, v in sorted(agg.items())]
 
     def get_category_summary(self, year: int = None, month: int = None) -> list:
-        agg = defaultdict(float)
+        # Aggregate by category_id when present so rows sharing a name but not an id
+        # (收入/支出 both「匯入」) stay separate, and renames在設定頁自動反映——名稱是即時
+        # 從 categories.csv 解析的，不吃 expenses/history 內存的舊名稱。Legacy rows without
+        # a category_id fall back to keying by their stored name.
+        cat_by_id = {int(c["id"]): c for c in read_csv("categories.csv") if c.get("id")}
+
+        def resolve_name(stored_name, cat_id):
+            c = cat_by_id.get(int(cat_id or 0))
+            return c["name"] if c else stored_name
+
+        agg = defaultdict(float)  # (name, type) -> total
 
         for r in read_csv("expenses.csv"):
             if r.get("category") in self._SKIP_CATS:
@@ -122,7 +135,8 @@ class ExpenseModel:
                     continue
                 if month is not None and d_month != month:
                     continue
-            key = (r.get("category", ""), r.get("type", ""))
+            name = resolve_name(r.get("category", ""), r.get("category_id"))
+            key = (name, r.get("type", ""))
             try:
                 agg[key] += float(r.get("amount") or 0)
             except ValueError:
@@ -141,7 +155,8 @@ class ExpenseModel:
                 continue
             if month is not None and h_month != month:
                 continue
-            key = (h.get("category", ""), t)
+            name = resolve_name(h.get("category", ""), h.get("category_id"))
+            key = (name, t)
             try:
                 agg[key] += float(h.get("amount") or 0)
             except ValueError:
@@ -155,12 +170,12 @@ class ExpenseModel:
         expense_id = str(expense_id)
         for r in rows:
             if str(r.get("id")) == expense_id:
-                for key in ["title", "amount", "category", "date", "note", "type",
+                for key in ["title", "amount", "category", "category_id", "date", "note", "type",
                             "account_id", "to_account_id", "to_amount"]:
                     if key in data:
                         if key == "amount":
                             r[key] = float(data[key])
-                        elif key in ["account_id", "to_account_id"]:
+                        elif key in ["account_id", "to_account_id", "category_id"]:
                             r[key] = int(data[key]) if data[key] else 0
                         elif key == "to_amount":
                             r[key] = float(data[key]) if data[key] is not None else ""

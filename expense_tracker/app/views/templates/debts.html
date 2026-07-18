@@ -638,11 +638,11 @@
     <div class="summary-stats">
       <div class="s-item">
         <span class="s-label">信用卡未繳總額</span>
-        <span class="s-value danger">NT$ {{ "%.0f"|format(total_cc_outstanding) }}</span>
+        <span class="s-value danger">NT$ {{ total_cc_outstanding | money }}</span>
       </div>
       <div class="s-item">
         <span class="s-label">本期新增消費</span>
-        <span class="s-value">NT$ {{ "%.0f"|format(total_cycle_charges) }}</span>
+        <span class="s-value">NT$ {{ total_cycle_charges | money }}</span>
       </div>
       <div class="s-item">
         <span class="s-label">持卡數</span>
@@ -683,30 +683,30 @@
       <div class="debt-stats">
         <div class="stat-item">
           <span class="stat-label">本期應繳{% if card.due_date %} · 截止 {{ card.due_date }}{% endif %}</span>
-          <span class="stat-value danger">NT$ {{ "%.0f"|format(due) }}</span>
+          <span class="stat-value danger">NT$ {{ due | money }}</span>
         </div>
         {% if card.min_payment|float > 0 %}
         <div class="stat-item">
           <span class="stat-label">最低應繳</span>
-          <span class="stat-value">NT$ {{ "%.0f"|format(card.min_payment|float) }}</span>
+          <span class="stat-value">NT$ {{ card.min_payment|float | money }}</span>
         </div>
         {% endif %}
         <div class="stat-item">
           <span class="stat-label">本期新增消費</span>
-          <span class="stat-value">NT$ {{ "%.0f"|format(card.cycle_charges|float) }}</span>
+          <span class="stat-value">NT$ {{ card.cycle_charges|float | money }}</span>
         </div>
         <div class="stat-item">
           <span class="stat-label">累計未繳</span>
-          <span class="stat-value danger">NT$ {{ "%.0f"|format(bal) }}</span>
+          <span class="stat-value danger">NT$ {{ bal | money }}</span>
         </div>
         {% if limit > 0 %}
         <div class="stat-item">
           <span class="stat-label">信用額度</span>
-          <span class="stat-value">NT$ {{ "%.0f"|format(limit) }}</span>
+          <span class="stat-value">NT$ {{ limit | money }}</span>
         </div>
         <div class="stat-item">
           <span class="stat-label">可用額度</span>
-          <span class="stat-value accent">NT$ {{ "%.0f"|format(avail) }}</span>
+          <span class="stat-value accent">NT$ {{ avail | money }}</span>
         </div>
         {% endif %}
         <div class="stat-item">
@@ -770,16 +770,16 @@
     <div class="summary-stats">
       <div class="s-item">
         <span class="s-label">借入未還</span>
-        <span class="s-value danger">NT$ {{ "%.0f"|format(total_loan_owed) }}</span>
+        <span class="s-value danger">NT$ {{ total_loan_owed | money }}</span>
       </div>
       <div class="s-item">
         <span class="s-label">借出未收</span>
-        <span class="s-value accent">NT$ {{ "%.0f"|format(total_loan_receivable) }}</span>
+        <span class="s-value accent">NT$ {{ total_loan_receivable | money }}</span>
       </div>
       <div class="s-item">
         <span class="s-label">淨收支</span>
         <span class="s-value {% if net >= 0 %}accent{% else %}danger{% endif %}">
-          NT$ {{ "%.0f"|format(net|abs) }}{% if net >= 0 %} 淨收{% else %} 淨欠{% endif %}
+          NT$ {{ net|abs | money }}{% if net >= 0 %} 淨收{% else %} 淨欠{% endif %}
         </span>
       </div>
     </div>
@@ -814,27 +814,27 @@
 
       <div class="loan-formula">
         <div class="formula-item">
-          <span class="formula-value">NT$ {{ "%.0f"|format(loan.principal) }}</span>
+          <span class="formula-value">NT$ {{ loan.principal | money }}</span>
           <span class="formula-label">借款本金</span>
         </div>
         {% if paid > 0 %}
         <span class="formula-sep">−</span>
         <div class="formula-item">
-          <span class="formula-value accent">NT$ {{ "%.0f"|format(paid) }}</span>
+          <span class="formula-value accent">NT$ {{ paid | money }}</span>
           <span class="formula-label">已還金額</span>
         </div>
         {% endif %}
         {% if loan.accrued_interest > 0 %}
         <span class="formula-sep">+</span>
         <div class="formula-item">
-          <span class="formula-value" style="color:#f0a84a;">NT$ {{ "%.0f"|format(loan.accrued_interest) }}</span>
+          <span class="formula-value" style="color:#f0a84a;">NT$ {{ loan.accrued_interest | money }}</span>
           <span class="formula-label">推估利息（{{ loan.days_elapsed }} 天 / {{ loan.interest_rate }}%）</span>
         </div>
         {% endif %}
         <span class="formula-sep">=</span>
         <div class="formula-item">
           {% set total = loan.remaining + loan.accrued_interest %}
-          <span class="formula-value {% if total > 0 %}danger{% else %}accent{% endif %}">NT$ {{ "%.0f"|format(total)
+          <span class="formula-value {% if total > 0 %}danger{% else %}accent{% endif %}">NT$ {{ total | money
             }}</span>
           <span class="formula-label">{% if loan.accrued_interest > 0 %}本利合計{% else %}剩餘本金{% endif %}</span>
         </div>
@@ -904,7 +904,7 @@
             <span class="badge closed">已結清</span>
           </div>
           <div style="font-size:.8rem;color:var(--muted);margin-top:4px;">
-            本金 NT$ {{ "%.0f"|format(loan.principal) }} · {{ loan.account_icon }} {{ loan.account_name }}
+            本金 NT$ {{ loan.principal | money }} · {{ loan.account_icon }} {{ loan.account_name }}
           </div>
         </div>
         {% if loan.payment_count == 0 %}
@@ -1194,10 +1194,10 @@
   function openRepayModal(cardId, cardName, statementDue, minPayment, totalOutstanding) {
     document.getElementById('repay-card-id').value = cardId;
     document.getElementById('repay-card-name').value = cardName;
-    document.getElementById('repay-outstanding').value = 'NT$ ' + statementDue.toFixed(0);
+    document.getElementById('repay-outstanding').value = 'NT$ ' + Math.round(statementDue).toLocaleString();
     const minHint = document.getElementById('repay-min-hint');
     if (minPayment > 0) {
-      document.getElementById('repay-min-val').textContent = 'NT$ ' + minPayment.toFixed(0);
+      document.getElementById('repay-min-val').textContent = 'NT$ ' + Math.round(minPayment).toLocaleString();
       minHint.style.display = 'block';
     } else {
       minHint.style.display = 'none';
