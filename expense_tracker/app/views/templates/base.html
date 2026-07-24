@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
@@ -38,12 +38,12 @@
     }
     nav.top-nav a:hover, nav.top-nav a.active { color: var(--accent); }
 
-    .shell { max-width: 960px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+    .shell { max-width: 960px; margin: 0 auto; padding: 0 1.5rem 2.5rem; }
 
     {% if embed %}
     /* ── Embed mode: no nav chrome ── */
     header, .bottom-nav { display: none !important; }
-    .shell { padding: 1.5rem 1rem; }
+    .shell { padding: 0 1rem 1.5rem; }
     @media (max-width: 768px) {
       .shell { padding-bottom: calc(64px + 16px + env(safe-area-inset-bottom) + 1.25rem); }
     }
@@ -87,14 +87,14 @@
       header { display: none; }
       .bottom-nav { display: block; }
       .shell {
-        padding: 1.25rem 1rem;
+        padding: 0 1rem;
         padding-bottom: calc(64px + 12px + env(safe-area-inset-bottom) + 1.25rem);
       }
     }
     @media (min-width: 769px) {
       header { display: flex; }
       .bottom-nav { display: none; }
-      .shell { padding: 2.5rem 1.5rem; }
+      .shell { padding: 0 1.5rem 2.5rem; }
     }
     {% endif %}
   </style>

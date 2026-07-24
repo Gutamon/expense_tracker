@@ -579,7 +579,21 @@
     // start over, check whether we mirrored a 識別碼 into localStorage on a previous
     // visit (iOS home-screen PWAs routinely drop the cookie between launches) and
     // silently re-attach to the original ledger.
+    // A failed top-level join (GET /onboarding/join with a bad/expired code) bounces
+    // back here with ?join_error=1. Show the error, drop the stale saved code, and
+    // skip autoRecover this load so it can't immediately re-try the same bad code.
+    var _joinFailed = /[?&]join_error=1/.test(location.search);
+    if (_joinFailed) {
+      try { localStorage.removeItem('sync_code'); } catch (e) { }
+      window.addEventListener('DOMContentLoaded', function () {
+        toast('識別碼無效或已失效', 'error');
+      });
+      // Strip the query so a reload/bfcache restore doesn't re-toast.
+      try { history.replaceState(null, '', '/onboarding'); } catch (e) { }
+    }
+
     (function autoRecover() {
+      if (_joinFailed) return;
       var saved;
       try { saved = localStorage.getItem('sync_code'); } catch (e) { return; }
       if (!saved) return;
@@ -590,18 +604,17 @@
         if (sessionStorage.getItem('autorecover_tried')) return;
         sessionStorage.setItem('autorecover_tried', '1');
       } catch (e) { }
-      var root = document.documentElement;
-      var reveal = function () { root.style.visibility = ''; };
-      root.style.visibility = 'hidden';           // avoid a flash of the chooser
-      var failsafe = setTimeout(reveal, 4000);    // never stay hidden, whatever happens
-      fetch('/api/onboarding/join-by-code', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: saved })
-      }).then(function (res) {
-        if (res.ok) { goToApp(); return; }
-        try { localStorage.removeItem('sync_code'); } catch (e) { }
-        clearTimeout(failsafe); reveal();
-      }).catch(function () { clearTimeout(failsafe); reveal(); });
+      try { sessionStorage.removeItem('shell_tab'); } catch (e) { }
+      // Recover via the same reliable top-level navigation the manual 認回 uses, so
+      // the device cookie is committed even on an iOS home-screen PWA (a fetch/XHR
+      // Set-Cookie is routinely dropped there). A stale/expired saved code bounces
+      // back with ?join_error=1, which clears the code and skips this next time — so
+      // no permanent loop. Keep the page hidden until the navigation takes over to
+      // avoid flashing the chooser.
+      document.documentElement.style.visibility = 'hidden';
+      // Never stay hidden if the navigation stalls for any reason.
+      setTimeout(function () { document.documentElement.style.visibility = ''; }, 4000);
+      window.location.replace('/onboarding/join?code=' + encodeURIComponent(saved));
     })();
 
     // Register the PWA service worker so the app is installable from this first screen.
@@ -660,23 +673,20 @@
     });
 
     // ── Sync code ──────────────────────────────────────────────────────────────
-    async function obJoinByCode() {
+    function obJoinByCode() {
       const input = document.getElementById('sync-code-input');
       const code = input.value.trim();
       if (!code) { toast('請輸入識別碼', 'error'); return; }
       const btn = document.getElementById('btn-sync-join');
       btn.innerHTML = '<span class="spinner"></span> 認回中...'; btn.disabled = true;
-      try {
-        const res = await fetch('/api/onboarding/join-by-code', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code })
-        });
-        const data = await res.json();
-        if (res.ok) { toast('認回成功', 'success'); setTimeout(() => goToApp(), 600); }
-        else { toast(data.error || '識別碼無效', 'error'); btn.textContent = '認回'; btn.disabled = false; }
-      } catch (e) {
-        toast('認回失敗：' + e.message, 'error'); btn.textContent = '認回'; btn.disabled = false;
-      }
+      // Remember the code so a later cookie-drop auto-recovers into THIS shared ledger.
+      try { localStorage.setItem('sync_code', code); } catch (e) { }
+      try { sessionStorage.removeItem('shell_tab'); } catch (e) { }
+      // Full top-level navigation (NOT fetch): the join's Set-Cookie then rides a real
+      // document response, which iOS home-screen PWAs commit reliably — a fetch/XHR
+      // Set-Cookie is routinely dropped there, which is what made 認回 report success
+      // yet reload back into onboarding as a fresh empty device.
+      window.location.href = '/onboarding/join?code=' + encodeURIComponent(code);
     }
 
     // ── Import wizard ──────────────────────────────────────────────────────────

@@ -19,7 +19,10 @@ from config import Config
 
 COOKIE_NAME = "device_id"
 REGISTRY_FILE = "registry.csv"
-REGISTRY_FIELDS = ["device_id", "display_name", "sync_id", "created_at"]
+# role: "owner" (this device owns its ledger) or "member" (joined someone else's via
+# a 識別碼). Missing/blank on rows written before this column existed — always read it
+# as (row.get("role") or "owner") so legacy single-device rows behave as owners.
+REGISTRY_FIELDS = ["device_id", "display_name", "sync_id", "role", "created_at"]
 
 SYNC_FILE = "sync_codes.csv"
 SYNC_FIELDS = ["code", "sync_id", "created_at"]
@@ -107,8 +110,9 @@ def has_users(root: str) -> bool:
         return any(True for _ in csv.DictReader(f))
 
 
-def register(root: str, device_id: str, display_name: str = ""):
-    """Append a device to users/registry.csv."""
+def register(root: str, device_id: str, display_name: str = "", role: str = "owner"):
+    """Append a device to users/registry.csv. A device starts as owner of its own
+    (private) folder; joining a sync group flips it to member (see join_sync_group)."""
     os.makedirs(_users_root(root), exist_ok=True)
     p = _registry_path(root)
     exists = os.path.exists(p)
@@ -123,6 +127,7 @@ def register(root: str, device_id: str, display_name: str = ""):
             "device_id": device_id,
             "display_name": display_name,
             "sync_id": "",
+            "role": role,
             "created_at": datetime.now().isoformat(timespec="seconds"),
         })
 
@@ -233,12 +238,32 @@ def _generate_code() -> str:
     return raw[:4] + "-" + raw[4:]
 
 
-def _set_device_sync_id(root: str, device_id: str, sync_id: str):
+def _set_device_sync_id(root: str, device_id: str, sync_id: str, role: str | None = None):
+    """Update a device's sync_id (and optionally its role) in one registry save."""
+    def apply(row):
+        row["sync_id"] = sync_id
+        if role is not None:
+            row["role"] = role
+
     rows = _load_registry_rows(root)
+    found = False
     for row in rows:
         if row.get("device_id") == device_id:
-            row["sync_id"] = sync_id
+            apply(row)
+            found = True
             break
+    # Self-heal an orphaned device: a browser can hold a validly-signed device_id
+    # cookie whose registry row no longer exists (e.g. the users/ folder was wiped
+    # out-of-band). Without this, joining a 識別碼 would loop over the registry, find
+    # nothing to update, and silently persist no sync_id — so 認回 would report success
+    # yet never actually attach. Registering the row here makes the join take effect.
+    if not found:
+        register(root, device_id)
+        rows = _load_registry_rows(root)
+        for row in rows:
+            if row.get("device_id") == device_id:
+                apply(row)
+                break
     _save_registry_rows(root, rows)
 
 
@@ -340,8 +365,10 @@ def resolve_sync_code(root: str, code: str) -> str | None:
 
 
 def join_sync_group(root: str, device_id: str, sync_id: str):
-    """Attach this (fresh, first-run) device to an existing sync group."""
-    _set_device_sync_id(root, device_id, sync_id)
+    """Attach this (fresh, first-run) device to an existing sync group as a member —
+    this is where a 從裝置 (slave) is born. The group's owner is the device that
+    originally minted the sync group (see _promote_to_sync_group), never touched here."""
+    _set_device_sync_id(root, device_id, sync_id, role="member")
 
 
 def linked_device_count(root: str, device_id: str) -> int:
@@ -360,8 +387,67 @@ def linked_device_count(root: str, device_id: str) -> int:
 
 def leave_sync_group(root: str, device_id: str):
     """Detach this device from its sync group, giving it back its own private
-    folder (named by its own device_id, initially empty — onboarding runs again)."""
-    _set_device_sync_id(root, device_id, "")
+    folder (named by its own device_id, initially empty — onboarding runs again).
+    It owns that fresh folder, so role returns to owner."""
+    _set_device_sync_id(root, device_id, "", role="owner")
+
+
+def is_owner(root: str, device_id: str) -> bool:
+    """True if this device owns its ledger (owner of its sync group, or an unsynced
+    single device). Legacy rows with no role column read as owner."""
+    row = _registry_row(root, device_id)
+    return ((row or {}).get("role") or "owner") == "owner"
+
+
+def group_members(root: str, device_id: str) -> list:
+    """Every device sharing this device's effective data folder, oldest first.
+
+    Returns [{device_id, role, created_at, is_self}]. An unsynced device is a group
+    of just itself. Read-only (no folder move) — safe alongside the shell's iframes.
+    """
+    sync_id = (_registry_row(root, device_id) or {}).get("sync_id") or ""
+    if not sync_id:
+        me = _registry_row(root, device_id) or {}
+        return [{
+            "device_id": device_id,
+            "role": (me.get("role") or "owner"),
+            "created_at": me.get("created_at") or "",
+            "is_self": True,
+        }]
+    members = [
+        {
+            "device_id": r.get("device_id"),
+            "role": (r.get("role") or "owner"),
+            "created_at": r.get("created_at") or "",
+            "is_self": r.get("device_id") == device_id,
+        }
+        for r in _load_registry_rows(root)
+        if r.get("sync_id") == sync_id
+    ]
+    members.sort(key=lambda m: m["created_at"])
+    return members
+
+
+def kick_device(root: str, owner_device_id: str, target_device_id: str):
+    """Owner removes a 從裝置 from the sync group. Returns (ok, error).
+
+    Only detaches the target (clears its sync_id, role back to owner — it lands on its
+    own empty folder and re-onboards on its next request). The group's 識別碼 is left
+    intact, so other members are unaffected and the code keeps working.
+    """
+    if not is_owner(root, owner_device_id):
+        return False, "只有主裝置可以移除其他裝置"
+    owner_row = _registry_row(root, owner_device_id)
+    sync_id = (owner_row or {}).get("sync_id") or ""
+    if not sync_id:
+        return False, "此裝置未與其他裝置同步"
+    if target_device_id == owner_device_id:
+        return False, "無法移除主裝置自己"
+    target_row = _registry_row(root, target_device_id)
+    if not target_row or (target_row.get("sync_id") or "") != sync_id:
+        return False, "找不到該裝置或其不在此群組"
+    _set_device_sync_id(root, target_device_id, "", role="owner")
+    return True, None
 
 
 def clear_sync_code(root: str, sync_id: str):

@@ -1,4 +1,4 @@
-from app.models.csv_store import read_csv, write_csv, next_id, SCHEMA
+from app.models.csv_store import read_csv, write_csv, next_id, SCHEMA, seed_if_empty
 
 
 class AccountModel:
@@ -9,28 +9,29 @@ class AccountModel:
         {"name": "其他",   "icon": "👝", "type": "asset",     "sub_type": "其他",    "is_asset": 1},
     ]
 
+    def _build_defaults(self):
+        return [{
+            "id": i + 1,
+            "name": a["name"],
+            "icon": a["icon"],
+            "sort_order": i,
+            "type": a["type"],
+            "sub_type": a.get("sub_type", ""),
+            "is_asset": a.get("is_asset", 1),
+            "billing_start_day": 1,
+            "currency": "TWD",
+            "credit_limit": 0,
+            "payment_due_day": 0,
+            "min_payment_pct": 10,
+            "min_payment_floor": 1000,
+            "apr": 0,
+        } for i, a in enumerate(self.DEFAULT_ACCOUNTS)]
+
     def ensure_defaults(self):
-        rows = read_csv("accounts.csv")
-        if rows:
-            return
-        for i, a in enumerate(self.DEFAULT_ACCOUNTS):
-            rows.append({
-                "id": i + 1,
-                "name": a["name"],
-                "icon": a["icon"],
-                "sort_order": i,
-                "type": a["type"],
-                "sub_type": a.get("sub_type", ""),
-                "is_asset": a.get("is_asset", 1),
-                "billing_start_day": 1,
-                "currency": "TWD",
-                "credit_limit": 0,
-                "payment_due_day": 0,
-                "min_payment_pct": 10,
-                "min_payment_floor": 1000,
-                "apr": 0,
-            })
-        write_csv("accounts.csv", rows, SCHEMA["accounts.csv"])
+        # Atomic seed-if-empty: the shell's concurrent iframe requests all call this on
+        # a first-touch device; without serialization they raced and 500'd (see
+        # csv_store.seed_if_empty).
+        seed_if_empty("accounts.csv", self._build_defaults)
 
     def get_all(self) -> list:
         self.ensure_defaults()

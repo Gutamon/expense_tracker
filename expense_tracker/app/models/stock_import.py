@@ -52,7 +52,16 @@ def _load_listing() -> dict:
 
 
 def resolve_symbol(name: str) -> str:
-    """以股名查代碼；先原樣查，再去掉 * 等註記查。查不到回傳空字串。"""
+    """
+    以股名查代碼。券商對帳單常用自家簡稱，與證交所/櫃買正式名稱不完全一致
+    （例如「永豐台灣ESG50」實際正式名稱只是「永豐台灣ESG」，多了數字後綴），
+    因此比對順序為：
+      1. 完全比對
+      2. 去掉 * 等註記後比對
+      3. 前綴比對——正式名稱是輸入名稱的前綴，且長度差在容許範圍內
+         （檔名/註記差異，而非撞名到別支股票）
+    查不到回傳空字串。
+    """
     listing = _load_listing()
     if not listing:
         return ""
@@ -60,7 +69,16 @@ def resolve_symbol(name: str) -> str:
     if name in listing:
         return listing[name]
     stripped = name.rstrip("*＊ ").strip()
-    return listing.get(stripped, "")
+    if stripped in listing:
+        return listing[stripped]
+
+    # 前綴比對：只在「正式名稱是輸入名稱的前綴」且差異不大時採用，
+    # 避免「永豐」誤配到「永豐金」這種完全不同標的的股票。
+    candidates = [n for n in listing if stripped.startswith(n) and len(stripped) - len(n) <= 4]
+    if candidates:
+        best = max(candidates, key=len)  # 取最長、最貼近的正式名稱
+        return listing[best]
+    return ""
 
 # 券商 CSV 的欄位名稱（國泰證券對帳單格式）。以「包含」比對，
 # 容忍不同券商的細微命名差異。
@@ -105,6 +123,34 @@ def _detect_header(rows: list) -> int:
     return 0
 
 
+_CSV_ENCODINGS = ("utf-8-sig", "cp950", "big5")
+
+
+def _read_csv_rows(file_path: str) -> list:
+    """
+    自動偵測編碼讀取券商 CSV。多數券商系統預設輸出 Big5/CP950，
+    若強制用 utf-8-sig 解碼會讓中文股名整批變成替換字元（U+FFFD）而完全查無代碼
+    ——不會拋例外、也看不出任何錯誤，只會在對帳結果裡「莫名其妙查不到代碼」。
+    因此依序嘗試每種編碼，選第一個「不含替換字元」的結果；全部都有替換字元則
+    取替換字元最少的那個，避免無聲吞掉整批中文。
+    """
+    with open(file_path, "rb") as f:
+        raw = f.read()
+    best_rows, best_bad_count = None, None
+    for enc in _CSV_ENCODINGS:
+        try:
+            text = raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+        bad_count = text.count("�")
+        if bad_count == 0:
+            return list(csv.reader(text.splitlines()))
+        if best_bad_count is None or bad_count < best_bad_count:
+            best_rows = list(csv.reader(text.splitlines()))
+            best_bad_count = bad_count
+    return best_rows or []
+
+
 def parse_broker_csv(file_path: str) -> dict:
     """
     回傳每支股票的聚合初始倉位：
@@ -116,8 +162,7 @@ def parse_broker_csv(file_path: str) -> dict:
       現賣：先以當前均價沖銷賣出股數的成本，再扣股數；手續費不影響剩餘成本
     最終只保留 shares > 0 的股票。
     """
-    with open(file_path, "r", encoding="utf-8-sig", errors="replace", newline="") as f:
-        all_rows = list(csv.reader(f))
+    all_rows = _read_csv_rows(file_path)
     if not all_rows:
         return {"positions": [], "skipped": 0}
 
@@ -175,11 +220,13 @@ def parse_broker_csv(file_path: str) -> dict:
         shares = 0.0
         total_cost = 0.0
         last_date = ""
+        tx_list = []
         for date, side, s, cost, fee in txs:
-            if date:
-                nd = _norm_date(date)
-                if nd > last_date:
-                    last_date = nd
+            nd = _norm_date(date) if date else datetime.now().strftime("%Y-%m-%d")
+            if nd > last_date:
+                last_date = nd
+            price = round((cost / s), 4) if s else 0
+            tx_list.append({"date": nd, "side": side, "shares": s, "price": price, "fee": fee})
             if side == "buy":
                 shares += s
                 total_cost += cost + fee
@@ -193,42 +240,72 @@ def parse_broker_csv(file_path: str) -> dict:
                     total_cost = 0
 
         shares = int(round(shares))
-        if shares <= 0:
-            continue
         avg_price = round(total_cost / shares, 4) if shares > 0 else 0
         positions.append({
             "name": name,
             "symbol": resolve_symbol(name),   # 查得到就自動填，查不到留空待使用者輸入
-            "shares": shares,
+            "shares": shares,   # 0 代表對帳單範圍內已完全平倉，仍保留完整交易供匯入
             "total_cost": round(total_cost, 2),
             "avg_price": avg_price,
             "last_date": last_date or datetime.now().strftime("%Y-%m-%d"),
+            "txs": tx_list,   # 逐筆交易明細，供匯入時完整寫入 stock_transactions
+            "closed": shares <= 0,
         })
 
     positions.sort(key=lambda p: p["total_cost"], reverse=True)
     return {"positions": positions, "skipped": skipped}
 
 
-def mark_existing_positions(positions: list, existing_stocks: list) -> dict:
+def _tx_fingerprint(date: str, side: str, shares, price, fee) -> tuple:
+    """交易去重指紋：對帳單沒有唯一 ID，以 日期+買賣別+股數+單價+手續費 判斷是否為同一筆。"""
+    def r(v):
+        try:
+            return round(float(v or 0), 4)
+        except (TypeError, ValueError):
+            return 0.0
+    return (_norm_date(date), side, r(shares), r(price), r(fee))
+
+
+def mark_existing_positions(positions: list, existing_stocks: list, existing_txs: list = None) -> dict:
     """
     比對聚合出的倉位是否已存在於目前持股（stocks.csv），標記 existing=True/False。
     比對規則與 StockModel.import_opening_positions 的去重邏輯一致：
     有代碼以代碼比對，否則以股名比對。
 
-    回傳 {"positions": [...每筆多了 existing 欄位...], "existing_count": int}。
+    對已存在的股票，進一步比對對帳單裡的逐筆交易（p["txs"]）是否已記錄於
+    stock_transactions（existing_txs），把尚未記錄過的交易篩到 p["new_txs"]，
+    並附上 p["stock_id"]（供匯入時定位要補寫的股票）。
+    去重以 日期+買賣別+股數+單價+手續費 的指紋比對，重複的視為已匯入過。
+
+    回傳 {"positions": [...每筆多了 existing / new_txs / stock_id 欄位...], "existing_count": int}。
     """
-    existing_symbols = {s.get("symbol") for s in existing_stocks if s.get("symbol")}
-    existing_names = {s.get("name") for s in existing_stocks}
+    existing_symbols = {s.get("symbol"): s for s in existing_stocks if s.get("symbol")}
+    existing_names = {s.get("name"): s for s in existing_stocks}
+
+    tx_fingerprints_by_stock = {}
+    for t in (existing_txs or []):
+        sid = str(t.get("stock_id"))
+        fp = _tx_fingerprint(t.get("date"), t.get("type"), t.get("shares"), t.get("price"), t.get("fee"))
+        tx_fingerprints_by_stock.setdefault(sid, set()).add(fp)
 
     existing_count = 0
     for p in positions:
         symbol = (p.get("symbol") or "").strip().upper()
         name = (p.get("name") or "").strip()
-        is_existing = (symbol and symbol in existing_symbols) or \
-                      (not symbol and name in existing_names)
+        stock = (symbol and existing_symbols.get(symbol)) or (not symbol and existing_names.get(name))
+        is_existing = bool(stock)
         p["existing"] = is_existing
         if is_existing:
             existing_count += 1
+            stock_id = str(stock.get("id"))
+            p["stock_id"] = stock.get("id")
+            seen = tx_fingerprints_by_stock.get(stock_id, set())
+            new_txs = []
+            for t in (p.get("txs") or []):
+                fp = _tx_fingerprint(t.get("date"), t.get("side"), t.get("shares"), t.get("price"), t.get("fee"))
+                if fp not in seen:
+                    new_txs.append(t)
+            p["new_txs"] = new_txs
 
     return {"positions": positions, "existing_count": existing_count}
 

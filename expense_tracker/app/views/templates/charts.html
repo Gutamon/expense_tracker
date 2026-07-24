@@ -5,6 +5,35 @@
 {% block head %}
 <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
 <style>
+  /* ── Sticky header: page tabs + filter bar + time toggle ──
+     實色背景 + 底部邊緣明度漸層淡出，取代整塊漸層透明。 */
+  .sticky-area {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    background: var(--bg);
+    margin-bottom: 20px;
+    padding-top: var(--sticky-top);
+  }
+
+  .sticky-area::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    top: 100%;
+    height: 16px;
+    background: linear-gradient(to bottom, var(--bg), transparent);
+    pointer-events: none;
+  }
+
+  .sticky-area .page-tabs {
+    margin-bottom: 16px;
+  }
+
+  .sticky-area .trend-head {
+    margin-bottom: 0;
+  }
+
   /* ── Attribute filter dropdowns ── */
   .filter-bar {
     display: flex;
@@ -116,6 +145,7 @@
     border: 1px solid var(--border);
     border-radius: 6px;
     overflow: hidden;
+    background: var(--surface);
   }
 
   .unit-opt {
@@ -129,7 +159,7 @@
     transition: all .2s;
   }
 
-  .unit-opt + .unit-opt {
+  .unit-opt+.unit-opt {
     border-left: 1px solid var(--border);
   }
 
@@ -256,7 +286,7 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 24px;
+    margin-bottom: 10px;
     flex-wrap: wrap;
   }
 
@@ -289,7 +319,7 @@
   .rank-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 28px;
+    gap: 5px;
   }
 
   .rank-grid.two-col {
@@ -299,7 +329,7 @@
   .rank-section-title {
     font-size: .85rem;
     font-weight: 500;
-    margin-bottom: 16px;
+    margin-bottom: 10px;
   }
 
   .rank-section-title.income {
@@ -311,7 +341,7 @@
   }
 
   .rank-group {
-    margin-bottom: 18px;
+    margin-bottom: 5px;
   }
 
   .rank-head {
@@ -320,11 +350,12 @@
     justify-content: space-between;
     gap: 12px;
     font-size: .85rem;
+    font-weight: 400;
   }
 
   .rank-name {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: 8px;
     min-width: 0;
     overflow: hidden;
@@ -332,47 +363,30 @@
     white-space: nowrap;
   }
 
+  .rank-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
   .rank-val {
     font-family: 'JetBrains Mono', monospace;
-    font-size: .82rem;
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
     display: flex;
     align-items: baseline;
+    min-width: 88px;
   }
 
   .rank-val .amt-sign {
     display: inline-block;
-    width: 32px;
-    color: var(--muted);
+    width: 28px;
   }
 
   .rank-val .amt-digits {
+    flex: 1;
     text-align: right;
-  }
-
-  .rank-val .pct {
-    color: var(--muted);
-    font-size: .75rem;
-    margin-left: 6px;
-  }
-
-  .rank-track {
-    height: 6px;
-    background: rgba(255, 255, 255, .06);
-    border-radius: 4px;
-    margin: 8px 0 6px;
-    overflow: hidden;
-  }
-
-  .rank-fill {
-    height: 100%;
-    border-radius: 4px;
-    min-width: 2px;
-  }
-
-  .rank-cats {
-    padding-left: 16px;
   }
 
   .rank-cat {
@@ -431,14 +445,6 @@
     padding: 12px 0;
   }
 
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    flex-shrink: 0;
-  }
-
   @media (max-width: 768px) {
     .rank-grid.two-col {
       grid-template-columns: 1fr;
@@ -454,34 +460,56 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-tabs">
-  <button class="page-tab" data-tab="balance" onclick="switchTab('balance')">收支</button>
-  <button class="page-tab" data-tab="expense" onclick="switchTab('expense')">支出</button>
-  <button class="page-tab" data-tab="income" onclick="switchTab('income')">收入</button>
-</div>
+<div class="sticky-area">
+  <div class="page-tabs">
+    <button class="page-tab" data-tab="balance" onclick="switchTab('balance')">收支</button>
+    <button class="page-tab" data-tab="expense" onclick="switchTab('expense')">支出</button>
+    <button class="page-tab" data-tab="income" onclick="switchTab('income')">收入</button>
+  </div>
 
-<!-- 篩選：每個屬性一顆按鈕，展開可複選的選單 -->
-<div class="filter-bar" id="filter-bar">
-  <div class="mfilter" data-kind="acc">
-    <button class="mfilter-btn" id="mf-btn-acc" onclick="toggleMenu(event,'acc')">
-      <span id="mf-label-acc">帳戶</span>
-      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
-    </button>
-    <div class="mfilter-menu" id="mf-menu-acc"></div>
+  <!-- 篩選：每個屬性一顆按鈕，展開可複選的選單 -->
+  <div class="filter-bar" id="filter-bar">
+    <div class="mfilter" data-kind="acc">
+      <button class="mfilter-btn" id="mf-btn-acc" onclick="toggleMenu(event,'acc')">
+        <span id="mf-label-acc">帳戶</span>
+        <svg viewBox="0 0 24 24">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      <div class="mfilter-menu" id="mf-menu-acc"></div>
+    </div>
+    <div class="mfilter" data-kind="grp">
+      <button class="mfilter-btn" id="mf-btn-grp" onclick="toggleMenu(event,'grp')">
+        <span id="mf-label-grp">群組</span>
+        <svg viewBox="0 0 24 24">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      <div class="mfilter-menu" id="mf-menu-grp"></div>
+    </div>
+    <div class="mfilter" data-kind="cat">
+      <button class="mfilter-btn" id="mf-btn-cat" onclick="toggleMenu(event,'cat')">
+        <span id="mf-label-cat">類別</span>
+        <svg viewBox="0 0 24 24">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      <div class="mfilter-menu" id="mf-menu-cat"></div>
+    </div>
   </div>
-  <div class="mfilter" data-kind="grp">
-    <button class="mfilter-btn" id="mf-btn-grp" onclick="toggleMenu(event,'grp')">
-      <span id="mf-label-grp">群組</span>
-      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+
+  <!-- 時間切換：區間按鈕（左）+ 月／年／全 toggle（右） -->
+  <div class="card-head trend-head">
+    <button class="range-btn" id="range-btn" onclick="openRangeDialog()">
+      <span id="range-start">—</span>
+      <span class="range-tilde">～</span>
+      <span id="range-end">—</span>
     </button>
-    <div class="mfilter-menu" id="mf-menu-grp"></div>
-  </div>
-  <div class="mfilter" data-kind="cat">
-    <button class="mfilter-btn" id="mf-btn-cat" onclick="toggleMenu(event,'cat')">
-      <span id="mf-label-cat">類別</span>
-      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
-    </button>
-    <div class="mfilter-menu" id="mf-menu-cat"></div>
+    <div class="unit-toggle" id="unit-toggle">
+      <button class="unit-opt" data-mode="month" onclick="setMode('month')">月</button>
+      <button class="unit-opt" data-mode="year" onclick="setMode('year')">年</button>
+      <button class="unit-opt" data-mode="all" onclick="setMode('all')">全</button>
+    </div>
   </div>
 </div>
 
@@ -489,20 +517,6 @@
 
   <!-- 收支趨勢 + 總資產趨勢線 -->
   <div class="trend-block">
-    <div class="card-head trend-head">
-      <!-- 時間切換（區間按鈕）靠左 -->
-      <button class="range-btn" id="range-btn" onclick="openRangeDialog()">
-        <span id="range-start">—</span>
-        <span class="range-tilde">～</span>
-        <span id="range-end">—</span>
-      </button>
-      <!-- 月／年／全 toggle 靠右 -->
-      <div class="unit-toggle" id="unit-toggle">
-        <button class="unit-opt" data-mode="month" onclick="setMode('month')">月</button>
-        <button class="unit-opt" data-mode="year" onclick="setMode('year')">年</button>
-        <button class="unit-opt" data-mode="all" onclick="setMode('all')">全</button>
-      </div>
-    </div>
     <div class="swipe-area" id="trend-swipe">
       <canvas id="trend-chart"></canvas>
     </div>
@@ -511,7 +525,6 @@
   <!-- 主要收/支組成（依群組） -->
   <div class="card full">
     <div class="card-head">
-      <h2 id="rank-title">主要收支</h2>
       <span class="scope" id="rank-scope"></span>
     </div>
     <div class="rank-grid" id="rank-container"></div>
@@ -526,7 +539,9 @@
       <div class="mfilter" data-kind="rstart">
         <button class="mfilter-btn range-sel" onclick="toggleMenu(event,'rstart')">
           <span id="rstart-label">—</span>
-          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          <svg viewBox="0 0 24 24">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
         </button>
         <div class="mfilter-menu" id="mf-menu-rstart"></div>
       </div>
@@ -534,7 +549,9 @@
       <div class="mfilter" data-kind="rend">
         <button class="mfilter-btn range-sel" onclick="toggleMenu(event,'rend')">
           <span id="rend-label">—</span>
-          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          <svg viewBox="0 0 24 24">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
         </button>
         <div class="mfilter-menu" id="mf-menu-rend"></div>
       </div>
@@ -548,6 +565,7 @@
 </div>
 
 <script>
+  // prettier-ignore
   window.CHART_DATA = {
     expenses: {{ expenses | tojson }},
     categories: {{ categories | tojson }},

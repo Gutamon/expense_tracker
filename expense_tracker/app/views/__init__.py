@@ -1,6 +1,14 @@
 import os
+import threading
 from flask import Flask, g, request
 from app.models import csv_store, user
+
+# Serializes first-touch seeding of a device folder. The shell loads five tabs as
+# concurrent same-origin iframes; on a device whose folder is missing (freshly
+# created, or wiped/lost) all five requests would race in init_current_user() and one
+# could read accounts.csv mid-write, 500-ing with FileNotFoundError. One lock keyed
+# per data_dir lets the first request seed while the rest wait, then find it ready.
+_seed_lock = threading.Lock()
 
 
 def start_rate_scheduler(app):
@@ -50,10 +58,11 @@ def create_app():
 
     @app.before_request
     def bind_device():
-        # Static assets don't touch per-device data. The sync-code join endpoint
-        # resolves its own device_id from the code and sets the cookie itself — it
-        # must not have a throwaway device auto-created for it here first.
-        if request.endpoint in ("static", "onboarding.join_by_code"):
+        # Static assets don't touch per-device data. The sync-code join endpoints
+        # resolve their own device_id from the code and set the cookie themselves —
+        # they must not have a throwaway device auto-created for them here first.
+        if request.endpoint in ("static", "onboarding.join_by_code",
+                                "onboarding.join_by_code_nav"):
             return
         device_id = user.resolve_device_id(request)
         new_device = device_id is None
@@ -65,8 +74,13 @@ def create_app():
         # own device_id folder — see user.effective_data_id.
         g.data_dir = user.resolve_data_dir(root_dir, device_id)
         # Seed + migrate the folder for new devices (and re-seed if it went missing).
+        # Serialized so concurrent iframe requests don't race in init_current_user()
+        # and read a half-written accounts.csv (see _seed_lock).
         if new_device or not os.path.isdir(g.data_dir):
-            csv_store.init_current_user()
+            with _seed_lock:
+                # Re-check under the lock: another request may have just seeded it.
+                if new_device or not os.path.isdir(g.data_dir):
+                    csv_store.init_current_user()
         else:
             # Existing devices: run one-time backfill of expenses/history.category_id.
             # Guarded by a settings flag so it costs one cheap check per request, not

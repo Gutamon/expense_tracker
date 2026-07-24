@@ -57,12 +57,39 @@
 
   function closeMenu(cs) {
     cs.classList.remove('open');
+    const menu = cs.querySelector('.cs-menu');
+    menu.classList.remove('cs-menu-fixed');
+    menu.style.top = menu.style.bottom = menu.style.left = menu.style.width = menu.style.maxHeight = '';
+  }
+
+  // Anchors the menu to the trigger button's viewport position instead of relying on
+  // CSS `position: absolute`, so it renders above any ancestor's overflow clipping
+  // (e.g. a scrollable .modal) rather than being cut off at the container edge.
+  function positionMenu(cs) {
+    const btn = cs.querySelector('.cs-btn');
+    const menu = cs.querySelector('.cs-menu');
+    const rect = btn.getBoundingClientRect();
+    const margin = 6;
+    const spaceBelow = window.innerHeight - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    const openUp = spaceBelow < 172 && spaceAbove > spaceBelow;
+    const maxHeight = Math.min(172, Math.max(80, openUp ? spaceAbove : spaceBelow));
+
+    menu.classList.add('cs-menu-fixed');
+    menu.style.left = `${rect.left}px`;
+    menu.style.width = `${rect.width}px`;
+    menu.style.maxHeight = `${maxHeight}px`;
+    menu.style.top = openUp ? '' : `${rect.bottom + margin}px`;
+    menu.style.bottom = openUp ? `${window.innerHeight - rect.top + margin}px` : '';
   }
 
   function toggleMenu(cs) {
     const wasOpen = cs.classList.contains('open');
     document.querySelectorAll('.cs.open').forEach(closeMenu);
-    if (!wasOpen) cs.classList.add('open');
+    if (!wasOpen) {
+      cs.classList.add('open');
+      positionMenu(cs);
+    }
   }
 
   // Existing scripts commonly do `select.value = x` / `select.disabled = true` directly,
@@ -135,6 +162,14 @@
   document.addEventListener('click', ev => {
     if (!ev.target.closest('.cs')) document.querySelectorAll('.cs.open').forEach(closeMenu);
   });
+
+  // Fixed-position menus don't move with their trigger during scroll/resize (e.g. the
+  // page or an ancestor .modal scrolling) — reposition live instead of leaving them stale.
+  function repositionOpenMenus() {
+    document.querySelectorAll('.cs.open').forEach(positionMenu);
+  }
+  window.addEventListener('scroll', repositionOpenMenus, true);
+  window.addEventListener('resize', repositionOpenMenus);
 
   window.enhanceCustomSelects = enhanceCustomSelects;
   window.refreshCustomSelect = refreshCustomSelect;

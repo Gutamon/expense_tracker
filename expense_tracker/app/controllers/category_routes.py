@@ -36,12 +36,28 @@ def manage_settings():
         lid = int(r.get("linked_account_id") or 0)
         if lid:
             linked_account_ids.add(lid)
-    sync_code = user.ensure_sync_code(csv_store.root_dir(), g.device_id)
+    # Read-only: NEVER promote (move the device folder) during page render. The shell
+    # loads this as /settings?embed=1 alongside four other iframes hitting the same
+    # folder; promoting here (ensure_sync_code) os.replace's the whole folder mid-flight
+    # and 500s the siblings with FileNotFound/PermissionError. The code is minted lazily
+    # by POST /api/sync-code/ensure when the user actually reveals it.
+    sync_code = user.sync_code_if_exists(csv_store.root_dir(), g.device_id) or ""
     linked_device_count = user.linked_device_count(csv_store.root_dir(), g.device_id)
+    is_owner = user.is_owner(csv_store.root_dir(), g.device_id)
     return render_template("settings.html", categories=categories, groups=groups,
                            accounts=accounts, username="", monthly_budget=monthly_budget,
                            linked_account_ids=linked_account_ids, device_id=g.device_id,
-                           sync_code=sync_code, linked_device_count=linked_device_count)
+                           sync_code=sync_code, linked_device_count=linked_device_count,
+                           is_owner=is_owner)
+
+
+@settings_bp.route("/api/sync-code/ensure", methods=["POST"])
+def api_ensure_sync_code():
+    """Mint this device's 識別碼 on demand (promoting it to a sync group of one if
+    needed). Called from a real user action on 設定, NOT during page render — so the
+    folder move in _promote_to_sync_group can't race the shell's sibling iframes."""
+    code = user.ensure_sync_code(csv_store.root_dir(), g.device_id)
+    return jsonify({"code": code})
 
 
 @settings_bp.route("/api/sync-code/regenerate", methods=["POST"])
@@ -58,6 +74,30 @@ def api_leave_sync_group():
     if user.linked_device_count(root, g.device_id) <= 1:
         return jsonify({"error": "此裝置未與其他裝置同步"}), 400
     user.leave_sync_group(root, g.device_id)
+    return jsonify({"success": True})
+
+
+@settings_bp.route("/api/sync-code/members", methods=["GET"])
+def api_sync_members():
+    """List every device sharing this ledger (for the owner's 共享裝置名單 popup).
+    Read-only — never promotes, safe to call anytime."""
+    root = csv_store.root_dir()
+    return jsonify({
+        "members": user.group_members(root, g.device_id),
+        "is_owner": user.is_owner(root, g.device_id),
+    })
+
+
+@settings_bp.route("/api/sync-code/kick", methods=["POST"])
+def api_sync_kick():
+    """Owner removes a 從裝置 from the sync group (detach only; 識別碼 stays valid)."""
+    root = csv_store.root_dir()
+    target = (request.get_json(silent=True) or {}).get("device_id", "")
+    if not user.is_owner(root, g.device_id):
+        return jsonify({"error": "只有主裝置可以移除其他裝置"}), 403
+    ok, err = user.kick_device(root, g.device_id, target)
+    if not ok:
+        return jsonify({"error": err}), 400
     return jsonify({"success": True})
 
 
@@ -389,16 +429,22 @@ def api_import_settings():
 
 @settings_bp.route("/api/data/wipe", methods=["POST"])
 def api_data_wipe():
+    root = csv_store.root_dir()
+    # A 從裝置 (member) deleting its data means "leave the share", NOT "destroy the
+    # ledger": only detach this device (back to its own empty folder → onboarding).
+    # The owner's shared ledger and every other member are untouched.
+    if not user.is_owner(root, g.device_id):
+        user.leave_sync_group(root, g.device_id)
+        return jsonify({"success": True, "role": "member"})
+    # The 主裝置 (owner) wiping destroys the shared ledger for the whole group. Clear
+    # every CSV, then invalidate the group's 識別碼 and detach every device in it —
+    # otherwise onboarding's auto-recover would re-attach to the now-empty folder and
+    # loop back to onboarding forever. Members fall back to onboarding on next request.
     for filename, fieldnames in csv_store.SCHEMA.items():
         csv_store.write_csv(filename, [], fieldnames)
-    # Wiping clears the shared folder for every synced device at once (there's only
-    # one ledger). Invalidate the group's 識別碼 and detach every device in it too —
-    # otherwise onboarding's auto-recover would re-attach to the now-empty folder and
-    # loop back to onboarding forever.
-    root = csv_store.root_dir()
     sync_id = user.effective_data_id(root, g.device_id)
     user.clear_sync_code(root, sync_id)
-    return jsonify({"success": True})
+    return jsonify({"success": True, "role": "owner"})
 
 
 @settings_bp.route("/api/import/restore", methods=["POST"])

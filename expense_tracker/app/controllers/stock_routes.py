@@ -1,8 +1,9 @@
 import os
 import re
 import tempfile
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date
+from datetime import date, datetime, timedelta
 from flask import Blueprint, render_template, request, jsonify, abort
 from app.models.stock import StockModel
 from app.models.account import AccountModel
@@ -12,12 +13,26 @@ from app.models.stock_import import parse_broker_csv, mark_existing_positions
 try:
     import yfinance as yf
     _YF_AVAILABLE = True
+    # 查價時常規性地以多個代碼後綴（.TW/.TWO）重試，失敗屬預期行為，
+    # 但 yfinance 會把每次失敗都印成 error log，靜音以免洗版終端機/伺服器日誌。
+    logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 except ImportError:
     _YF_AVAILABLE = False
 
 stock_bp = Blueprint("stock", __name__)
 stock_model = StockModel()
 account_model = AccountModel()
+
+# 台股代碼格式：傳統股票/ETF 是純 4-6 位數字（如 2330），
+# 新制主動式 ETF 則是數字+單一英文字母（如 00981A、00988A）。
+# 兩者都要嘗試補上 .TW / .TWO 後綴查詢，否則後綴判斷只認純數字會漏掉這些新代碼。
+_TW_SYMBOL_RE = re.compile(r"^\d{4,6}[A-Z]?$")
+
+
+def _tw_price_candidates(symbol: str) -> list:
+    if _TW_SYMBOL_RE.match(symbol.replace(".", "")):
+        return [symbol + ".TW", symbol + ".TWO", symbol]
+    return [symbol]
 
 
 @stock_bp.route("/stocks")
@@ -64,8 +79,7 @@ def api_create_position():
         abort(400, "設定初始總成本時必須填寫初始股數")
 
     if _YF_AVAILABLE:
-        candidates = ([symbol + ".TW", symbol + ".TWO", symbol]
-                      if symbol.replace(".", "").isdigit() else [symbol])
+        candidates = _tw_price_candidates(symbol)
         found = False
         for candidate in candidates:
             try:
@@ -116,11 +130,7 @@ def api_update_all_prices():
         return jsonify({"updated": 0, "failed": []})
 
     def _fetch_price(symbol):
-        """Try symbol as-is; for pure-digit TW symbols also try .TW / .TWO suffixes."""
-        candidates = [symbol]
-        if symbol.replace(".", "").isdigit():
-            candidates = [symbol + ".TW", symbol + ".TWO", symbol]
-        for candidate in candidates:
+        for candidate in _tw_price_candidates(symbol):
             try:
                 info = yf.Ticker(candidate).fast_info
                 price = float(info.last_price or 0)
@@ -256,22 +266,34 @@ def api_delete_stock_transaction(tx_id):
 
 @stock_bp.route("/api/stocks/import/preview", methods=["POST"])
 def api_stocks_import_preview():
-    """解析上傳的券商對帳單，回傳每支股票聚合後的初始倉位（不寫入）。"""
+    """
+    解析上傳的券商對帳單，回傳每支股票聚合後的初始倉位（不寫入）。
+    overwrite=true 時（表單欄位，字串 "true"）代表使用者打算用這份對帳單覆蓋所有
+    現有股票資料，此時預覽不與現有持股/交易比對去重——反正比對基準即將被清空，
+    對帳單裡的每支股票都當作全新倉位處理。
+    """
     f = request.files.get("file")
     if not f:
         abort(400, "請上傳券商對帳單 CSV")
     if not f.filename.lower().endswith(".csv"):
         abort(400, "僅支援 CSV 格式")
+    overwrite = (request.form.get("overwrite") or "").lower() == "true"
 
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=".csv")
     try:
         os.close(tmp_fd)
         f.save(tmp_path)
         result = parse_broker_csv(tmp_path)
-        existing_stocks = stock_model.get_all()
-        mark_result = mark_existing_positions(result["positions"], existing_stocks)
-        result["positions"] = mark_result["positions"]
-        result["existing_count"] = mark_result["existing_count"]
+        if overwrite:
+            for p in result["positions"]:
+                p["existing"] = False
+            result["existing_count"] = 0
+        else:
+            existing_stocks = stock_model.get_all()
+            existing_txs = stock_model.get_transactions()
+            mark_result = mark_existing_positions(result["positions"], existing_stocks, existing_txs)
+            result["positions"] = mark_result["positions"]
+            result["existing_count"] = mark_result["existing_count"]
     except ValueError as e:
         abort(400, str(e))
     except Exception as e:
@@ -285,13 +307,158 @@ def api_stocks_import_preview():
 
 @stock_bp.route("/api/stocks/import", methods=["POST"])
 def api_stocks_import():
-    """依使用者確認的倉位清單批次建立期初倉位。"""
+    """
+    依使用者確認的倉位清單批次建立期初倉位。
+    overwrite=true 時，會先清空所有股票倉位、交易紀錄與連動投資帳戶
+    （StockModel.reset_all），再重新匯入這份對帳單——用於「這份 CSV 才是完整
+    真實紀錄，之前建立的都作廢」的情境。這是破壞性操作，不可復原。
+    """
     data = request.get_json(force=True)
     account_id = data.get("account_id")
     positions = data.get("positions", [])
+    overwrite = bool(data.get("overwrite"))
     if not account_id:
         abort(400, "請選擇交割帳號")
     if not positions:
         abort(400, "沒有可匯入的倉位")
+    reset_count = stock_model.reset_all() if overwrite else 0
     result = stock_model.import_opening_positions(positions, int(account_id))
-    return jsonify({"success": True, **result})
+    return jsonify({"success": True, "reset_count": reset_count, **result})
+
+
+def _historical_close(symbol: str, end_date: str):
+    """查 symbol 於 end_date 當天（或之前最近一個交易日）的收盤價。查不到回傳 None。"""
+    candidates = _tw_price_candidates(symbol)
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+    start = end - timedelta(days=10)
+    fetch_end = end + timedelta(days=1)  # yfinance end 為 exclusive
+    for candidate in candidates:
+        try:
+            hist = yf.Ticker(candidate).history(
+                start=start.strftime("%Y-%m-%d"), end=fetch_end.strftime("%Y-%m-%d"))
+            if hist.empty:
+                continue
+            price = float(hist["Close"].iloc[-1])
+            if price > 0:
+                return price
+        except Exception:
+            continue
+    return None
+
+
+@stock_bp.route("/api/stocks/holdings-as-of", methods=["POST"])
+def api_stocks_holdings_as_of():
+    """
+    報酬分析用：依 end_date 重建所有股票（含目前已平倉、尚未出現在主頁的）的持股狀態，
+    只回傳當時仍持有（shares > 0）的股票清單，供勾選清單即時依日期篩選。
+    純重播 stock_transactions，不查即時/歷史股價，速度快。
+    """
+    data = request.get_json(force=True)
+    end_date = (data.get("end_date") or "").strip()
+    if not end_date:
+        abort(400, "缺少結束日期")
+    try:
+        datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError:
+        abort(400, "結束日期格式錯誤")
+
+    items = []
+    for s in stock_model.get_all():
+        holding = stock_model.holding_as_of(int(s["id"]), end_date)
+        if holding["shares"] > 0:
+            items.append({
+                "id": s["id"], "symbol": s.get("symbol"), "name": s.get("name"),
+                "shares": holding["shares"], "avg_price": holding["avg_price"],
+            })
+    items.sort(key=lambda x: x["name"])
+    return jsonify({"items": items})
+
+
+@stock_bp.route("/api/stocks/performance", methods=["POST"])
+def api_stocks_performance():
+    """
+    區間績效：計算所選股票於 end_date 當下的總報酬率。
+    股數/成本不是直接讀 stocks.csv 目前的 shares/avg_price，而是重播該股票
+    在 end_date（含）以前的交易（StockModel.holding_as_of）算出「end_date 當下」
+    的持股狀態——避免把 end_date 之後才買入、或 end_date 之前已平倉的股票，
+    誤用目前的股數/均價算入。end_date 當下股數為 0（尚未買進或已平倉）的股票
+    直接排除在外。
+    總成本 = Σ(end_date 當下持有成本)；結束總市值 = Σ(end_date 當下股數 × 收盤價)。
+    end_date 為今天（或更晚）時股價直接用目前現價，不查歷史股價。
+    """
+    if not _YF_AVAILABLE:
+        return jsonify({"error": "yfinance 未安裝，無法查詢歷史股價"}), 503
+
+    data = request.get_json(force=True)
+    end_date = (data.get("end_date") or "").strip()
+    stock_ids = {str(i) for i in (data.get("stock_ids") or [])}
+    if not end_date:
+        abort(400, "缺少結束日期")
+    if not stock_ids:
+        abort(400, "請至少勾選一支股票")
+
+    try:
+        datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError:
+        abort(400, "結束日期格式錯誤")
+
+    is_today_or_future = end_date >= date.today().isoformat()
+
+    all_stocks = {str(s["id"]): s for s in stock_model.get_all()}
+    holdings = []  # (stock, holding) pairs，僅保留 end_date 當下股數 > 0 的
+    excluded = 0
+    for sid in stock_ids:
+        s = all_stocks.get(sid)
+        if not s:
+            continue
+        holding = stock_model.holding_as_of(int(sid), end_date)
+        if holding["shares"] <= 0:
+            excluded += 1
+            continue
+        holdings.append((s, holding))
+    if not holdings:
+        abort(400, "所選股票於結束日期當下皆無持股（尚未買進或已平倉）")
+
+    def _end_price(s):
+        if is_today_or_future:
+            return float(s.get("current_price") or 0)
+        if not s.get("symbol"):
+            return None
+        return _historical_close(s["symbol"], end_date)
+
+    items = []
+    failed = []
+    with ThreadPoolExecutor(max_workers=min(8, len(holdings))) as pool:
+        future_to_pair = {pool.submit(_end_price, s): (s, h) for s, h in holdings}
+        for future in as_completed(future_to_pair):
+            s, holding = future_to_pair[future]
+            price = future.result()
+            shares = holding["shares"]
+            cost = holding["cost"]
+            if price is None:
+                failed.append(s.get("symbol") or s.get("name"))
+                value = cost  # 查無股價時以成本頂替，避免整體報酬率失真為缺漏
+                price = holding["avg_price"]
+            else:
+                value = shares * price
+            items.append({
+                "id": s["id"], "symbol": s.get("symbol"), "name": s.get("name"),
+                "shares": shares, "avg_price": holding["avg_price"], "end_price": round(price, 4),
+                "cost": round(cost, 2), "value": round(value, 2),
+            })
+
+    items.sort(key=lambda x: x["value"], reverse=True)
+    total_cost = sum(i["cost"] for i in items)
+    total_value = sum(i["value"] for i in items)
+    total_pl = total_value - total_cost
+    total_pct = (total_pl / total_cost * 100) if total_cost > 0 else 0
+
+    return jsonify({
+        "items": items,
+        "failed": failed,
+        "excluded": excluded,
+        "total_cost": round(total_cost, 2),
+        "total_value": round(total_value, 2),
+        "total_pl": round(total_pl, 2),
+        "total_pct": round(total_pct, 2),
+    })

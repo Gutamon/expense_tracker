@@ -153,6 +153,8 @@ def index():
         g = c.get("group_name", "未分類") or "未分類"
         grouped_categories.setdefault(g, []).append(c)
 
+    group_sort_order = [g["name"] for g in CategoryGroupModel().get_all()]
+
     monthly_budget = float(csv_store.get_setting("monthly_budget", 0) or 0)
 
     # Collect linked account IDs from stocks and loans — these should not appear
@@ -172,7 +174,9 @@ def index():
                       or (a.get("type") == "liability" and not a.get("sub_type"))]
 
     filtered_grouped_categories = {}
-    for g, cats in grouped_categories.items():
+    ordered_group_names = group_sort_order + [g for g in grouped_categories if g not in group_sort_order and g != "未分類"]
+    for g in ordered_group_names:
+        cats = grouped_categories.get(g)
         if g == "未分類": continue
         if cats: filtered_grouped_categories[g] = cats
     if "未分類" in grouped_categories and grouped_categories["未分類"]:
@@ -390,51 +394,31 @@ def api_delete(expense_id):
     return jsonify({"success": True})
 
 
-def _ym_key(r):
-    return int(r.get("year") or 0) * 12 + int(r.get("month") or 0)
-
-
-def _latest_amount_before_or_at(rows, key_field, key_value, year, month):
-    """Among rows matching key_field==key_value with (year,month) <= target, return the
-    amount from the most recent one that is non-zero. Used to carry a budget forward to
-    months that were never explicitly set."""
-    target = year * 12 + month
-    candidates = [r for r in rows if str(r.get(key_field)) == str(key_value) and _ym_key(r) <= target and float(r.get("amount") or 0) != 0]
-    if not candidates:
-        return 0.0
-    latest = max(candidates, key=_ym_key)
-    return float(latest.get("amount") or 0)
-
-
 @main_bp.route("/api/budget")
 def api_get_budget():
+    """回傳指定年月「實際設定過」的預算，不做任何往前月份的沿用推算——
+    每個月份的預算彼此獨立，未設定就是沒有資料（前端顯示為 0）。"""
     now = datetime.now()
     year = int(request.args.get("year", now.year))
     month = int(request.args.get("month", now.month))
 
     mb_rows = csv_store.read_csv("monthly_budgets.csv")
     row = next((r for r in mb_rows if int(r.get("year") or 0) == year and int(r.get("month") or 0) == month), None)
-    if row:
-        total = float(row["amount"])
-    else:
-        candidates = [r for r in mb_rows if _ym_key(r) <= year * 12 + month and float(r.get("amount") or 0) != 0]
-        total = float(max(candidates, key=_ym_key)["amount"]) if candidates else 0.0
+    total = float(row["amount"]) if row else 0.0
 
     cat_rows = csv_store.read_csv("cat_monthly_budgets.csv")
-    cat_ids = {str(r["category_id"]) for r in cat_rows}
-    cats = []
-    for cid in cat_ids:
-        exact = next((r for r in cat_rows if str(r.get("category_id")) == cid and int(r.get("year") or 0) == year and int(r.get("month") or 0) == month), None)
-        amount = float(exact["amount"]) if exact else _latest_amount_before_or_at(cat_rows, "category_id", cid, year, month)
-        cats.append({"id": cid, "amount": amount})
+    cats = [
+        {"id": str(r["category_id"]), "amount": float(r.get("amount") or 0)}
+        for r in cat_rows
+        if int(r.get("year") or 0) == year and int(r.get("month") or 0) == month
+    ]
 
     grp_rows = csv_store.read_csv("group_monthly_budgets.csv")
-    grp_ids = {str(r["group_id"]) for r in grp_rows}
-    groups = []
-    for gid in grp_ids:
-        exact = next((r for r in grp_rows if str(r.get("group_id")) == gid and int(r.get("year") or 0) == year and int(r.get("month") or 0) == month), None)
-        amount = float(exact["amount"]) if exact else _latest_amount_before_or_at(grp_rows, "group_id", gid, year, month)
-        groups.append({"id": gid, "amount": amount})
+    groups = [
+        {"id": str(r["group_id"]), "amount": float(r.get("amount") or 0)}
+        for r in grp_rows
+        if int(r.get("year") or 0) == year and int(r.get("month") or 0) == month
+    ]
 
     return jsonify({"total_budget": total, "categories": cats, "groups": groups})
 
@@ -458,6 +442,13 @@ def api_save_budget():
     csv_store.write_csv("monthly_budgets.csv", mb_rows, csv_store.SCHEMA["monthly_budgets.csv"])
 
     cmb_rows = csv_store.read_csv("cat_monthly_budgets.csv")
+    submitted_cat_ids = {str(cat["id"]) for cat in cats}
+    # 未勾選（未出現在本次提交）的細項預算視為取消追蹤，直接移除該月的紀錄
+    cmb_rows = [
+        r for r in cmb_rows
+        if not (int(r.get("year") or 0) == year and int(r.get("month") or 0) == month
+                and str(r.get("category_id")) not in submitted_cat_ids)
+    ]
     for cat in cats:
         cat_id = str(cat["id"])
         existing_cat = next(
@@ -478,6 +469,13 @@ def api_save_budget():
     csv_store.write_csv("cat_monthly_budgets.csv", cmb_rows, csv_store.SCHEMA["cat_monthly_budgets.csv"])
 
     gmb_rows = csv_store.read_csv("group_monthly_budgets.csv")
+    submitted_group_ids = {str(grp["id"]) for grp in groups}
+    # 未勾選（未出現在本次提交）的群組預算視為取消追蹤，直接移除該月的紀錄
+    gmb_rows = [
+        r for r in gmb_rows
+        if not (int(r.get("year") or 0) == year and int(r.get("month") or 0) == month
+                and str(r.get("group_id")) not in submitted_group_ids)
+    ]
     for grp in groups:
         group_id = str(grp["id"])
         existing_grp = next(

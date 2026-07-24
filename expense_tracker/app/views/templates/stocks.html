@@ -4,10 +4,29 @@
 
 {% block head %}
 <style>
+  /* 實色背景 + 底部邊緣明度漸層淡出，取代整塊漸層透明。 */
+  .sticky-area {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    background: var(--bg);
+    padding-top: var(--sticky-top);
+  }
+
+  .sticky-area::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    top: 100%;
+    height: 16px;
+    background: linear-gradient(to bottom, var(--bg), transparent);
+    pointer-events: none;
+  }
+
   .summary-bar {
     width: 100%;
     box-sizing: border-box;
-    margin-bottom: 24px;
+    padding-bottom: 10px;
     display: flex;
     flex-direction: column;
   }
@@ -47,6 +66,7 @@
   }
 
   .stock-list {
+    padding-top: var(--sticky-top);
     display: grid;
     gap: 20px;
   }
@@ -101,7 +121,7 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 20px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -120,16 +140,15 @@
 
   .stock-header {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 16px;
+    flex-direction: column;
+    gap: 5px;
   }
 
-  .stock-info {
+  .stock-row {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
-    flex-shrink: 0;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
   }
 
   .stock-symbol {
@@ -166,14 +185,22 @@
 
   .stock-stats {
     display: flex;
-    gap: 24px;
-    text-align: right;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: center;
+    border-top: 1px solid var(--border);
   }
+
 
   .stat-item {
     display: flex;
-    flex-direction: column;
+    flex: 1;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
     gap: 4px;
+    padding: 5px 0px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .stat-label {
@@ -186,18 +213,9 @@
     font-size: 1rem;
   }
 
-  .stock-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    border-top: 1px solid var(--border);
-    padding-top: 16px;
-    flex-wrap: wrap;
-  }
-
   .btn-action {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid transparent;
+    background: var(--bg);
+    border: 1px solid var(--border);
     color: var(--text);
     padding: 6px 12px;
     border-radius: 6px;
@@ -207,7 +225,6 @@
   }
 
   .btn-action:hover {
-    background: rgba(255, 255, 255, 0.1);
     border-color: var(--border);
   }
 
@@ -228,14 +245,9 @@
     color: var(--accent);
   }
 
-  .tx-container {
-    display: none;
-    border-top: 1px dashed var(--border);
-    padding-top: 12px;
-  }
-
-  .tx-container.open {
-    display: block;
+  #tx-list-body {
+    max-height: 50vh;
+    overflow-y: auto;
   }
 
   .tx-item {
@@ -346,11 +358,11 @@
   }
 
   .btn {
-    padding: 10px 16px;
+    padding: 10px 5px;
     border: none;
     border-radius: 8px;
     font-family: inherit;
-    font-size: .9rem;
+    font-size: .8rem;
     font-weight: 500;
     cursor: pointer;
     background: var(--accent);
@@ -362,7 +374,7 @@
   }
 
   .btn-ghost {
-    background: transparent;
+    background: var(--bg);
     border: 1px solid var(--border);
     color: var(--text);
   }
@@ -413,6 +425,12 @@
     font-size: 1.1rem;
     margin-bottom: 24px;
     font-weight: 500;
+  }
+
+  #tx-list-title {
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
   }
 
   .field {
@@ -584,20 +602,6 @@
   }
 
 
-  .account-row {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-top: 2px;
-  }
-
-  .account-label {
-    font-size: .7rem;
-    color: var(--muted);
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
   .zero-section-header {
     margin-top: 20px;
     padding: 4px 0;
@@ -631,11 +635,6 @@
       display: none;
     }
 
-    .stock-header {
-      flex-direction: column;
-      gap: 12px;
-    }
-
     .stock-info {
       width: 100%;
     }
@@ -645,23 +644,6 @@
       max-width: 100px;
     }
 
-    .stock-stats {
-      flex-direction: column;
-      gap: 0;
-      width: 100%;
-      text-align: left;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .stat-item {
-      flex-direction: row;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
 
     .stat-item:last-child {
       border-bottom: none;
@@ -692,36 +674,45 @@
 {% endblock %}
 
 {% block content %}
-<div class="summary-bar">
-  <div class="summary-stats">
-    <div class="s-item">
-      <span class="s-label">總投入成本</span>
-      <span class="s-value">${{ total_cost | money }}</span>
+<div class="sticky-area">
+  <div class="summary-bar">
+    <div class="summary-stats">
+      <div class="s-item">
+        <span class="s-label">總投入成本</span>
+        <span class="s-value">${{ total_cost | money }}</span>
+      </div>
+      <div class="s-item">
+        <span class="s-label">總市值</span>
+        <span class="s-value">${{ total_value | money }}</span>
+      </div>
+      <div class="s-item">
+        <span class="s-label">總未實現損益</span>
+        {% set total_pct = (total_pl / total_cost * 100) if total_cost > 0 else 0 %}
+        <span class="s-value {% if total_pl >= 0 %}profit{% else %}loss{% endif %}">
+          {% if total_pl >= 0 %}+{% endif %}${{ total_pl | money }}
+          <span style="font-size:1rem;">({{ "%.1f" | format(total_pct) }}%)</span>
+        </span>
+      </div>
     </div>
-    <div class="s-item">
-      <span class="s-label">總市值</span>
-      <span class="s-value">${{ total_value | money }}</span>
-    </div>
-    <div class="s-item">
-      <span class="s-label">總未實現損益</span>
-      {% set total_pct = (total_pl / total_cost * 100) if total_cost > 0 else 0 %}
-      <span class="s-value {% if total_pl >= 0 %}profit{% else %}loss{% endif %}">
-        {% if total_pl >= 0 %}+{% endif %}${{ total_pl | money }}
-        <span style="font-size:1rem;">({{ "%.1f" | format(total_pct) }}%)</span>
-      </span>
+    <div style="display:flex;flex-wrap:wrap;width:100%;gap:8px;">
+      <button class="btn btn-ghost" style="flex:1;" onclick="openPosModal()">新增倉位</button>
+      <button class="btn btn-ghost" style="flex:1;" onclick="openImportModal()">匯入交易</button>
+      <button class="btn btn-ghost" style="flex:1;" id="btn-refresh-prices" onclick="updateAllPrices()">更新現價</button>
+      <button class="btn" style="flex:1;" onclick="openPerfModal()">報酬分析</button>
     </div>
   </div>
-  <div style="display:flex;flex-wrap:wrap;width:100%;gap:8px;n ">
-    <button class="btn btn-ghost" style="flex:1;" id="btn-refresh-prices" onclick="updateAllPrices()">↻ 更新現價</button>
-    <button class="btn btn-ghost" style="flex:1;" onclick="openImportModal()">匯入對帳單</button>
-    <button class="btn" style="flex:1;" onclick="openPosModal()">新增倉位</button>
-  </div>
-</div>
 
-<div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:12px;">
-  <button class="stock-sort-toggle" id="stock-sort-toggle" onclick="toggleStockSort()" title="切換排序方式">
-    <span class="stock-sort-opt" data-mode="sort">自訂排序</span><span class="stock-sort-opt" data-mode="cost">成本最高</span>
-  </button>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn-action" onclick="openTxPickStock('buy')">買入</button>
+      <button class="btn-action" onclick="openTxPickStock('sell')">賣出</button>
+      <button class="btn-action" onclick="openTxPickStock('dividend')">股利</button>
+      <button class="btn-action" onclick="openTxPickStock('split')">分割</button>
+    </div>
+    <button class="stock-sort-toggle" id="stock-sort-toggle" onclick="toggleStockSort()" title="切換排序方式">
+      <span class="stock-sort-opt" data-mode="sort">設定</span><span class="stock-sort-opt" data-mode="cost">成本</span>
+    </button>
+  </div>
 </div>
 
 {% if stocks %}
@@ -739,18 +730,20 @@
   {% set stock_txs = transactions | selectattr("stock_id", "equalto", s.id) | list %}
   <div class="stock-card" data-cost="{{ scost }}">
     <div class="stock-header">
-      <div class="stock-info">
+      <div class="stock-row">
         <div class="stock-symbol">{{ s.symbol }}</div>
+        <select class="account-select" data-cs-compact data-stock-id="{{ s.id }}" onchange="changeStockAccount(this)">
+          {% for a in accounts if a.icon == '🏦' %}
+          <option value="{{ a.id }}" {% if a.id==s.account_id %}selected{% endif %}>{{ a.icon }} {{ a.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="stock-row">
         <input type="text" class="stock-name-input" id="s-name-{{ s.id }}" value="{{ s.name | e }}"
           data-stock-id="{{ s.id }}" data-original="{{ s.name | e }}">
-        <div class="account-row">
-          <span class="account-label">交割戶</span>
-          <select class="account-select" data-cs-compact data-stock-id="{{ s.id }}" onchange="changeStockAccount(this)">
-            {% for a in accounts if a.icon == '🏦' %}
-            <option value="{{ a.id }}" {% if a.id==s.account_id %}selected{% endif %}>{{ a.icon }} {{ a.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
+        <button class="tx-toggle" style="margin-left:0;" onclick="openTxListModal({{ s.id }})">
+          交易紀錄 ({{ stock_txs | length }}) ▾
+        </button>
       </div>
       <div class="stock-stats">
         <div class="stat-item">
@@ -768,48 +761,6 @@
           </span>
         </div>
       </div>
-    </div>
-    <div class="stock-actions">
-      <button class="btn-action" onclick="openTxModal({{ s.id }}, 'buy')">買入</button>
-      <button class="btn-action" onclick="openTxModal({{ s.id }}, 'sell')">賣出</button>
-      <button class="btn-action" onclick="openTxModal({{ s.id }}, 'dividend')">股利</button>
-      <button class="btn-action" onclick="openTxModal({{ s.id }}, 'split')">分割</button>
-      <button class="tx-toggle" onclick="toggleTx('tx-{{ s.id }}')">
-        交易紀錄 ({{ stock_txs | length }}) ▾
-      </button>
-    </div>
-    <div class="tx-container" id="tx-{{ s.id }}">
-      {% if stock_txs %}
-      {% for t in stock_txs %}
-      <div class="tx-item">
-        <span class="badge {{ t.type }}">{% if t.type == 'opening' %}期初{% else %}{{ t.type | upper }}{% endif %}</span>
-        <div class="tx-body">
-          <span class="tx-date">{{ t.date }}</span>
-          <div class="tx-amount">
-            {% if t.type == 'buy' or t.type == 'sell' %}
-            ${{ t.price | money(2) }} × {{ "%.0f" | format(t.shares) }}
-            {% elif t.type == 'opening' %}
-            ${{ t.price | money(2) }} × {{ "%.0f" | format(t.shares) }}
-            {% elif t.type == 'dividend' %}
-            <span style="color:#4a8af0">+ ${{ t.price | money(2) }}</span>
-            {% elif t.type == 'split' %}
-            <span style="color:#f04ac8">比例: {{ t.price }}</span>
-            {% endif %}
-          </div>
-          {% if t.type == 'buy' or t.type == 'sell' %}
-          <span class="tx-fee">手續費: ${{ t.fee | money }}</span>
-          {% endif %}
-        </div>
-        <div class="tx-btns">
-          <button class="icon-btn edit" data-id="{{ t.id }}" data-type="{{ t.type }}" data-date="{{ t.date }}"
-            data-shares="{{ t.shares }}" data-price="{{ t.price }}" data-fee="{{ t.fee }}">✎</button>
-          <button class="icon-btn del" onclick="deleteTx({{ t.id }})">✕</button>
-        </div>
-      </div>
-      {% endfor %}
-      {% else %}
-      <div style="text-align:center;color:var(--muted);font-size:.8rem;padding:12px 0;">尚無交易紀錄</div>
-      {% endif %}
     </div>
   </div>
   {% endfor %}
@@ -834,17 +785,25 @@
   {% set stock_txs = transactions | selectattr("stock_id", "equalto", s.id) | list %}
   <div class="stock-card empty">
     <div class="stock-header">
-      <div class="stock-info">
+      <div class="stock-row">
         <div class="stock-symbol">{{ s.symbol }}</div>
+        <select class="account-select" data-cs-compact data-stock-id="{{ s.id }}" onchange="changeStockAccount(this)">
+          {% for a in accounts if a.icon == '🏦' %}
+          <option value="{{ a.id }}" {% if a.id==s.account_id %}selected{% endif %}>{{ a.icon }} {{ a.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="stock-row">
         <input type="text" class="stock-name-input" id="s-name-{{ s.id }}" value="{{ s.name | e }}"
           data-stock-id="{{ s.id }}" data-original="{{ s.name | e }}">
-        <div class="account-row">
-          <span class="account-label">交割戶</span>
-          <select class="account-select" data-cs-compact data-stock-id="{{ s.id }}" onchange="changeStockAccount(this)">
-            {% for a in accounts if a.icon == '🏦' %}
-            <option value="{{ a.id }}" {% if a.id==s.account_id %}selected{% endif %}>{{ a.icon }} {{ a.name }}</option>
-            {% endfor %}
-          </select>
+        <div style="display:flex;align-items:center;gap:8px;">
+          {% if stock_txs | length == 0 %}
+          <button class="btn-action" style="color:var(--danger);border-color:rgba(255,95,95,0.35);"
+            onclick="deletePosition({{ s.id }}, '{{ s.symbol | e }}')">刪除倉位</button>
+          {% endif %}
+          <button class="tx-toggle" style="margin-left:0;" onclick="openTxListModal({{ s.id }})">
+            交易紀錄 ({{ stock_txs | length }}) ▾
+          </button>
         </div>
       </div>
       <div class="stock-stats">
@@ -863,49 +822,6 @@
           </span>
         </div>
       </div>
-    </div>
-    <div class="stock-actions">
-      <button class="btn-action" onclick="openTxModal({{ s.id }}, 'buy')">買入</button>
-      {% if stock_txs | length == 0 %}
-      <button class="btn-action" style="color:var(--danger);border-color:rgba(255,95,95,0.35);"
-        onclick="deletePosition({{ s.id }}, '{{ s.symbol | e }}')">刪除倉位</button>
-      {% endif %}
-      <button class="tx-toggle" onclick="toggleTx('tx-{{ s.id }}')">
-        交易紀錄 ({{ stock_txs | length }}) ▾
-      </button>
-    </div>
-    <div class="tx-container" id="tx-{{ s.id }}">
-      {% if stock_txs %}
-      {% for t in stock_txs %}
-      <div class="tx-item">
-        <span class="badge {{ t.type }}">{% if t.type == 'opening' %}期初{% else %}{{ t.type | upper }}{% endif %}</span>
-        <div class="tx-body">
-          <span class="tx-date">{{ t.date }}</span>
-          <div class="tx-amount">
-            {% if t.type == 'buy' or t.type == 'sell' %}
-            ${{ t.price | money(2) }} × {{ "%.0f" | format(t.shares) }}
-            {% elif t.type == 'opening' %}
-            ${{ t.price | money(2) }} × {{ "%.0f" | format(t.shares) }}
-            {% elif t.type == 'dividend' %}
-            <span style="color:#4a8af0">+ ${{ t.price | money(2) }}</span>
-            {% elif t.type == 'split' %}
-            <span style="color:#f04ac8">比例: {{ t.price }}</span>
-            {% endif %}
-          </div>
-          {% if t.type == 'buy' or t.type == 'sell' %}
-          <span class="tx-fee">手續費: ${{ t.fee | money }}</span>
-          {% endif %}
-        </div>
-        <div class="tx-btns">
-          <button class="icon-btn edit" data-id="{{ t.id }}" data-type="{{ t.type }}" data-date="{{ t.date }}"
-            data-shares="{{ t.shares }}" data-price="{{ t.price }}" data-fee="{{ t.fee }}">✎</button>
-          <button class="icon-btn del" onclick="deleteTx({{ t.id }})">✕</button>
-        </div>
-      </div>
-      {% endfor %}
-      {% else %}
-      <div style="text-align:center;color:var(--muted);font-size:.8rem;padding:12px 0;">尚無交易紀錄</div>
-      {% endif %}
     </div>
   </div>
   {% endfor %}
@@ -989,10 +905,14 @@
         <label>對帳單檔案 (CSV)</label>
         <input type="file" id="import-file" accept=".csv" autocomplete="off">
       </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--muted);cursor:pointer;margin-top:4px;">
+        <input type="checkbox" id="import-overwrite" style="width:16px;height:16px;accent-color:var(--danger);">
+        用這份對帳單覆蓋所有現有股票交易紀錄（會先刪除目前所有股票倉位與交易，無法復原）
+      </label>
     </div>
 
     <div id="import-step-preview" style="display:none;">
-      <p style="font-size:.85rem;color:var(--muted);margin-bottom:12px;">
+      <p id="import-preview-note" style="font-size:.85rem;color:var(--muted);margin-bottom:12px;">
         以下為聚合後的初始倉位，取消勾選可排除該股票：
       </p>
       <div id="import-list" class="import-list"></div>
@@ -1007,8 +927,51 @@
   </div>
 </div>
 
+<!-- Performance Modal -->
+<div class="modal-overlay" id="perf-modal">
+  <div class="modal">
+    <h3>報酬分析 · 區間績效</h3>
+
+    <div id="perf-result" style="display:none;margin-top:4px;">
+      <div class="summary-stats" style="margin-bottom:0;">
+        <div class="s-item">
+          <span class="s-label">總成本</span>
+          <span class="s-value" id="perf-total-cost">$0</span>
+        </div>
+        <div class="s-item">
+          <span class="s-label">結束總市值</span>
+          <span class="s-value" id="perf-total-value">$0</span>
+        </div>
+        <div class="s-item">
+          <span class="s-label">損益</span>
+          <span class="s-value" id="perf-total-pl">$0</span>
+        </div>
+        <div class="s-item">
+          <span class="s-label">總報酬率</span>
+          <span class="s-value" id="perf-total-pct">0%</span>
+        </div>
+      </div>
+      <p id="perf-failed" style="font-size:.75rem;color:var(--muted);margin-top:8px;"></p>
+    </div>
+
+    <div class="field">
+      <label>結束日期</label>
+      <input type="date" id="perf-end-date" autocomplete="off" onchange="onPerfEndDateChange()">
+    </div>
+    <div class="field">
+      <label>納入計算的股票</label>
+      <div id="perf-stock-list" class="import-list"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closePerfModal()">關閉</button>
+      <button class="btn" id="perf-calc-btn" onclick="calcPerformance()">計算</button>
+    </div>
+  </div>
+</div>
+
 <!-- Confirm Modal -->
-<div class="modal-overlay" id="confirm-modal">
+<div class="modal-overlay" id="confirm-modal" style="z-index: 60;">
   <div class="modal confirm-modal">
     <div class="confirm-icon danger">🗑</div>
     <h3 id="confirm-title">確認刪除？</h3>
@@ -1016,6 +979,32 @@
     <div class="confirm-actions">
       <button class="btn-ghost" id="confirm-cancel">取消</button>
       <button class="btn-danger" id="confirm-ok">刪除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Stock Picker Modal -->
+<div class="modal-overlay" id="tx-pick-modal">
+  <div class="modal">
+    <h3 id="tx-pick-title">選擇股票</h3>
+    <div class="field">
+      <label>股票</label>
+      <select id="tx-pick-select"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeTxPickModal()">取消</button>
+      <button class="btn" onclick="confirmTxPickStock()">下一步</button>
+    </div>
+  </div>
+</div>
+
+<!-- Transaction List Modal -->
+<div class="modal-overlay" id="tx-list-modal">
+  <div class="modal">
+    <h3 id="tx-list-title">交易紀錄</h3>
+    <div id="tx-list-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeTxListModal()">關閉</button>
     </div>
   </div>
 </div>
@@ -1050,6 +1039,13 @@
       <label>手續費</label>
       <input type="number" id="tx-fee" step="0.01" min="0" placeholder="0" autocomplete="off">
     </div>
+    <div class="field" id="wrap-cost-estimate">
+      <label>本次交易成本</label>
+      <div class="price-input" style="opacity:.8;">
+        <span class="price-prefix">$</span>
+        <input type="text" id="tx-cost-estimate" readonly tabindex="-1" placeholder="0">
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeTxModal()">取消</button>
       <button class="btn" onclick="submitTransaction()">送出</button>
@@ -1062,6 +1058,101 @@
 
 {% block scripts %}
 <script>
+  const STOCKS_DATA = {{ stocks | tojson | safe }};
+  const TRANSACTIONS_DATA = {{ transactions | tojson | safe }};
+
+  const TX_TYPE_TITLES = { buy: '買入', sell: '賣出', dividend: '股利', split: '分割' };
+
+  function _txItemHtml(t) {
+    const badgeLabel = t.type === 'opening' ? '期初' : String(t.type).toUpperCase();
+    let amount = '';
+    if (t.type === 'buy' || t.type === 'sell' || t.type === 'opening') {
+      amount = `$${Number(t.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × ${Math.round(t.shares)}`;
+    } else if (t.type === 'dividend') {
+      amount = `<span style="color:#4a8af0">+ $${Number(t.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+    } else if (t.type === 'split') {
+      amount = `<span style="color:#f04ac8">比例: ${t.price}</span>`;
+    }
+    const fee = (t.type === 'buy' || t.type === 'sell')
+      ? `<span class="tx-fee">手續費: $${Math.round(t.fee).toLocaleString()}</span>` : '';
+    return `
+      <div class="tx-item">
+        <span class="badge ${t.type}">${badgeLabel}</span>
+        <div class="tx-body">
+          <span class="tx-date">${t.date}</span>
+          <div class="tx-amount">${amount}</div>
+          ${fee}
+        </div>
+        <div class="tx-btns">
+          <button class="icon-btn edit" onclick="editTx(${t.id}, '${t.type}', '${t.date}', ${t.shares}, ${t.price}, ${t.fee}, ${t.stock_id})">✎</button>
+          <button class="icon-btn del" onclick="deleteTx(${t.id})">✕</button>
+        </div>
+      </div>`;
+  }
+
+  function openTxListModal(stockId) {
+    const stock = STOCKS_DATA.find(s => s.id === stockId);
+    const txs = TRANSACTIONS_DATA.filter(t => t.stock_id === stockId);
+    const titleEl = document.getElementById('tx-list-title');
+    if (stock) {
+      const cost = stock.shares * stock.avg_price;
+      titleEl.innerHTML = `<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${stock.name}</span><span style="color:var(--muted);font-size:.75rem;font-weight:normal;flex:none;margin-left:8px;">成本 $${Math.round(cost).toLocaleString()}</span>`;
+    } else {
+      titleEl.textContent = '交易紀錄';
+    }
+    document.getElementById('tx-list-body').innerHTML = txs.length
+      ? txs.map(_txItemHtml).join('')
+      : '<div style="text-align:center;color:var(--muted);font-size:.8rem;padding:12px 0;">尚無交易紀錄</div>';
+    document.getElementById('tx-list-modal').classList.add('open');
+  }
+
+  function closeTxListModal() { document.getElementById('tx-list-modal').classList.remove('open'); }
+
+  function openTxPickStock(type) {
+    const sel = document.getElementById('tx-pick-select');
+    const list = type === 'sell'
+      ? STOCKS_DATA.filter(s => s.shares > 0)
+      : STOCKS_DATA;
+    if (!list.length) { toast(type === 'sell' ? '目前無可賣出的持倉' : '請先新增股票倉位'); return; }
+    sel.innerHTML = list.map(s => `<option value="${s.id}">${s.symbol} ${s.name}</option>`).join('');
+    sel.dataset.type = type;
+    document.getElementById('tx-pick-title').textContent = `選擇股票（${TX_TYPE_TITLES[type]}）`;
+    document.getElementById('tx-pick-modal').classList.add('open');
+  }
+
+  function closeTxPickModal() { document.getElementById('tx-pick-modal').classList.remove('open'); }
+
+  function confirmTxPickStock() {
+    const sel = document.getElementById('tx-pick-select');
+    const stockId = parseInt(sel.value, 10);
+    const type = sel.dataset.type;
+    closeTxPickModal();
+    openTxModal(stockId, type);
+  }
+
+  function updateCostEstimate() {
+    const wrap = document.getElementById('wrap-cost-estimate');
+    const type = document.getElementById('tx-type').value;
+    const stockId = document.getElementById('tx-stock-id').value;
+    const stock = STOCKS_DATA.find(s => String(s.id) === String(stockId));
+    const out = document.getElementById('tx-cost-estimate');
+    if (!stock || type === 'dividend') { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+
+    const shares = parseFloat(document.getElementById('tx-shares').value || 0);
+    const price = parseFloat(document.getElementById('tx-price').value || 0);
+    const fee = parseFloat(document.getElementById('tx-fee').value || 0);
+
+    if (type === 'split') { wrap.style.display = 'none'; return; }
+
+    const txCost = shares * price + fee;
+    out.value = `${Math.round(txCost).toLocaleString()}`;
+  }
+
+  ['tx-shares', 'tx-price', 'tx-fee'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateCostEstimate);
+  });
+
   async function updateAllPrices() {
     const btn = document.getElementById('btn-refresh-prices');
     btn.textContent = '更新中...';
@@ -1080,7 +1171,7 @@
     } catch (e) {
       toast('無法連線，請確認網路後重試');
     }
-    btn.textContent = '↻ 更新現價';
+    btn.textContent = '更新現價';
     btn.disabled = false;
   }
 
@@ -1115,10 +1206,6 @@
     t.textContent = msg;
     t.classList.add("show");
     setTimeout(() => t.classList.remove("show"), 2500);
-  }
-
-  function toggleTx(id) {
-    document.getElementById(id).classList.toggle('open');
   }
 
   // ── 持倉排序：'sort' 依伺服器預設（自訂）順序，'cost' 依持倉成本由高至低 ──
@@ -1198,14 +1285,18 @@
   // Import Modal
   let _importPositions = [];
 
+  let _importOverwrite = false;
+
   function openImportModal() {
     _importPositions = [];
+    _importOverwrite = false;
     document.getElementById('import-step-upload').style.display = 'block';
     document.getElementById('import-step-preview').style.display = 'none';
     document.getElementById('import-next-btn').style.display = 'block';
     document.getElementById('import-confirm-btn').style.display = 'none';
     document.getElementById('import-file').value = '';
     document.getElementById('import-account').selectedIndex = 0;
+    document.getElementById('import-overwrite').checked = false;
     document.getElementById('import-list').innerHTML = '';
     document.getElementById('import-skipped').textContent = '';
     document.getElementById('import-modal').classList.add('open');
@@ -1217,20 +1308,30 @@
     const file = document.getElementById('import-file').files[0];
     if (!account_id) return toast("請選擇交割帳號");
     if (!file) return toast("請選擇對帳單檔案");
+    _importOverwrite = document.getElementById('import-overwrite').checked;
 
     const btn = document.getElementById('import-next-btn');
     btn.textContent = '解析中...'; btn.disabled = true;
     try {
       const fd = new FormData();
       fd.append('file', file);
+      if (_importOverwrite) fd.append('overwrite', 'true');
       const res = await fetch('/api/stocks/import/preview', { method: 'POST', body: fd });
       const data = await res.json();
       if (!res.ok) { toast(data.error || '解析失敗'); return; }
       const allPositions = data.positions || [];
-      // 只列出尚未建倉的股票；已存在的持股不重複顯示，僅在下方提示筆數。
-      _importPositions = allPositions.filter(p => !p.existing);
+      // 覆蓋模式下對帳單裡的股票一律視為全新倉位（後端已不做既有持股比對）。
+      // 一般模式：未建倉的股票全部列出；已建倉的股票只在對帳單裡有「尚未記錄過的交易」時才列出（供補匯）。
+      _importPositions = _importOverwrite
+        ? allPositions
+        : allPositions.filter(p => !p.existing || (p.new_txs && p.new_txs.length));
+      const skippedExisting = data.existing_count - _importPositions.filter(p => p.existing).length;
       if (!allPositions.length) { toast('找不到可建立的倉位'); return; }
-      if (!_importPositions.length) { toast('對帳單中的股票皆已建倉，無新增項目'); return; }
+      if (!_importPositions.length) { toast('對帳單中的股票皆已建倉且無新交易，無新增項目'); return; }
+
+      document.getElementById('import-preview-note').textContent = _importOverwrite
+        ? '⚠ 覆蓋模式：確認後將先刪除所有現有股票倉位與交易，再以下列內容重新建立，無法復原。'
+        : '以下為聚合後的初始倉位，取消勾選可排除該股票：';
 
       const list = document.getElementById('import-list');
       list.innerHTML = _importPositions.map((p, i) => `
@@ -1238,18 +1339,22 @@
           <input type="checkbox" class="import-check" data-idx="${i}" checked>
           <div class="import-row-info">
             <div class="import-row-top">
-              <span class="import-row-name">${p.name}</span>
-              <input type="text" class="import-code" data-idx="${i}" value="${p.symbol || ''}"
+              <span class="import-row-name">${p.name}${p.existing ? ' <span style="color:var(--muted);font-weight:400;">（已建倉·補齊交易）</span>' : ''}${(!p.existing && p.closed) ? ' <span style="color:var(--muted);font-weight:400;">（已平倉）</span>' : ''}</span>
+              ${p.existing ? '' : `<input type="text" class="import-code" data-idx="${i}" value="${p.symbol || ''}"
                 placeholder="代碼" maxlength="12" autocomplete="off"
-                oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9.]/g,'')">
+                oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9.]/g,'')">`}
             </div>
-            <span class="import-row-sub">${p.shares} 股 · 均價 $${p.avg_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · $${Math.round(p.total_cost).toLocaleString()}</span>
+            <span class="import-row-sub">${p.existing
+              ? `新增 ${p.new_txs.length} 筆交易`
+              : (p.closed
+                ? `已平倉 · 共 ${p.txs.length} 筆交易`
+                : `${p.shares} 股 · 均價 $${p.avg_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · $${Math.round(p.total_cost).toLocaleString()}`)}</span>
           </div>
         </div>
       `).join('');
-      const missing = _importPositions.filter(p => !p.symbol).length;
+      const missing = _importPositions.filter(p => !p.existing && !p.symbol).length;
       let note = '';
-      if (data.existing_count) note += `已略過 ${data.existing_count} 支已建倉的股票。`;
+      if (skippedExisting > 0) note += `已略過 ${skippedExisting} 支已建倉且無新交易的股票。`;
       if (data.skipped) note += `已略過 ${data.skipped} 筆無法解析的資料列。`;
       if (missing) note += `${missing} 支未自動對應到代碼，請手動輸入才能查詢即時報價。`;
       document.getElementById('import-skipped').textContent = note;
@@ -1275,17 +1380,24 @@
       .map(cb => _importPositions[parseInt(cb.dataset.idx, 10)]);
     if (!checked.length) return toast("請至少勾選一支股票");
 
+    if (_importOverwrite) {
+      const ok = await showConfirm('確認覆蓋所有股票資料？\n這會先刪除目前所有股票倉位、交易紀錄與連動投資帳戶，再用這份對帳單重新建立，操作無法復原。');
+      if (!ok) return;
+    }
+
     const btn = document.getElementById('import-confirm-btn');
     btn.textContent = '建立中...'; btn.disabled = true;
     try {
       const res = await fetch('/api/stocks/import', {
         method: 'POST',
-        body: JSON.stringify({ account_id, positions: checked })
+        body: JSON.stringify({ account_id, positions: checked, overwrite: _importOverwrite })
       });
       const data = await res.json();
       if (!res.ok) { toast(data.error || '匯入失敗'); return; }
-      let msg = `已建立 ${data.created} 支倉位`;
-      if (data.skipped) msg += `，略過 ${data.skipped} 支（已存在）`;
+      let msg = _importOverwrite
+        ? `已覆蓋重建，共 ${data.created} 支股票`
+        : `已處理 ${data.created} 支股票（新建倉或補齊交易）`;
+      if (data.skipped) msg += `，略過 ${data.skipped} 支`;
       toast(msg);
       _reloadTabs('settings', 'home');
       setTimeout(() => location.reload(), 700);
@@ -1296,6 +1408,107 @@
     }
   }
 
+  // Performance Modal
+  async function openPerfModal() {
+    document.getElementById('perf-end-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('perf-result').style.display = 'none';
+    document.getElementById('perf-modal').classList.add('open');
+    await refreshPerfStockList();
+  }
+  function closePerfModal() { document.getElementById('perf-modal').classList.remove('open'); }
+
+  function onPerfEndDateChange() {
+    document.getElementById('perf-result').style.display = 'none';
+    refreshPerfStockList();
+  }
+
+  // 依「結束日期」重建當時仍持有（未平倉）的股票清單；即使目前已平倉，
+  // 只要結束日當下仍持有就要出現在可勾選清單，反之目前持有但結束日尚未買進/已平倉的不出現。
+  async function refreshPerfStockList() {
+    const end_date = document.getElementById('perf-end-date').value;
+    const list = document.getElementById('perf-stock-list');
+    if (!end_date) { list.innerHTML = ''; return; }
+
+    // 記住目前已勾選/取消勾選的股票，重新整理清單後盡量保留使用者的選擇
+    const prevChecked = new Map(
+      [...document.querySelectorAll('#perf-stock-list .perf-check')].map(cb => [cb.dataset.id, cb.checked])
+    );
+
+    list.innerHTML = `<p style="font-size:.85rem;color:var(--muted);">載入中...</p>`;
+    let items = [];
+    try {
+      const res = await fetch('/api/stocks/holdings-as-of', {
+        method: 'POST',
+        body: JSON.stringify({ end_date })
+      });
+      const data = await res.json();
+      if (!res.ok) { toast(data.error || '查詢失敗'); list.innerHTML = ''; return; }
+      items = data.items || [];
+    } catch (e) {
+      toast('查詢失敗'); list.innerHTML = ''; return;
+    }
+
+    if (!items.length) {
+      list.innerHTML = `<p style="font-size:.85rem;color:var(--muted);">結束日期當下沒有任何持股。</p>`;
+      return;
+    }
+    list.innerHTML = items.map(s => `
+      <div class="import-row">
+        <input type="checkbox" class="perf-check" data-id="${s.id}" ${prevChecked.has(String(s.id)) ? (prevChecked.get(String(s.id)) ? 'checked' : '') : 'checked'}>
+        <div class="import-row-info">
+          <div class="import-row-top">
+            <span class="import-row-name">${s.name}${s.symbol ? ' · ' + s.symbol : ''}</span>
+          </div>
+          <span class="import-row-sub">${s.shares} 股 · 均價 $${Number(s.avg_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function _fmtMoney(v) {
+    const n = Math.round(v);
+    return (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString();
+  }
+
+  async function calcPerformance() {
+    const end_date = document.getElementById('perf-end-date').value;
+    if (!end_date) return toast("請選擇結束日期");
+    const stock_ids = [...document.querySelectorAll('#perf-stock-list .perf-check:checked')]
+      .map(cb => cb.dataset.id);
+    if (!stock_ids.length) return toast("請至少勾選一支股票");
+
+    const btn = document.getElementById('perf-calc-btn');
+    btn.textContent = '計算中...'; btn.disabled = true;
+    try {
+      const res = await fetch('/api/stocks/performance', {
+        method: 'POST',
+        body: JSON.stringify({ end_date, stock_ids })
+      });
+      const data = await res.json();
+      if (!res.ok) { toast(data.error || '計算失敗'); return; }
+
+      document.getElementById('perf-total-cost').textContent = _fmtMoney(data.total_cost);
+      document.getElementById('perf-total-value').textContent = _fmtMoney(data.total_value);
+      const plEl = document.getElementById('perf-total-pl');
+      const pctEl = document.getElementById('perf-total-pct');
+      const isProfit = data.total_pl >= 0;
+      plEl.textContent = (isProfit ? '+' : '') + _fmtMoney(data.total_pl);
+      plEl.className = 's-value ' + (isProfit ? 'profit' : 'loss');
+      pctEl.textContent = (isProfit ? '+' : '') + data.total_pct.toFixed(2) + '%';
+      pctEl.className = 's-value ' + (isProfit ? 'profit' : 'loss');
+
+      let note = '';
+      if (data.failed && data.failed.length) note += `查無股價（以成本計入）：${data.failed.join('、')}。`;
+      if (data.excluded) note += `已排除 ${data.excluded} 支於結束日尚未持有或已平倉的股票。`;
+      document.getElementById('perf-failed').textContent = note;
+      document.getElementById('perf-result').style.display = 'block';
+    } catch (e) {
+      toast('計算失敗');
+    } finally {
+      btn.textContent = '計算'; btn.disabled = false;
+    }
+  }
+
   // Transaction Modal
   function _configureTxFields(type) {
     const wShares = document.getElementById('wrap-shares');
@@ -1303,7 +1516,7 @@
     const wFee = document.getElementById('wrap-fee');
     const lPrice = document.getElementById('lbl-price');
     const sep = document.getElementById('price-shares-sep');
-    const prefix = document.querySelector('.price-prefix');
+    const prefix = wPrice.querySelector('.price-prefix');
     wShares.style.display = 'block'; wPrice.style.display = 'block'; wFee.style.display = 'block';
     sep.style.display = 'block'; prefix.style.display = 'inline';
     if (type === 'buy' || type === 'sell') {
@@ -1332,12 +1545,14 @@
     const titles = { buy: '買入', sell: '賣出', dividend: '現金股利', split: '股票分割' };
     document.getElementById('tx-title').textContent = titles[type];
     _configureTxFields(type);
+    updateCostEstimate();
     document.getElementById('tx-modal').classList.add('open');
   }
 
-  function editTx(id, type, date, shares, price, fee) {
+  function editTx(id, type, date, shares, price, fee, stockId) {
+    closeTxListModal();
     document.getElementById('tx-id-edit').value = id;
-    document.getElementById('tx-stock-id').value = '';
+    document.getElementById('tx-stock-id').value = stockId || '';
     document.getElementById('tx-type').value = type;
     document.getElementById('tx-date').value = date;
     document.getElementById('tx-shares').value = shares;
@@ -1346,23 +1561,11 @@
     const titles = { buy: '買入 (修改)', sell: '賣出 (修改)', dividend: '現金股利 (修改)', split: '股票分割 (修改)', opening: '期初持股 (修改)' };
     document.getElementById('tx-title').textContent = titles[type];
     _configureTxFields(type);
+    updateCostEstimate();
     document.getElementById('tx-modal').classList.add('open');
   }
 
   function closeTxModal() { document.getElementById('tx-modal').classList.remove('open'); }
-
-  document.querySelectorAll('.icon-btn.edit').forEach(btn => {
-    btn.addEventListener('click', function () {
-      editTx(
-        parseInt(this.dataset.id),
-        this.dataset.type,
-        this.dataset.date,
-        parseFloat(this.dataset.shares),
-        parseFloat(this.dataset.price),
-        parseFloat(this.dataset.fee)
-      );
-    });
-  });
 
   async function deleteTx(id) {
     if (!await showConfirm('確定要刪除這筆交易？')) return;

@@ -18,7 +18,6 @@
   .stats {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 16px;
   }
 
   .stat-card {
@@ -26,6 +25,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 24px;
+    margin-bottom: 20px;
   }
 
   .stat-card .label {
@@ -66,6 +66,192 @@
 
   .progress-fill.over {
     background: var(--danger);
+  }
+
+  /* ── Budget overview (circular progress) ── */
+  .budget-overview {
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .budget-ring-wrap {
+    position: relative;
+    width: 108px;
+    height: 108px;
+    flex-shrink: 0;
+  }
+
+  .budget-ring-wrap svg {
+    transform: rotate(-90deg);
+  }
+
+  .budget-ring-track {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 10;
+  }
+
+  .budget-ring-fill {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 10;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.4s, stroke 0.3s;
+  }
+
+  .budget-ring-fill.over {
+    stroke: var(--danger);
+  }
+
+  .budget-ring-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .budget-ring-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+
+  .budget-ring-pct.over {
+    color: var(--danger);
+  }
+
+  .budget-ring-sub {
+    font-size: .65rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .budget-summary {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    row-gap: 6px;
+    column-gap: 8px;
+  }
+
+  .budget-summary-row {
+    display: contents;
+  }
+
+  .budget-summary-row .label {
+    font-size: .78rem;
+    color: var(--muted);
+    align-self: baseline;
+  }
+
+  .budget-summary-row .value {
+    display: contents;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .95rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .budget-summary-row .value .amt-sign,
+  .budget-summary-row .value .amt-digits {
+    align-self: baseline;
+  }
+
+  .budget-summary-row .value .amt-sign {
+    text-align: left;
+  }
+
+  .budget-summary-row .value .amt-digits {
+    text-align: right;
+  }
+
+  .budget-summary-row .value.danger .amt-sign,
+  .budget-summary-row .value.danger .amt-digits {
+    color: var(--danger);
+  }
+
+  .budget-summary-row .value.accent .amt-sign,
+  .budget-summary-row .value.accent .amt-digits {
+    color: var(--accent);
+  }
+
+  /* ── Budget category accordion ── */
+  .budget-groups {
+    margin-top: 14px;
+  }
+
+  .budget-group {
+    margin-bottom: 8px;
+  }
+
+  .budget-group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    user-select: none;
+  }
+
+  .budget-group-header .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .budget-group-header .dot.healthy {
+    background: var(--accent);
+  }
+
+  .budget-group-header .dot.unhealthy {
+    background: var(--danger);
+  }
+
+  .budget-group-header .title {
+    flex: 1;
+    font-size: .85rem;
+    font-weight: 500;
+    color: var(--text);
+    text-transform: none;
+    letter-spacing: normal;
+    margin-bottom: 0;
+  }
+
+  .budget-group-header .count {
+    font-size: .75rem;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .budget-group-header .chevron {
+    width: 14px;
+    height: 14px;
+    color: var(--muted);
+    transition: transform 0.25s;
+    flex-shrink: 0;
+  }
+
+  .budget-group-header.open .chevron {
+    transform: rotate(180deg);
+  }
+
+  .budget-group-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+  }
+
+  .budget-group-body-inner {
+    padding: 12px 12px 4px;
   }
 
   /* ── Total card header + correction button ── */
@@ -234,7 +420,12 @@
     font-size: .9rem;
     padding: 10px 14px;
     outline: none;
+    box-sizing: border-box;
     transition: border-color .2s;
+  }
+
+  .field input[type="date"] {
+    max-width: 100%;
   }
 
   .field input:focus,
@@ -310,24 +501,38 @@
   .item-info {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
   }
 
   .item-title {
     font-size: .94rem;
     font-weight: 500;
+    color: var(--text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1;
   }
 
   .item-date {
     font-size: .75rem;
     color: var(--muted);
-    margin-top: 4px;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
+  }
+
+  .item-date:first-child {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .item-date:first-child>span:first-child {
+    flex-shrink: 0;
   }
 
   .account-tag {
@@ -345,19 +550,8 @@
     white-space: nowrap;
     display: flex;
     align-items: baseline;
-    gap: 4px;
-    min-width: 118px;
+    gap: 10px;
     text-align: left;
-  }
-
-  .item-amount .amt-sign {
-    display: inline-block;
-    width: 48px;
-  }
-
-  .item-amount .amt-digits {
-    text-align: right;
-    flex: 1;
   }
 
   .item-amount.income {
@@ -430,6 +624,7 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 4px;
+    z-index: 10;
   }
 
   .view-toggle label {
@@ -530,10 +725,6 @@
       padding: 0 20px;
     }
 
-    .stats {
-      grid-template-columns: 1fr;
-    }
-
     .grid {
       grid-template-columns: 1fr;
     }
@@ -564,42 +755,12 @@
     }
 
     .shell {
+      padding-top: 0;
       padding-bottom: calc(64px + 40px + env(safe-area-inset-bottom) + 1.25rem);
     }
 
     .fab-add:active {
       transform: scale(.92);
-    }
-
-    .expense-item {
-      display: grid;
-      grid-template-columns: max-content 1fr max-content;
-      grid-template-rows: auto auto;
-      column-gap: 12px;
-      row-gap: 10px;
-      align-items: center;
-    }
-
-    .expense-item .cat-badge {
-      grid-column: 1;
-      grid-row: 1;
-    }
-
-    .expense-item .item-amount {
-      grid-column: 2;
-      grid-row: 1;
-      justify-self: start;
-    }
-
-    .expense-item .item-info {
-      grid-column: 1 / 3;
-      grid-row: 2;
-    }
-
-    .expense-item .item-actions {
-      grid-column: 3;
-      grid-row: 1 / 3;
-      justify-self: end;
     }
 
   }
@@ -644,10 +805,135 @@
     font-size: .85rem;
     padding: 6px 10px;
     outline: none;
+    box-sizing: border-box;
+    max-width: 100%;
   }
 
   .budget-section {
     margin-bottom: 12px;
+  }
+
+  .w1 {
+    position: relative;
+    background: var(--bg);
+    padding-top: var(--sticky-top);
+  }
+  .w1::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 30px;
+    background: linear-gradient(to bottom, var(--bg), transparent);
+    pointer-events: none;
+  }
+
+  /* ── Budget section: single block, collapsed = mini bar row, expanded = full overview ──
+     同一個區塊，點擊切換內部顯示的內容（迷你進度條列 ⟷ 完整預算內容），
+     不是兩個各自獨立的元件，高度單純隨內容變化。 */
+  .budget-block {
+    position: relative;
+    cursor: pointer;
+    padding: 10px 34px 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    user-select: none;
+  }
+
+  .budget-block.open {
+    padding-bottom: 6px;
+  }
+
+  .budget-mini-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-height: 20px;
+    opacity: 1;
+    transition: max-height 0.25s ease, opacity 0.2s ease, margin 0.25s ease;
+    overflow: hidden;
+  }
+
+  .budget-block.open .budget-mini-row {
+    max-height: 0;
+    opacity: 0;
+  }
+
+  .budget-mini-label {
+    font-size: .78rem;
+    color: var(--muted);
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .budget-mini-bar {
+    flex: 1;
+    min-width: 0;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .budget-mini-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s;
+  }
+
+  .budget-mini-fill.over {
+    background: var(--danger);
+  }
+
+  .budget-mini-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .78rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .budget-mini-pct.over {
+    color: var(--danger);
+  }
+
+  .budget-block .chevron {
+    position: absolute;
+    top: 14px;
+    right: 12px;
+    width: 14px;
+    height: 14px;
+    color: var(--muted);
+    transition: transform 0.25s;
+    flex-shrink: 0;
+  }
+
+  .budget-block.open .chevron {
+    transform: rotate(180deg);
+  }
+
+  .budget-full-row {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.25s ease, opacity 0.2s ease;
+  }
+
+  .budget-block.open .budget-full-row {
+    opacity: 1;
+  }
+
+  /* ── Sticky header: panel nav + month nav/date range/budget/filter row ──
+     panel-nav 現在是 sticky-area 的第一個子元素，兩者一起黏頂、共用同一個
+     背景色，不再各自 sticky（避免巢狀 sticky 造成的縫隙/跳動）。 */
+  .sticky-area {
+    position: sticky;
+    top: 0;
+    z-index: 14;
+    padding: 0 0 15px 0;
+    display: flex;
+    flex-direction: column;
   }
 
   /* ── Mobile panel nav ── */
@@ -662,7 +948,7 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 4px;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .panel-tab {
@@ -1053,14 +1339,21 @@
 {% endblock %}
 
 {% block content %}
-<!-- Mobile Panel Nav -->
-<div class="panel-nav" id="panel-nav">
-  <div class="panel-tab" id="panel-tab-0" onclick="panelGo(0)">資產總覽</div>
-  <div class="panel-tab active" id="panel-tab-1" onclick="panelGo(1)">記帳明細</div>
-</div>
+
 
 <!-- Stats -->
 <div class="stats" id="mobile-panel-balance">
+
+  <div class="sticky-area">
+    <div class="w1">
+      <!-- Mobile Panel Nav -->
+      <div class="panel-nav">
+        <div class="panel-tab active" onclick="panelGo(0)">資產總覽</div>
+        <div class="panel-tab" onclick="panelGo(1)">記帳明細</div>
+      </div>
+    </div>
+  </div>
+
   <div class="stat-card">
     <div class="total-header">
       <div class="label">資產總覽</div>
@@ -1172,57 +1465,129 @@
   <!-- List -->
   <div id="mobile-panel-list" style="min-width: 0;">
 
-    <!-- Budget Section -->
-    <div class="budget-section">
-      <div id="budget-bars"></div>
-    </div>
+    <div class="sticky-area" id="sticky-area">
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:10px;">
-      <button id="adv-filter-btn" class="adv-filter-btn" onclick="openAdvFilter()" title="篩選">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-          stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <span class="filter-dot"></span>
-      </button>
-      <div class="view-toggle" style="flex-shrink:0;">
-        <input type="radio" name="view-mode" id="view-list" value="list" checked onchange="switchView('list')">
-        <label for="view-list">明細</label>
-        <input type="radio" name="view-mode" id="view-cal" value="cal" onchange="switchView('cal')">
-        <label for="view-cal">行事曆</label>
+      <div class="w1">
+        <!-- Mobile Panel Nav -->
+        <div class="panel-nav" id="panel-nav">
+          <div class="panel-tab" id="panel-tab-0" onclick="panelGo(0)">資產總覽</div>
+          <div class="panel-tab active" id="panel-tab-1" onclick="panelGo(1)">記帳明細</div>
+        </div>
+
+        <!-- Month Navigator -->
+        <div class="month-nav" id="month-nav">
+          <div class="month-nav-controls">
+            <button class="month-btn tap-repeat" onclick="changeMonth(-1)">&#8249;</button>
+            <span id="month-display" onclick="openMonthPicker()" style="cursor:pointer;user-select:none"
+              title="點擊跳轉"></span>
+            <button class="month-btn tap-repeat" onclick="changeMonth(1)">&#8250;</button>
+          </div>
+        </div>
+        <div id="date-range-bar" style="display:none">
+          <input type="date" id="range-start" class="range-input">
+          <span style="color:var(--muted);font-size:.85rem">至</span>
+          <input type="date" id="range-end" class="range-input">
+          <button class="btn-filter active" onclick="applyDateRange()">套用</button>
+          <button class="btn-filter" onclick="clearDateRange()">清除</button>
+        </div>
+
+        <!-- Budget Section: 單一區塊，點擊在「迷你進度條」與「完整內容」間切換 -->
+        <div class="budget-section">
+          <div class="budget-block" id="budget-block" onclick="toggleBudgetCollapse()">
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+            <div class="budget-mini-row" id="budget-mini-row">
+              <span class="budget-mini-label" id="budget-mini-label">本月預算</span>
+              <div class="budget-mini-bar" id="budget-mini-bar">
+                <div class="budget-mini-fill" id="budget-mini-fill" style="width:0%;"></div>
+              </div>
+              <span class="budget-mini-pct" id="budget-mini-pct">—</span>
+            </div>
+            <div class="budget-full-row" id="budget-full-row"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <button id="adv-filter-btn" class="adv-filter-btn" onclick="openAdvFilter()" title="篩選">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span class="filter-dot"></span>
+        </button>
+        <div class="view-toggle" style="flex-shrink:0;">
+          <input type="radio" name="view-mode" id="view-list" value="list" checked onchange="switchView('list')">
+          <label for="view-list">明細</label>
+          <input type="radio" name="view-mode" id="view-cal" value="cal" onchange="switchView('cal')">
+          <label for="view-cal">行事曆</label>
+        </div>
       </div>
     </div>
 
-    <!-- Month Navigator -->
-    <div class="month-nav" id="month-nav">
-      <div class="month-nav-controls">
-        <button class="month-btn tap-repeat" onclick="changeMonth(-1)">&#8249;</button>
-        <span id="month-display" onclick="openMonthPicker()" style="cursor:pointer;user-select:none"
-          title="點擊跳轉"></span>
-        <button class="month-btn tap-repeat" onclick="changeMonth(1)">&#8250;</button>
+    <script id="budget-ring-tpl" type="text/template">
+      <div class="budget-overview">
+        <div class="budget-ring-wrap">
+          <svg width="108" height="108" viewBox="0 0 108 108">
+            <circle class="budget-ring-track" cx="54" cy="54" r="46"></circle>
+            <circle class="budget-ring-fill __OVER__" cx="54" cy="54" r="46"
+              stroke-dasharray="__CIRC__" stroke-dashoffset="__OFFSET__"></circle>
+          </svg>
+          <div class="budget-ring-label">
+            <span class="budget-ring-pct __OVER__">__PCT__%</span>
+            <span class="budget-ring-sub">已使用</span>
+          </div>
+        </div>
+        <div class="budget-summary">
+          <div class="budget-summary-row">
+            <span class="label">本月花費</span>
+            <span class="value"><span class="amt-sign">NT$</span><span class="amt-digits">__SPENT__</span></span>
+          </div>
+          <div class="budget-summary-row">
+            <span class="label">總預算</span>
+            <span class="value"><span class="amt-sign">NT$</span><span class="amt-digits">__BUDGET__</span></span>
+          </div>
+          <div class="budget-summary-row">
+            <span class="label">__REMAIN_LABEL__</span>
+            <span class="value __REMAIN_CLASS__"><span class="amt-sign">NT$</span><span class="amt-digits">__REMAIN__</span></span>
+          </div>
+          <div class="budget-summary-row" style="margin-bottom:0;">
+            <span class="label">__DAILY_LABEL__</span>
+            <span class="value __DAILY_CLASS__"><span class="amt-sign">NT$</span><span class="amt-digits">__DAILY__</span></span>
+          </div>
+        </div>
       </div>
-    </div>
-    <div id="date-range-bar" style="display:none">
-      <input type="date" id="range-start" class="range-input">
-      <span style="color:var(--muted);font-size:.85rem">至</span>
-      <input type="date" id="range-end" class="range-input">
-      <button class="btn-filter active" onclick="applyDateRange()">套用</button>
-      <button class="btn-filter" onclick="clearDateRange()">清除</button>
-    </div>
+    </script>
 
     <div id="expense-list">
       {% if expenses %}
       {% for e in expenses %}
       <div class="expense-item" id="exp-{{ e.id }}" data-acc-id="{{ e.account_id }}" data-date="{{ e.date }}" {% if
         e.type=='transfer' %}data-to-acc-id="{{ e.to_account_id or '' }}" {% endif %}>
-        <span class="cat-badge {% if e.type == 'expense' %}expense{% elif e.type == 'transfer' %}transfer{% endif %}">
-          {% if e.type == 'transfer' %}轉帳{% else %}{{ e.category }}{% endif %}
-        </span>
         <div class="item-info">
-          <div class="item-title">{{ e.title }}</div>
           <div class="item-date">
-            <span>{{ e.date }}{% if e.note %} · {{ e.note }}{% endif %}</span>
+            <span>{{ e.date }}</span>
+            <span class="item-title">{{ e.title }}{% if e.note %} · {{ e.note }}{% endif %}</span>
+          </div>
+          <div class="item-amount {{ e.type }}">
+            {% if e.type == 'transfer' and e.to_amount %}
+            {% set from_acc = account_map.get(e.account_id) %}
+            {% set to_acc = account_map.get(e.to_account_id) %}
+            {{ "{:,.0f}".format(e.amount) }} {{ from_acc.get('currency', 'TWD') if from_acc else 'TWD' }} → {{
+            "{:,.0f}".format(e.to_amount) }} {{ to_acc.get('currency', 'TWD') if to_acc else 'TWD' }}
+            {% else %}
+            {% set acc = account_map.get(e.account_id) %}
+            {% set cur = acc.get('currency', 'TWD') if acc else 'TWD' %}
+            {% set sign = '+' if e.type == 'income' else ('-' if e.type == 'expense' else '') %}
+            {% set prefix = 'NT$' if cur == 'TWD' else cur %}
+            <span class="amt-sign">{{ sign }}{{ prefix }}</span><span class="amt-digits">{{ "{:,.0f}".format(e.amount)
+              }}</span>
+            {% endif %}
+          </div>
+          <div class="item-date">
             {% if e.account_id and account_map.get(e.account_id) %}
             <span class="account-tag">{{ account_map[e.account_id].icon }} {{ account_map[e.account_id].name }}</span>
             {% endif %}
@@ -1231,22 +1596,11 @@
             <span class="account-tag">{{ account_map[e.to_account_id].icon }} {{ account_map[e.to_account_id].name
               }}</span>
             {% endif %}
+            <span
+              class="cat-badge {% if e.type == 'expense' %}expense{% elif e.type == 'transfer' %}transfer{% endif %}">
+              {% if e.type == 'transfer' %}轉帳{% else %}{{ e.category }}{% endif %}
+            </span>
           </div>
-        </div>
-        <div class="item-amount {{ e.type }}">
-          {% if e.type == 'transfer' and e.to_amount %}
-          {% set from_acc = account_map.get(e.account_id) %}
-          {% set to_acc = account_map.get(e.to_account_id) %}
-          {{ "{:,.0f}".format(e.amount) }} {{ from_acc.get('currency', 'TWD') if from_acc else 'TWD' }} → {{
-          "{:,.0f}".format(e.to_amount) }} {{ to_acc.get('currency', 'TWD') if to_acc else 'TWD' }}
-          {% else %}
-          {% set acc = account_map.get(e.account_id) %}
-          {% set cur = acc.get('currency', 'TWD') if acc else 'TWD' %}
-          {% set sign = '+' if e.type == 'income' else ('-' if e.type == 'expense' else '') %}
-          {% set prefix = 'NT$' if cur == 'TWD' else cur %}
-          <span class="amt-sign">{{ sign }}{{ prefix }}</span><span class="amt-digits">{{ "{:,.0f}".format(e.amount)
-            }}</span>
-          {% endif %}
         </div>
         <div class="item-actions">
           <button class="icon-btn" onclick="openEditById('{{ e.id }}')">✎</button>
@@ -1790,8 +2144,13 @@
       groups.get(g).push(cat);
     });
 
+    const orderedNames = ALL_GROUPS.map(g => g.name).filter(n => groups.has(n));
+    orderedNames.push(...Array.from(groups.keys()).filter(n => !orderedNames.includes(n) && n !== '未分類'));
+    if (groups.has('未分類')) orderedNames.push('未分類');
+
     let firstValue = null;
-    groups.forEach((cats, gname) => {
+    orderedNames.forEach(gname => {
+      const cats = groups.get(gname);
       const og = document.createElement('optgroup');
       og.label = gname;
       cats.forEach(cat => {
@@ -1838,6 +2197,96 @@
         <span style="font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--muted);">NT$ ${Math.round(spent).toLocaleString()} / ${Math.round(budget).toLocaleString()}</span>
       </div>
       <div class="progress-bar"><div class="progress-fill ${over ? 'over' : ''}" style="width:${pct}%;"></div></div>
+    </div>`;
+  }
+
+  // 剩餘天數含今天；月底當天回傳 1，避免除以 0。
+  function daysLeftInMonth(year, month) {
+    const today = new Date();
+    const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    if (!isCurrentMonth) return totalDays;
+    return Math.max(1, totalDays - today.getDate() + 1);
+  }
+
+  function buildBudgetOverview(totalSpent, totalBudget) {
+    const pct = totalBudget > 0 ? Math.round(totalSpent / totalBudget * 100) : 0;
+    const over = totalSpent > totalBudget;
+    const remain = totalBudget - totalSpent;
+    const r = 46, circ = 2 * Math.PI * r;
+    const ringPct = Math.min(100, pct);
+    const offset = circ * (1 - ringPct / 100);
+    const daysLeft = daysLeftInMonth(currentYear, currentMonth);
+    const dailyAllowance = remain > 0 ? remain / daysLeft : 0;
+
+    const tpl = document.getElementById('budget-ring-tpl').textContent;
+    return tpl
+      .replaceAll('__OVER__', over ? 'over' : '')
+      .replaceAll('__CIRC__', circ.toFixed(1))
+      .replaceAll('__OFFSET__', offset.toFixed(1))
+      .replaceAll('__PCT__', pct)
+      .replaceAll('__SPENT__', Math.round(totalSpent).toLocaleString())
+      .replaceAll('__BUDGET__', Math.round(totalBudget).toLocaleString())
+      .replaceAll('__REMAIN_LABEL__', over ? '超支金額' : '剩餘預算')
+      .replaceAll('__REMAIN_CLASS__', over ? 'danger' : 'accent')
+      .replaceAll('__REMAIN__', Math.round(Math.abs(remain)).toLocaleString())
+      .replaceAll('__DAILY_LABEL__', over ? '已無可花費額度' : `每日可花`)
+      .replaceAll('__DAILY_CLASS__', over ? 'danger' : '')
+      .replaceAll('__DAILY__', Math.round(dailyAllowance).toLocaleString());
+  }
+
+  // 展開狀態記憶（切換月份/重新整理時保留使用者的收合偏好）。
+  const _budgetGroupOpenState = { healthy: false, unhealthy: true };
+
+  function toggleBudgetGroup(key) {
+    _budgetGroupOpenState[key] = !_budgetGroupOpenState[key];
+    const header = document.getElementById(`budget-group-header-${key}`);
+    const body = document.getElementById(`budget-group-body-${key}`);
+    if (!header || !body) return;
+    const open = _budgetGroupOpenState[key];
+    header.classList.toggle('open', open);
+    body.style.maxHeight = open ? body.scrollHeight + 'px' : '0px';
+
+    // 外層 budget-full-row 的 max-height 是展開當下的快照，內層手風琴展開/收合後
+    // 高度會變，需要重新量測，否則內容可能被外層裁掉或留下多餘空白。
+    const outerRow = document.getElementById('budget-full-row');
+    if (outerRow && document.getElementById('budget-block').classList.contains('open')) {
+      requestAnimationFrame(() => {
+        outerRow.style.maxHeight = outerRow.scrollHeight + 'px';
+      });
+    }
+  }
+
+  function buildBudgetAccordion(items) {
+    // items: [{name, spent, budget, pct, over}], 依剩餘比例 <=10% 分為不健康 / 健康
+    const healthy = [];
+    const unhealthy = [];
+    items.forEach(it => {
+      const remainPct = 100 - it.pct;
+      (remainPct <= 10 ? unhealthy : healthy).push(it);
+    });
+
+    const section = (key, label, list) => {
+      if (list.length === 0) return '';
+      const open = _budgetGroupOpenState[key];
+      const dotClass = key === 'unhealthy' ? 'unhealthy' : 'healthy';
+      const rows = list.map(it => buildBudgetBar(it.name, it.spent, it.budget, it.pct, it.over)).join('');
+      return `<div class="budget-group">
+        <div class="budget-group-header ${open ? 'open' : ''}" id="budget-group-header-${key}" onclick="toggleBudgetGroup('${key}')">
+          <span class="dot ${dotClass}"></span>
+          <span class="title">${label}</span>
+          <span class="count">${list.length}</span>
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </div>
+        <div class="budget-group-body" id="budget-group-body-${key}" style="max-height:${open ? '2000px' : '0px'};">
+          <div class="budget-group-body-inner">${rows}</div>
+        </div>
+      </div>`;
+    };
+
+    return `<div class="budget-groups">
+      ${section('unhealthy', '不健康 (剩餘 ≤10%)', unhealthy)}
+      ${section('healthy', '健康', healthy)}
     </div>`;
   }
 
@@ -1913,15 +2362,16 @@
 
     let html = '';
     if (totalBudget > 0) {
-      const pct = Math.min(100, Math.round(totalSpent / totalBudget * 100));
-      html += buildBudgetBar('總預算', totalSpent, totalBudget, pct, totalSpent > totalBudget);
+      html += buildBudgetOverview(totalSpent, totalBudget);
     }
+
+    const items = [];
     ALL_GROUPS.forEach(g => {
       const b = grpBudgetMap[String(g.id)] || 0;
       if (b <= 0) return;
       const spent = groupSpent[String(g.id)] || 0;
       const pct = Math.min(100, Math.round(spent / b * 100));
-      html += buildBudgetBar(g.name, spent, b, pct, spent > b);
+      items.push({ name: g.name, spent, budget: b, pct, over: spent > b });
     });
     allCategories.filter(c => c.type === 'expense').forEach(cat => {
       if (advFilter.cats.length > 0 && !advFilter.cats.map(String).includes(String(cat.id))) return;
@@ -1929,15 +2379,57 @@
       if (b <= 0) return;
       const spent = catSpent[cat.name] || 0;
       const pct = Math.min(100, Math.round(spent / b * 100));
-      html += buildBudgetBar(cat.name, spent, b, pct, spent > b);
+      items.push({ name: cat.name, spent, budget: b, pct, over: spent > b });
     });
+    if (items.length > 0) html += buildBudgetAccordion(items);
 
-    const container = document.getElementById('budget-bars');
+    const container = document.getElementById('budget-full-row');
     if (!html) {
       container.innerHTML = '<p style="color:var(--muted);font-size:.85rem;text-align:center;padding:20px 0;">尚未設定預算 · <a href="#" onclick="goToSettingsBudget();return false;" style="color:var(--accent);">前往設定</a></p>';
     } else {
       container.innerHTML = html;
     }
+
+    updateBudgetMiniBar(totalSpent, totalBudget);
+
+    // 展開狀態下內容被整段重繪（換月份等），高度需要重新量測，否則沿用舊快照會裁切或留白。
+    if (_budgetCollapseOpen) {
+      container.style.maxHeight = container.scrollHeight + 'px';
+    }
+  }
+
+  function updateBudgetMiniBar(totalSpent, totalBudget) {
+    const label = document.getElementById('budget-mini-label');
+    const fill = document.getElementById('budget-mini-fill');
+    const pctEl = document.getElementById('budget-mini-pct');
+    if (!label || !fill || !pctEl) return;
+
+    if (totalBudget <= 0) {
+      label.textContent = '本月尚未設定預算';
+      fill.style.width = '0%';
+      fill.classList.remove('over');
+      pctEl.textContent = '—';
+      pctEl.classList.remove('over');
+      return;
+    }
+
+    const pct = Math.round(totalSpent / totalBudget * 100);
+    const over = totalSpent > totalBudget;
+    label.textContent = '本月預算';
+    fill.style.width = Math.min(100, pct) + '%';
+    fill.classList.toggle('over', over);
+    pctEl.textContent = pct + '%';
+    pctEl.classList.toggle('over', over);
+  }
+
+  // 收合狀態記憶（切換月份/重新整理時保留使用者的收合偏好）；預設收合以節省黏頂區塊高度。
+  let _budgetCollapseOpen = false;
+
+  function toggleBudgetCollapse() {
+    _budgetCollapseOpen = !_budgetCollapseOpen;
+    document.getElementById('budget-block').classList.toggle('open', _budgetCollapseOpen);
+    const fullRow = document.getElementById('budget-full-row');
+    fullRow.style.maxHeight = _budgetCollapseOpen ? fullRow.scrollHeight + 'px' : '0px';
   }
 
   // ── Add expense ──
@@ -2423,7 +2915,7 @@
         if (!(activeIds.has(s1) || (s2 && activeIds.has(s2)))) return false;
       }
       return expenseMatchesAdvFilter(e);
-    });
+    }).sort((x, y) => (y.created_at || '').localeCompare(x.created_at || '') || (y.id - x.id));
 
     const d = new Date(dateStr + 'T00:00:00');
     document.getElementById('day-modal-title').textContent = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
@@ -2495,7 +2987,9 @@
     const listPanel = document.getElementById('mobile-panel-list');
     balPanel.classList.toggle('panel-active', idx === 0);
     listPanel.classList.toggle('panel-hidden', idx !== 1);
-    document.querySelectorAll('.panel-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+    document.querySelectorAll('.panel-nav').forEach(nav => {
+      nav.querySelectorAll('.panel-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+    });
   }
 
   // ── Day modal: close + open edit/delete ──

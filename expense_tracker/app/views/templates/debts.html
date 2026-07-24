@@ -4,13 +4,37 @@
 
 {% block head %}
 <style>
+  /* ── Sticky header container ──
+     一頁只有一個 .sticky-area，裡面包 .page-tabs + 兩個分頁的 .tab-summary（由 switchTab
+     切換顯示哪一個），整塊一起黏頂。實色背景 + 底部 ::after 明度漸層淡出。 */
+  .sticky-area {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    background: var(--bg);
+    padding-top: var(--sticky-top);
+  }
+
+  .sticky-area::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    top: 100%;
+    height: 16px;
+    background: linear-gradient(to bottom, var(--bg), transparent);
+    pointer-events: none;
+  }
+
+  .page-tabs {
+    margin-bottom: 16px;
+  }
+
   /* ── Per-Tab Summary ── */
   .tab-summary {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 20px 24px;
-    margin-bottom: 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -66,7 +90,7 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 20px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -85,7 +109,7 @@
   .debt-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
   }
 
@@ -618,23 +642,30 @@
       bottom: calc(76px + env(safe-area-inset-bottom) + 16px);
     }
   }
+
+  #section-cc {
+    padding-top: var(--sticky-top);
+  }
+  #section-loans {
+    padding-top: var(--sticky-top);
+  }
 </style>
 {% endblock %}
 
 {% block content %}
 {% set active_loans_count = loans | selectattr('status', 'equalto', 'active') | list | length %}
 
-<!-- Section Tabs -->
-<div class="page-tabs">
-  <button class="page-tab active" id="tab-cc" onclick="switchTab('cc')">信用卡{% if credit_cards %} ({{
-    credit_cards|length }}張){% endif %}</button>
-  <button class="page-tab" id="tab-loans" onclick="switchTab('loans')">借貸{% if active_loans_count %} ({{
-    active_loans_count }}筆){% endif %}</button>
-</div>
+<!-- Section Tabs + per-tab summary（同一個 sticky-area 容器，一頁只有一個） -->
+{% set net = total_loan_receivable - total_loan_owed %}
+<div class="sticky-area">
+  <div class="page-tabs">
+    <button class="page-tab active" id="tab-cc" onclick="switchTab('cc')">信用卡{% if credit_cards %} ({{
+      credit_cards|length }}張){% endif %}</button>
+    <button class="page-tab" id="tab-loans" onclick="switchTab('loans')">借貸{% if active_loans_count %} ({{
+      active_loans_count }}筆){% endif %}</button>
+  </div>
 
-<!-- ── Credit Card Section ── -->
-<div id="section-cc">
-  <div class="tab-summary">
+  <div class="tab-summary" id="summary-cc">
     <div class="summary-stats">
       <div class="s-item">
         <span class="s-label">信用卡未繳總額</span>
@@ -651,6 +682,30 @@
     </div>
     <button class="btn" onclick="openCCModal()">＋ 新增信用卡</button>
   </div>
+
+  <div class="tab-summary" id="summary-loans" style="display:none;">
+    <div class="summary-stats">
+      <div class="s-item">
+        <span class="s-label">借入未還</span>
+        <span class="s-value danger">NT$ {{ total_loan_owed | money }}</span>
+      </div>
+      <div class="s-item">
+        <span class="s-label">借出未收</span>
+        <span class="s-value accent">NT$ {{ total_loan_receivable | money }}</span>
+      </div>
+      <div class="s-item">
+        <span class="s-label">淨收支</span>
+        <span class="s-value {% if net >= 0 %}accent{% else %}danger{% endif %}">
+          NT$ {{ net|abs | money }}{% if net >= 0 %} 淨收{% else %} 淨欠{% endif %}
+        </span>
+      </div>
+    </div>
+    <button class="btn" onclick="openLoanModal()">＋ 新增借貸</button>
+  </div>
+</div>
+
+<!-- ── Credit Card Section ── -->
+<div id="section-cc">
   {% if credit_cards %}
   <div class="debt-list">
     {% for card in credit_cards %}
@@ -764,27 +819,6 @@
 <div id="section-loans" style="display:none;">
   {% set active_loans = loans | selectattr('status', 'equalto', 'active') | list %}
   {% set closed_loans = loans | selectattr('status', 'equalto', 'closed') | list %}
-  {% set net = total_loan_receivable - total_loan_owed %}
-
-  <div class="tab-summary">
-    <div class="summary-stats">
-      <div class="s-item">
-        <span class="s-label">借入未還</span>
-        <span class="s-value danger">NT$ {{ total_loan_owed | money }}</span>
-      </div>
-      <div class="s-item">
-        <span class="s-label">借出未收</span>
-        <span class="s-value accent">NT$ {{ total_loan_receivable | money }}</span>
-      </div>
-      <div class="s-item">
-        <span class="s-label">淨收支</span>
-        <span class="s-value {% if net >= 0 %}accent{% else %}danger{% endif %}">
-          NT$ {{ net|abs | money }}{% if net >= 0 %} 淨收{% else %} 淨欠{% endif %}
-        </span>
-      </div>
-    </div>
-    <button class="btn" onclick="openLoanModal()">＋ 新增借貸</button>
-  </div>
 
   {% if active_loans %}
   <div class="debt-list">
@@ -1167,6 +1201,8 @@
   function switchTab(tab) {
     document.getElementById('section-cc').style.display = tab === 'cc' ? 'block' : 'none';
     document.getElementById('section-loans').style.display = tab === 'loans' ? 'block' : 'none';
+    document.getElementById('summary-cc').style.display = tab === 'cc' ? 'flex' : 'none';
+    document.getElementById('summary-loans').style.display = tab === 'loans' ? 'flex' : 'none';
     document.getElementById('tab-cc').classList.toggle('active', tab === 'cc');
     document.getElementById('tab-loans').classList.toggle('active', tab === 'loans');
     NavState.set('debts', 'tab', tab);

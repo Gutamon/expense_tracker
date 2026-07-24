@@ -439,9 +439,7 @@ function rankSectionHtml(type, groups, showTitle) {
   const TOP_GROUPS = 6, TOP_CATS = 3;
 
   groups.slice(0, TOP_GROUPS).forEach(g => {
-    const color = colorOfGroup(g.id);
-    const pct = sectionTotal ? (g.total / sectionTotal * 100).toFixed(1) : 0;
-    const width = Math.max(2, g.total / maxTotal * 100);
+    const pct = sectionTotal ? Math.round(g.total / sectionTotal * 100) : 0;
 
     const catRow = c => `
       <div class="rank-cat">
@@ -464,10 +462,9 @@ function rankSectionHtml(type, groups, showTitle) {
     html += `
     <div class="rank-group">
       <div class="rank-head">
-        <span class="rank-name"><span class="dot" style="background:${color}"></span>${esc(g.name)}</span>
-        <span class="rank-val"><span class="amt-sign">NT$</span><span class="amt-digits">${fmtMoney(g.total)}</span><span class="pct">${pct}%</span></span>
+        <span class="rank-name"><span class="rank-pct">${pct}%</span>${esc(g.name)}</span>
+        <span class="rank-val"><span class="amt-sign">NT$</span><span class="amt-digits">${fmtMoney(g.total)}</span></span>
       </div>
-      <div class="rank-track"><div class="rank-fill" style="width:${width}%;background:${color}"></div></div>
       <div class="rank-cats">${cats}</div>
     </div>`;
   });
@@ -486,18 +483,15 @@ function toggleRankMore(el) {
 
 function renderRanking(periods) {
   const container = document.getElementById("rank-container");
-  const title = document.getElementById("rank-title");
 
   if (currentTab === 'balance') {
-    title.textContent = "主要收支";
     container.classList.add('two-col');
     container.innerHTML =
       rankSectionHtml('expense', aggregateByGroup(periods, 'expense'), true) +
       rankSectionHtml('income', aggregateByGroup(periods, 'income'), true);
   } else {
-    title.textContent = currentTab === 'expense' ? "主要支出" : "主要收入";
     container.classList.remove('two-col');
-    container.innerHTML = rankSectionHtml(currentTab, aggregateByGroup(periods, currentTab), false);
+    container.innerHTML = rankSectionHtml(currentTab, aggregateByGroup(periods, currentTab), true);
   }
 }
 

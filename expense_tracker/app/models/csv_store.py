@@ -8,8 +8,8 @@ from flask import g, has_request_context
 
 INT_FIELDS = {
     "expenses.csv": {"id", "category_id", "account_id", "to_account_id", "stock_transaction_id", "loan_id", "loan_payment_id"},
-    "categories.csv": {"id", "is_asset", "in_budget", "sort_order"},
-    "category_groups.csv": {"id", "sort_order"},
+    "categories.csv": {"id", "is_asset", "in_budget", "sort_order", "is_system"},
+    "category_groups.csv": {"id", "sort_order", "is_system"},
     "accounts.csv": {"id", "sort_order", "is_asset", "billing_start_day", "payment_due_day"},
     "stocks.csv": {"id", "shares", "account_id", "linked_account_id"},
     "stock_transactions.csv": {"id", "stock_id", "shares"},
@@ -61,8 +61,8 @@ SCHEMA = {
                      "type", "account_id", "to_account_id", "to_amount",
                      "stock_transaction_id", "loan_id", "loan_payment_id"],
     "categories.csv": ["id", "name", "type", "is_asset", "in_budget", "group_name",
-                       "sort_order", "monthly_budget"],
-    "category_groups.csv": ["id", "name", "sort_order", "type"],
+                       "sort_order", "monthly_budget", "is_system"],
+    "category_groups.csv": ["id", "name", "sort_order", "type", "is_system"],
     "accounts.csv": ["id", "name", "icon", "sort_order", "type", "sub_type", "is_asset",
                      "billing_start_day", "currency", "credit_limit",
                      "payment_due_day", "min_payment_pct", "min_payment_floor", "apr", "opening_balance"],
@@ -97,6 +97,20 @@ def root_dir() -> str:
 
 
 _local = threading.local()
+
+# Per-file-path write locks, so concurrent writers to the same CSV serialize instead
+# of clobbering each other's tmp (see write_csv). Guarded by _path_locks_guard.
+_path_locks = {}
+_path_locks_guard = threading.Lock()
+
+
+def _path_lock(p: str) -> threading.Lock:
+    key = os.path.normcase(os.path.abspath(p))
+    with _path_locks_guard:
+        lock = _path_locks.get(key)
+        if lock is None:
+            lock = _path_locks[key] = threading.Lock()
+        return lock
 
 
 @contextlib.contextmanager
@@ -137,20 +151,63 @@ def _path(filename: str) -> str:
 
 
 def read_csv(filename: str) -> list:
-    p = _path(filename)
-    if not os.path.exists(p):
-        return []
-    rows = []
-    with open(p, "r", encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            rows.append(coerce_row(filename, dict(row)))
-    return rows
+    return _read_csv_raw(filename, _path(filename))
+
+
+def _read_csv_raw(filename: str, p: str) -> list:
+    # A concurrent write's os.replace can momentarily unlink the destination on
+    # Windows, so a file that exists() one instant can vanish before/at open(). Retry
+    # briefly before treating it as genuinely absent, so a reader racing a writer
+    # doesn't 500 with FileNotFoundError.
+    for attempt in range(5):
+        if not os.path.exists(p):
+            return []
+        try:
+            with open(p, "r", encoding="utf-8-sig", newline="") as f:
+                reader = csv.DictReader(f)
+                return [coerce_row(filename, dict(row)) for row in reader]
+        except FileNotFoundError:
+            if attempt == 4:
+                return []
+            time.sleep(0.05)
 
 
 def write_csv(filename: str, rows: list, fieldnames: list):
     p = _path(filename)
-    tmp = p + ".tmp"
+    # Serialize writes to THIS file path. The shell fires five same-origin iframe
+    # requests at once; on a first-touch device several of them write the SAME csv
+    # concurrently (ensure_defaults / set_setting / migrations). Without a lock two
+    # writers clobbered each other's tmp — os.replace then found no tmp and 500'd with
+    # FileNotFoundError. The lock (plus a private tmp name) makes each write atomic and
+    # ordered; last-writer-wins is safe since all seed writers produce the same rows.
+    with _path_lock(p):
+        _write_csv_locked(p, rows, fieldnames)
+
+
+def seed_if_empty(filename: str, build_rows) -> list:
+    """Atomically seed default rows into a CSV iff it is currently empty, returning the
+    resulting rows. `build_rows()` is called (only if needed) to produce the defaults.
+
+    Guards the classic read-check-then-write in every model's ensure_defaults(): the
+    shell's five concurrent iframe requests each ran get_all()->ensure_defaults() on a
+    first-touch device, all saw an empty file, and all wrote — a lost-update race that,
+    combined with the tmp collision, 500'd the page. Doing the check and the write under
+    this file's write lock makes only the first writer seed; the rest see the rows and
+    return them.
+    """
+    p = _path(filename)
+    with _path_lock(p):
+        existing = _read_csv_raw(filename, p)
+        if existing:
+            return existing
+        rows = list(build_rows())
+        _write_csv_locked(p, rows, SCHEMA[filename])
+        return rows
+
+
+def _write_csv_locked(p: str, rows: list, fieldnames: list):
+    tmp = "%s.%d.%d.%s.tmp" % (p, os.getpid(), threading.get_ident(),
+                               os.urandom(4).hex())
     with open(tmp, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
@@ -164,6 +221,11 @@ def write_csv(filename: str, rows: list, fieldnames: list):
             return
         except PermissionError:
             if attempt == 4:
+                # Don't leak our private tmp if the replace ultimately fails.
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
                 raise
             time.sleep(0.1)
 

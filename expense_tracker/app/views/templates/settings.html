@@ -5,11 +5,12 @@
 {% block head %}
 <script src="{{ url_for('static', filename='vendor/sortablejs/Sortable.min.js') }}"></script>
 <style>
+
   .list-section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 20px;
+    padding: 4px 0 5px 0;
   }
 
   .list-section-header h2 {
@@ -193,7 +194,24 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 16px;
+    margin-top: 5px;
+  }
+
+  /* ── 月預算：切換月份時「尚未存檔」確認視窗，三個選項直向排列 ── */
+  .confirm-actions-stacked {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .confirm-actions-stacked button {
+    width: 100%;
+    padding: 11px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: .9rem;
+    font-weight: 500;
+    cursor: pointer;
   }
 
   /* ── 細項預算：選擇項目下拉選單（沿用 .mfilter 共用元件，見 globals.css） ── */
@@ -239,7 +257,7 @@
     border-radius: 10px;
     padding: 6px;
     min-width: 240px;
-    max-height: 320px;
+    max-height: 160px;
     overflow-y: auto;
     box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
   }
@@ -263,11 +281,22 @@
     border-bottom: 1px solid var(--border);
   }
 
+  .budget-amount-group-title.budget-amount-group-title-with-input {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--accent);
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: .9rem;
+  }
+
   .budget-amount-row {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 8px 0;
+    padding: 8px 0 8px 16px;
   }
 
   .budget-amount-row .budget-amount-name {
@@ -275,11 +304,8 @@
     font-size: .9rem;
   }
 
-  .budget-amount-row .budget-amount-name.is-group {
-    font-weight: 500;
-  }
-
-  .budget-amount-row .budget-amount-input-wrap {
+  .budget-amount-row .budget-amount-input-wrap,
+  .budget-amount-group-title .budget-amount-input-wrap {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -293,18 +319,21 @@
     transition: border-color .2s;
   }
 
-  .budget-amount-row .budget-amount-input-wrap:focus-within {
+  .budget-amount-row .budget-amount-input-wrap:focus-within,
+  .budget-amount-group-title .budget-amount-input-wrap:focus-within {
     border-color: var(--accent);
   }
 
-  .budget-amount-row .budget-amount-input-wrap .amt-sign {
+  .budget-amount-row .budget-amount-input-wrap .amt-sign,
+  .budget-amount-group-title .budget-amount-input-wrap .amt-sign {
     font-family: 'JetBrains Mono', monospace;
     font-size: .82rem;
     color: var(--muted);
     flex-shrink: 0;
   }
 
-  .budget-amount-row input[type="number"] {
+  .budget-amount-row input[type="number"],
+  .budget-amount-group-title input[type="number"] {
     flex: 1;
     min-width: 0;
     background: transparent;
@@ -321,6 +350,29 @@
 
   .filter-bar .cs {
     flex: 1;
+  }
+
+  /* ── Sticky header container ──
+     每個分頁（section-*）各自只能有一個 .sticky-area：把 page_tabs() 巨集連同該分頁
+     專屬的標題列/toggle/篩選列都包進同一個容器一起黏頂（top:0），避免同分頁疊出
+     兩層各自 sticky 的元素。實色背景 + 底部 ::after 明度漸層淡出。 */
+  .sticky-area {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    background: var(--bg);
+    padding-top: var(--sticky-top);
+    min-width: 0;
+  }
+
+  .sticky-area::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    top: 100%;
+    height: 16px;
+    background: linear-gradient(to bottom, var(--bg), transparent);
+    pointer-events: none;
   }
 
   @media (max-width: 768px) {
@@ -346,7 +398,6 @@
     }
 
     .shell {
-      margin: 20px auto 0;
       padding: 0 16px;
       padding-bottom: calc(64px + 16px + env(safe-area-inset-bottom) + 1.25rem);
     }
@@ -355,7 +406,9 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-tabs">
+<!-- 唯一一份頁籤列 DOM；switchMainTab() 會把它搬進目前顯示中 section 的 .sticky-area，
+     確保每個分頁畫面上永遠只有一個 .sticky-area（不重複 id，也不用複製節點）。 -->
+<div class="page-tabs" id="page-tabs">
   <button id="main-tab-accounts" class="page-tab active" onclick="switchMainTab('accounts')">帳戶</button>
   <button id="main-tab-budget" class="page-tab" onclick="switchMainTab('budget')">月預算</button>
   <button id="main-tab-groups" class="page-tab" onclick="switchMainTab('groups')">群組</button>
@@ -365,24 +418,26 @@
 
 <!-- Category Section -->
 <div id="section-categories" style="display:none;">
-  <div class="list-section-header">
-    <h2>類別列表</h2>
-    <button class="btn-add-icon" title="新增類別"
-      onclick="document.getElementById('mobile-cat-overlay').classList.add('open')">＋</button>
+  <div class="sticky-area">
+    <div class="list-section-header">
+      <h2>類別列表</h2>
+      <button class="btn-add-icon" title="新增類別"
+        onclick="document.getElementById('mobile-cat-overlay').classList.add('open')">＋</button>
+    </div>
+    <div class="type-switch" style="margin-top:10px;margin-bottom:8px;">
+      <input type="radio" name="cat-list-filter" id="cat-list-exp" value="expense" checked
+        onchange="switchCatListTab('expense')">
+      <label for="cat-list-exp">支出類別</label>
+      <input type="radio" name="cat-list-filter" id="cat-list-inc" value="income" onchange="switchCatListTab('income')">
+      <label for="cat-list-inc">收入類別</label>
+    </div>
+    <div class="filter-bar" style="margin:0;">
+      <select id="cat-group-filter" onchange="filterCatGroups()">
+        <option value="all">所有群組</option>
+      </select>
+    </div>
   </div>
-  <div class="type-switch" style="margin-bottom:24px;">
-    <input type="radio" name="cat-list-filter" id="cat-list-exp" value="expense" checked
-      onchange="switchCatListTab('expense')">
-    <label for="cat-list-exp">支出類別</label>
-    <input type="radio" name="cat-list-filter" id="cat-list-inc" value="income" onchange="switchCatListTab('income')">
-    <label for="cat-list-inc">收入類別</label>
-  </div>
-  <div class="filter-bar">
-    <select id="cat-group-filter" onchange="filterCatGroups()">
-      <option value="all">所有群組</option>
-    </select>
-  </div>
-  <div id="cat-list">
+  <div id="cat-list" style="padding-top:10px;">
     {% for c in categories %}
     <div class="list-item cat-item" data-id="{{ c.id }}" data-type="{{ c.type }}" data-group="{{ c.group_name }}">
       <span class="drag-handle">⠿</span>
@@ -393,12 +448,20 @@
           <span style="color:#fff;">{{ c.group_name }}</span>
           {% if c.is_asset %}<span>計資產</span>{% endif %}
           {% if c.type == 'expense' and c.in_budget %}<span>計預算</span>{% endif %}
+          {% if c.is_system %}<span>系統類別</span>{% endif %}
         </div>
       </div>
       <div class="item-actions">
+        {% if c.is_system %}
+        {% if c.type == 'expense' %}
         <button class="icon-btn"
-          onclick="openCatEdit({{ c.id }}, '{{ c.name }}', '{{ c.group_name }}', '{{ c.type }}', {{ c.is_asset }}, {{ c.in_budget }})">✎</button>
+          onclick="openCatEdit({{ c.id }}, '{{ c.name }}', '{{ c.group_name }}', '{{ c.type }}', {{ c.is_asset }}, {{ c.in_budget }}, true)">✎</button>
+        {% endif %}
+        {% else %}
+        <button class="icon-btn"
+          onclick="openCatEdit({{ c.id }}, '{{ c.name }}', '{{ c.group_name }}', '{{ c.type }}', {{ c.is_asset }}, {{ c.in_budget }}, false)">✎</button>
         <button class="icon-btn del" onclick="openCatDelete({{ c.id }}, '{{ c.name }}')">✕</button>
+        {% endif %}
       </div>
     </div>
     {% endfor %}
@@ -409,29 +472,34 @@
 
 <!-- Groups Section -->
 <div id="section-groups" style="display:none;">
-  <div class="list-section-header">
-    <h2>群組列表</h2>
-    <button class="btn-add-icon" title="新增群組"
-      onclick="document.getElementById('mobile-grp-overlay').classList.add('open')">＋</button>
+  <div class="sticky-area">
+    <div class="list-section-header">
+      <h2>群組列表</h2>
+      <button class="btn-add-icon" title="新增群組"
+        onclick="document.getElementById('mobile-grp-overlay').classList.add('open')">＋</button>
+    </div>
+    <div class="type-switch" style="margin-top:10px;margin-bottom:5px">
+      <input type="radio" name="grp-list-filter" id="grp-list-exp" value="expense" checked
+        onchange="switchGrpListTab('expense')">
+      <label for="grp-list-exp">支出群組</label>
+      <input type="radio" name="grp-list-filter" id="grp-list-inc" value="income" onchange="switchGrpListTab('income')">
+      <label for="grp-list-inc">收入群組</label>
+    </div>
   </div>
-  <div class="type-switch" style="margin-bottom:24px;">
-    <input type="radio" name="grp-list-filter" id="grp-list-exp" value="expense" checked
-      onchange="switchGrpListTab('expense')">
-    <label for="grp-list-exp">支出群組</label>
-    <input type="radio" name="grp-list-filter" id="grp-list-inc" value="income" onchange="switchGrpListTab('income')">
-    <label for="grp-list-inc">收入群組</label>
-  </div>
-  <div id="grp-list">
+  <div id="grp-list" style="padding-top:10px;">
     {% for g in groups %}
     <div class="list-item grp-item" data-id="{{ g.id }}" data-type="{{ g.get('type', 'expense') }}">
       <span class="drag-handle">⠿</span>
       <div class="item-info">
         <div class="item-name">{{ g.name }}</div>
+        {% if g.is_system %}<div class="item-meta"><span>系統群組</span></div>{% endif %}
       </div>
       <div class="item-actions">
+        {% if not g.is_system %}
         <button class="icon-btn"
           onclick="openGroupEdit({{ g.id }}, '{{ g.name }}', '{{ g.get('type', 'expense') }}')">✎</button>
         <button class="icon-btn del" onclick="openGroupDelete({{ g.id }}, '{{ g.name }}')">✕</button>
+        {% endif %}
       </div>
     </div>
     {% endfor %}
@@ -440,12 +508,14 @@
 
 <!-- Account Section -->
 <div id="section-accounts">
-  <div class="list-section-header">
-    <h2>帳戶列表</h2>
-    <button class="btn-add-icon" title="新增帳戶"
-      onclick="document.getElementById('mobile-acc-overlay').classList.add('open')">＋</button>
+  <div class="sticky-area">
+    <div class="list-section-header">
+      <h2>帳戶列表</h2>
+      <button class="btn-add-icon" title="新增帳戶"
+        onclick="document.getElementById('mobile-acc-overlay').classList.add('open')">＋</button>
+    </div>
   </div>
-  <div id="acc-list">
+  <div id="acc-list" style="padding-top: 10px;">
     {% set icon_sub = {'💵': '現金', '🏦': '銀行', '🪙': '預付儲值', '💳': '信用卡', '👝': '其他'} %}
     {% set sub_disp_map = {'負債其他': '其他'} %}
     {% for a in accounts %}
@@ -602,6 +672,7 @@
 
 <!-- Budget Section -->
 <div id="section-budget" style="display:none;">
+  <div class="sticky-area"></div>
   <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:24px;">
     <button class="month-btn tap-repeat" onclick="budgetChangeMonth(-1)">&#8249;</button>
     <span id="budget-month-display" style="font-size:.95rem;font-weight:500;min-width:90px;text-align:center;"></span>
@@ -611,22 +682,26 @@
   <div style="margin-bottom:24px;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
       <h2>月預算</h2>
-      <div style="display:flex;gap:8px;">
+      <div style="display:flex;gap:6px;">
         <button class="btn"
-          style="width:auto;padding:8px 20px;background:var(--surface);border:1px solid var(--border);color:var(--muted);"
-          onclick="clearAllBudgets()">清除本月預算</button>
-        <button class="btn" style="width:auto;padding:8px 20px;" onclick="saveAllBudgets()">存檔</button>
+          style="width:auto;padding:6px 12px;font-size:.82rem;background:var(--surface);border:1px solid var(--border);color:var(--muted);"
+          onclick="applyPreviousMonthBudget()">套用前月</button>
+        <button class="btn"
+          style="width:auto;padding:6px 12px;font-size:.82rem;background:var(--surface);border:1px solid var(--border);color:var(--muted);"
+          onclick="clearAllBudgets()">清除</button>
+        <button class="btn" style="width:auto;padding:6px 14px;font-size:.82rem;" onclick="saveAllBudgets()">存檔</button>
       </div>
     </div>
     <div class="field" style="max-width:280px;">
       <label>每月總預算 (NT$)</label>
-      <input type="number" id="total-budget-input" placeholder="0" min="0" autocomplete="off">
+      <input type="number" id="total-budget-input" placeholder="0" min="0" autocomplete="off"
+        oninput="markBudgetDirty()">
     </div>
   </div>
 
   <div>
     <h2>細項預算</h2>
-    <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px;">選擇要追蹤的群組／類別，下方會依此呈現各自的預算輸入欄位；設定 0 代表不追蹤</p>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px;">選擇要追蹤的群組／類別，下方會依此呈現各自的預算輸入欄位；不需要追蹤請取消勾選該項目</p>
 
     <div class="mfilter" id="budget-item-filter">
       <button class="mfilter-btn" id="budget-item-filter-btn" onclick="toggleBudgetItemMenu(event)">
@@ -655,6 +730,19 @@
 
     <div id="budget-amount-sections"></div>
     <p id="budget-amount-empty" style="font-size:.82rem;color:var(--muted);display:none;">尚未勾選任何群組或類別</p>
+  </div>
+</div>
+
+<!-- Modal: unsaved budget changes when switching month -->
+<div class="overlay" id="budget-unsaved-overlay">
+  <div class="modal confirm-modal">
+    <h3>本月預算尚未存檔</h3>
+    <p>目前月份的預算設定已修改但尚未存檔，離開後這些變更將會遺失。</p>
+    <div class="confirm-actions-stacked">
+      <button class="btn" onclick="budgetUnsavedSaveThenSwitch()">存檔後切換</button>
+      <button class="btn-ghost" onclick="budgetUnsavedDiscardAndSwitch()">不存檔直接切換</button>
+      <button class="btn-ghost" onclick="budgetUnsavedCancel()">取消切換</button>
+    </div>
   </div>
 </div>
 
@@ -803,6 +891,7 @@
 
 <!-- Data & Sync Section -->
 <div id="section-sync" style="display:none;">
+  <div class="sticky-area"></div>
   <!-- ── 資料管理 ── -->
   <div class="card">
     <h2>資料管理</h2>
@@ -821,20 +910,47 @@
     <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem;">
       清除瀏覽器資料或更換裝置後，在首頁輸入這組代碼即可認回目前的帳本，不必透過備份檔還原。在其他裝置的首頁輸入相同代碼，即可讓多台裝置共同編輯同一份帳本。請妥善保管，知道此代碼的人都能存取您的資料；若清除所有資料，此代碼將失效。</p>
     <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;">
+      <!-- Code is minted lazily (POST /api/sync-code/ensure) on first reveal, so the
+           settings page render never moves the device folder and races the shell's
+           sibling iframes. Until then, show a button instead of a blank code. -->
+      <button id="btn-sync-reveal" onclick="revealSyncCode()" class="btn" style="width:auto;{% if sync_code %}display:none;{% endif %}">顯示識別碼</button>
       <span id="sync-code-display"
-        style="font-family:'DM Mono',monospace;font-size:1.1rem;letter-spacing:.05rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.5rem 1rem;">{{
-        sync_code }}</span>
-      <button id="btn-sync-regen" onclick="regenSyncCode()" class="btn" style="width:auto;">重新產生</button>
+        style="{% if not sync_code %}display:none;{% endif %}font-family:'DM Mono',monospace;font-size:1.1rem;letter-spacing:.05rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.5rem 1rem;">{{ sync_code }}</span>
+      <button id="btn-sync-regen" onclick="regenSyncCode()" class="btn" style="width:auto;{% if not sync_code %}display:none;{% endif %}">重新產生</button>
     </div>
-    <p id="sync-device-count" style="font-size:.75rem;color:var(--muted);margin-top:.75rem;"
+    <p id="sync-device-count" style="font-size:.75rem;color:var(--muted);margin-top:.75rem;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;"
       data-count="{{ linked_device_count }}">
-      目前有 {{ linked_device_count }} 台裝置與此代碼同步{% if linked_device_count > 1 %}
+      <span>目前有 {{ linked_device_count }} 台裝置與此代碼同步</span>{% if linked_device_count > 1 %}
+      {% if not is_owner %}
       <button id="btn-sync-leave" onclick="leaveSyncGroup()" class="btn btn-outline"
-        style="width:auto;margin-left:.5rem;padding:.3rem .8rem;font-size:.78rem;">將此裝置退出同步</button>
+        style="width:auto;padding:.3rem .8rem;font-size:.78rem;">退出同步</button>
+      {% endif %}
       {% endif %}
     </p>
+    {% if is_owner %}
+    <div id="sync-owner-tools" style="{% if linked_device_count <= 1 %}display:none;{% endif %}margin-top:.5rem;">
+      <button id="btn-sync-members" onclick="openMembers()" class="btn btn-outline"
+        style="width:auto;padding:.4rem .9rem;font-size:.8rem;">共享裝置名單</button>
+    </div>
+    {% endif %}
   </div>
 </div>
+
+{% if is_owner %}
+<!-- Modal: 共享裝置名單（主裝置專用，列出所有從裝置並可踢除） -->
+<div class="overlay" id="members-overlay">
+  <div class="modal">
+    <h3>共享裝置名單</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem;">
+      以下裝置正與此帳本共用資料。移除某台裝置只會讓它退出共享，不影響其他裝置，識別碼仍然有效。</p>
+    <div id="members-list" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+    <div class="modal-actions">
+      <button class="btn" style="flex:1"
+        onclick="document.getElementById('members-overlay').classList.remove('open')">關閉</button>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 {% endblock %}
 
@@ -845,6 +961,9 @@
     const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");
     setTimeout(() => t.classList.remove("show"), 2500);
   }
+
+  // 主/從角色：主裝置 (owner) 才可見共享名單/踢除；影響 wipe 文案與行為。
+  const _IS_OWNER = {{ 'true' if is_owner else 'false' }};
 
   // Keep the localStorage mirror of the 識別碼 current (used for silent cookie-loss
   // recovery on the onboarding screen — see shell.html / onboarding.html).
@@ -883,6 +1002,9 @@
     document.getElementById('section-accounts').style.display = tab === 'accounts' ? 'grid' : 'none';
     document.getElementById('section-budget').style.display = tab === 'budget' ? 'block' : 'none';
     document.getElementById('section-sync').style.display = tab === 'sync' ? 'block' : 'none';
+    // 每個 section 只有一份 .sticky-area；把唯一的 #page-tabs 節點搬進目前顯示中
+    // section 的 .sticky-area 最前面，避免同分頁疊出兩層各自 sticky 的元素。
+    document.querySelector('#section-' + tab + ' .sticky-area').prepend(document.getElementById('page-tabs'));
     if (tab === 'categories') switchCatListTab(currentCatTab);
     if (tab === 'groups') switchGrpListTab(currentGrpTab);
     if (tab === 'budget') onBudgetTabActivated();
@@ -955,12 +1077,16 @@
     document.getElementById('cat-empty-msg').style.display = count === 0 ? 'block' : 'none';
   }
 
-  function openCatEdit(id, name, group_name, type, is_asset, in_budget) {
+  function openCatEdit(id, name, group_name, type, is_asset, in_budget, is_system) {
     document.getElementById('cat-e-id').value = id; document.getElementById('cat-e-name').value = name;
     document.querySelector(`input[name="cat-e-type"][value="${type}"]`).checked = true;
     filterCatGroupSelect('cat-e-group', type);
     setTimeout(() => { document.getElementById('cat-e-group').value = group_name; }, 0);
     document.getElementById('cat-e-in_budget').checked = !!in_budget;
+    document.getElementById('cat-e-name').disabled = !!is_system;
+    document.getElementById('cat-e-group').disabled = !!is_system;
+    document.getElementById('cat-e-type-exp').disabled = !!is_system;
+    document.getElementById('cat-e-type-inc').disabled = !!is_system;
     document.getElementById('cat-edit-overlay').classList.add('open');
   }
   async function saveCatEdit() {
@@ -1100,6 +1226,14 @@
   // Budget (per-month)
   let budgetCats = {};   // id -> amount (only entries for picked/checked categories)
   let budgetGroups = {}; // id -> amount (only entries for picked/checked groups)
+  let budgetCatsLast = {};   // id -> 該月編輯期間最後輸入的金額，取消勾選後仍保留，重新勾選時免重打
+  let budgetGroupsLast = {}; // 同上，for 群組
+  let budgetDirty = false;   // 目前月份是否有未存檔的變更
+  let budgetPendingMonthDelta = null; // 切換月份時若有未存檔變更，暫存使用者想切換的方向，等對話框回應後再套用
+
+  function markBudgetDirty() {
+    budgetDirty = true;
+  }
 
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1111,6 +1245,15 @@
   }
 
   async function budgetChangeMonth(delta) {
+    if (budgetDirty) {
+      budgetPendingMonthDelta = delta;
+      document.getElementById('budget-unsaved-overlay').classList.add('open');
+      return;
+    }
+    await applyBudgetMonthDelta(delta);
+  }
+
+  async function applyBudgetMonthDelta(delta) {
     budgetMonth += delta;
     if (budgetMonth < 1) { budgetMonth = 12; budgetYear--; }
     if (budgetMonth > 12) { budgetMonth = 1; budgetYear++; }
@@ -1118,11 +1261,45 @@
     await loadBudgetForMonth();
   }
 
-  // ── 細項預算：選擇項目下拉選單（樣式參考圖表專區的篩選） ──
+  function budgetUnsavedCancel() {
+    budgetPendingMonthDelta = null;
+    document.getElementById('budget-unsaved-overlay').classList.remove('open');
+  }
+
+  async function budgetUnsavedDiscardAndSwitch() {
+    document.getElementById('budget-unsaved-overlay').classList.remove('open');
+    const delta = budgetPendingMonthDelta;
+    budgetPendingMonthDelta = null;
+    if (delta === null) return;
+    budgetDirty = false;
+    await applyBudgetMonthDelta(delta);
+  }
+
+  async function budgetUnsavedSaveThenSwitch() {
+    const ok = await saveAllBudgets();
+    document.getElementById('budget-unsaved-overlay').classList.remove('open');
+    if (!ok) { budgetPendingMonthDelta = null; return; }
+    const delta = budgetPendingMonthDelta;
+    budgetPendingMonthDelta = null;
+    if (delta === null) return;
+    await applyBudgetMonthDelta(delta);
+  }
+
+  // ── 細項預算：選擇項目下拉選單（群組／類別分開，樣式參考圖表專區的篩選） ──
   const BUDGET_GRP_OPTS = Array.from(document.querySelectorAll('#budget-grp-source .opt-src'))
     .map(el => ({ id: el.dataset.id, name: el.dataset.name }));
   const BUDGET_CAT_OPTS = Array.from(document.querySelectorAll('#budget-cat-source .opt-src'))
     .map(el => ({ id: el.dataset.id, name: el.dataset.name, groupName: el.dataset.groupName }));
+  const BUDGET_GRP_BY_NAME = Object.fromEntries(BUDGET_GRP_OPTS.map(g => [g.name, g]));
+  // 未分類：沒有對應真實群組的類別，比照群組一樣有自己的彙總預算輸入列；id 用 '0'，不會與真實群組 id 衝突
+  const UNCAT_ID = '0';
+  const UNCAT_NAME = '未分類';
+  const BUDGET_ALL_GRP_OPTS = BUDGET_GRP_OPTS.concat([{ id: UNCAT_ID, name: UNCAT_NAME }]);
+
+  function resolveGroupFor(cat) {
+    if (!cat) return null;
+    return BUDGET_GRP_BY_NAME[cat.groupName] || { id: UNCAT_ID, name: UNCAT_NAME };
+  }
 
   function budgetItemCheckSvg() {
     return '<svg class="check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -1165,43 +1342,64 @@
     }
   });
 
+  function groupSumFromCats(groupName) {
+    return BUDGET_CAT_OPTS
+      .filter(c => c.groupName === groupName && budgetCats.hasOwnProperty(c.id))
+      .reduce((sum, c) => sum + (budgetCats[c.id] || 0), 0);
+  }
+
   function toggleBudgetItem(kind, id) {
-    const map = kind === 'grp' ? budgetGroups : budgetCats;
-    if (map.hasOwnProperty(id)) delete map[id];
-    else map[id] = 0;
+    markBudgetDirty();
+    if (kind === 'cat') {
+      const cat = BUDGET_CAT_OPTS.find(c => c.id === id);
+      if (budgetCats.hasOwnProperty(id)) {
+        delete budgetCats[id];
+      } else {
+        // 重新勾選時優先還原本次編輯期間最後輸入過的金額，不用重打
+        budgetCats[id] = budgetCatsLast[id] || 0;
+        // 選類別時自動勾選所屬群組（含未分類），並將群組預算預設為旗下已設定類別的加總
+        const grp = resolveGroupFor(cat);
+        if (grp && !budgetGroups.hasOwnProperty(grp.id)) {
+          const floor = groupSumFromCats(grp.name);
+          budgetGroups[grp.id] = Math.max(budgetGroupsLast[grp.id] || 0, floor);
+          budgetGroupsLast[grp.id] = budgetGroups[grp.id];
+        }
+      }
+      const grp = resolveGroupFor(cat);
+      if (grp && budgetGroups.hasOwnProperty(grp.id)) {
+        const minSum = groupSumFromCats(grp.name);
+        if (budgetGroups[grp.id] < minSum) budgetGroups[grp.id] = minSum;
+      }
+    } else {
+      const map = budgetGroups;
+      if (map.hasOwnProperty(id)) {
+        delete map[id];
+      } else {
+        const grp = BUDGET_ALL_GRP_OPTS.find(g => g.id === id);
+        const floor = grp ? groupSumFromCats(grp.name) : 0;
+        map[id] = Math.max(budgetGroupsLast[id] || 0, floor);
+      }
+    }
     syncBudgetItemMenuUI();
     renderBudgetAmountSections();
   }
 
   function renderBudgetAmountSections() {
-    // 依群組分節：先列出有勾選群組預算或勾選類別的群組
+    // 依群組分節（含未分類）：先列出有勾選群組預算或勾選類別的群組
     const sections = [];
-    BUDGET_GRP_OPTS.forEach(g => {
+    BUDGET_ALL_GRP_OPTS.forEach(g => {
       const catsInGroup = BUDGET_CAT_OPTS.filter(c => c.groupName === g.name && budgetCats.hasOwnProperty(c.id));
       const groupPicked = budgetGroups.hasOwnProperty(g.id);
       if (!groupPicked && catsInGroup.length === 0) return;
-      let rows = '';
-      if (groupPicked) {
-        rows += budgetAmountRowHtml('grp', g.id, g.name, budgetGroups[g.id], true);
-      }
-      catsInGroup.forEach(c => {
-        rows += budgetAmountRowHtml('cat', c.id, c.name, budgetCats[c.id], false);
-      });
+      const rows = catsInGroup.map(c => budgetAmountRowHtml('cat', c.id, c.name, budgetCats[c.id], false)).join('');
+      const titleHtml = groupPicked
+        ? budgetGroupTitleHtml(g.id, g.name, budgetGroups[g.id])
+        : `<div class="budget-amount-group-title">${esc(g.name)}</div>`;
       sections.push(`<div class="budget-amount-group">
-        <div class="budget-amount-group-title">${esc(g.name)}</div>
+        ${titleHtml}
         ${rows}
       </div>`);
     });
-    // 未分類到任何群組的已勾選類別（防呆）
-    const groupNames = BUDGET_GRP_OPTS.map(g => g.name);
-    const orphanCats = BUDGET_CAT_OPTS.filter(c => budgetCats.hasOwnProperty(c.id) && !groupNames.includes(c.groupName));
-    if (orphanCats.length) {
-      let rows = orphanCats.map(c => budgetAmountRowHtml('cat', c.id, c.name, budgetCats[c.id], false)).join('');
-      sections.push(`<div class="budget-amount-group">
-        <div class="budget-amount-group-title">未分類</div>
-        ${rows}
-      </div>`);
-    }
 
     const el = document.getElementById('budget-amount-sections');
     const emptyMsg = document.getElementById('budget-amount-empty');
@@ -1209,21 +1407,75 @@
     emptyMsg.style.display = sections.length ? 'none' : 'block';
   }
 
-  function budgetAmountRowHtml(kind, id, name, amount, isGroup) {
-    return `<div class="budget-amount-row">
-      <span class="budget-amount-name${isGroup ? ' is-group' : ''}">${esc(name)}</span>
+  function budgetGroupTitleHtml(id, name, amount) {
+    return `<div class="budget-amount-group-title budget-amount-group-title-with-input">
+      <span>${esc(name)}</span>
       <span class="budget-amount-input-wrap">
         <span class="amt-sign">NT$</span>
         <input type="number" min="0" placeholder="0" value="${amount || ''}"
-          onchange="setBudgetAmount('${kind}', '${esc(id)}', this.value)">
+          onchange="setBudgetAmount('grp', '${esc(id)}', this)">
       </span>
     </div>`;
   }
 
-  function setBudgetAmount(kind, id, value) {
-    const amount = parseFloat(value || 0);
-    if (kind === 'grp') budgetGroups[id] = amount;
-    else budgetCats[id] = amount;
+  function budgetAmountRowHtml(kind, id, name, amount, isGroup) {
+    return `<div class="budget-amount-row${isGroup ? ' is-group-row' : ''}">
+      <span class="budget-amount-name${isGroup ? ' is-group' : ''}">${esc(name)}</span>
+      <span class="budget-amount-input-wrap">
+        <span class="amt-sign">NT$</span>
+        <input type="number" min="0" placeholder="0" value="${amount || ''}"
+          onchange="setBudgetAmount('${kind}', '${esc(id)}', this)">
+      </span>
+    </div>`;
+  }
+
+  function setBudgetAmount(kind, id, inputEl) {
+    let amount = parseFloat(inputEl.value || 0);
+    markBudgetDirty();
+    if (kind === 'cat') {
+      // 已勾選的細項不得將預算設為 0；要取消追蹤請直接取消勾選該項目
+      if (amount <= 0) {
+        toast('細項預算不得為 0，如不需設定請取消勾選該項目');
+        amount = budgetCats[id] || 0;
+        inputEl.value = amount || '';
+        return;
+      }
+      budgetCats[id] = amount;
+      budgetCatsLast[id] = amount;
+      const cat = BUDGET_CAT_OPTS.find(c => c.id === id);
+      const grp = resolveGroupFor(cat);
+      if (grp && budgetGroups.hasOwnProperty(grp.id)) {
+        const minSum = groupSumFromCats(grp.name);
+        if (budgetGroups[grp.id] < minSum) {
+          budgetGroups[grp.id] = minSum;
+          budgetGroupsLast[grp.id] = minSum;
+          renderBudgetAmountSections();
+        }
+      }
+    } else {
+      const grp = BUDGET_ALL_GRP_OPTS.find(g => g.id === id);
+      const minSum = grp ? groupSumFromCats(grp.name) : 0;
+      if (amount < minSum) {
+        toast(`群組預算不得低於旗下類別預算加總（NT$ ${minSum}）`);
+        amount = minSum;
+        inputEl.value = amount || '';
+      }
+      budgetGroups[id] = amount;
+      budgetGroupsLast[id] = amount;
+    }
+  }
+
+  function budgetItemsTotal() {
+    // 已設定細項預算的總和：勾選群組（含未分類）的預算 + 未被涵蓋的孤兒類別預算，避免群組與其類別重複計算
+    const pickedGroupNames = Object.keys(budgetGroups)
+      .map(gid => BUDGET_ALL_GRP_OPTS.find(g => g.id === gid))
+      .filter(Boolean).map(g => g.name);
+    let sum = Object.values(budgetGroups).reduce((s, v) => s + (v || 0), 0);
+    Object.entries(budgetCats).forEach(([cid, amount]) => {
+      const cat = BUDGET_CAT_OPTS.find(c => c.id === cid);
+      if (!cat || !pickedGroupNames.includes(cat.groupName)) sum += (amount || 0);
+    });
+    return sum;
   }
 
   async function loadBudgetForMonth() {
@@ -1231,24 +1483,67 @@
     if (!res.ok) return;
     const data = await res.json();
     document.getElementById('total-budget-input').value = data.total_budget || 0;
+    // 換月／重新載入視為新的編輯期間，重置「取消勾選後保留金額」的暫存與未存檔標記
     budgetCats = {};
-    (data.categories || []).forEach(cb => { if (cb.amount) budgetCats[String(cb.id)] = cb.amount; });
+    budgetCatsLast = {};
+    (data.categories || []).forEach(cb => {
+      if (cb.amount) { budgetCats[String(cb.id)] = cb.amount; budgetCatsLast[String(cb.id)] = cb.amount; }
+    });
     budgetGroups = {};
-    (data.groups || []).forEach(gb => { if (gb.amount) budgetGroups[String(gb.id)] = gb.amount; });
+    budgetGroupsLast = {};
+    (data.groups || []).forEach(gb => {
+      if (gb.amount) { budgetGroups[String(gb.id)] = gb.amount; budgetGroupsLast[String(gb.id)] = gb.amount; }
+    });
+    budgetDirty = false;
     syncBudgetItemMenuUI();
     renderBudgetAmountSections();
   }
 
+  async function applyPreviousMonthBudget() {
+    // 僅將前一個月份「實際設定過」的預算拉進目前編輯狀態，不自動存檔——使用者確認後仍需按「存檔」
+    let py = budgetYear, pm = budgetMonth - 1;
+    if (pm < 1) { pm = 12; py--; }
+    const res = await fetch(`/api/budget?year=${py}&month=${pm}`);
+    if (!res.ok) return toast('套用失敗');
+    const data = await res.json();
+    document.getElementById('total-budget-input').value = data.total_budget || 0;
+    budgetCats = {};
+    budgetCatsLast = {};
+    (data.categories || []).forEach(cb => {
+      if (cb.amount) { budgetCats[String(cb.id)] = cb.amount; budgetCatsLast[String(cb.id)] = cb.amount; }
+    });
+    budgetGroups = {};
+    budgetGroupsLast = {};
+    (data.groups || []).forEach(gb => {
+      if (gb.amount) { budgetGroups[String(gb.id)] = gb.amount; budgetGroupsLast[String(gb.id)] = gb.amount; }
+    });
+    markBudgetDirty();
+    syncBudgetItemMenuUI();
+    renderBudgetAmountSections();
+    toast('已套用前月設定，請確認後存檔');
+  }
+
   async function saveAllBudgets() {
     const total = parseFloat(document.getElementById('total-budget-input').value || 0);
+    const itemsTotal = budgetItemsTotal();
+    if (total < itemsTotal) {
+      toast(`月預算不得小於已設定細項預算總和（NT$ ${itemsTotal}）`);
+      return false;
+    }
     const categories = Object.entries(budgetCats).map(([id, amount]) => ({ id: parseInt(id), amount }));
     const groups = Object.entries(budgetGroups).map(([id, amount]) => ({ id: parseInt(id), amount }));
     const res = await fetch('/api/budget', {
       method: 'POST',
       body: JSON.stringify({ year: budgetYear, month: budgetMonth, total_budget: total, categories, groups })
     });
-    if (res.ok) { toast("儲存成功"); notifyDataChanged(); }
-    else toast("儲存失敗");
+    if (res.ok) {
+      toast("儲存成功");
+      notifyDataChanged();
+      budgetDirty = false;
+      return true;
+    }
+    toast("儲存失敗");
+    return false;
   }
 
   async function clearAllBudgets() {
@@ -1256,8 +1551,14 @@
       method: 'POST',
       body: JSON.stringify({ year: budgetYear, month: budgetMonth })
     });
-    if (res.ok) { toast("已清除本月預算"); notifyDataChanged(); loadBudgetForMonth(); }
-    else toast("清除失敗");
+    if (res.ok) {
+      toast("已清除本月預算");
+      notifyDataChanged();
+      budgetDirty = false;
+      loadBudgetForMonth();
+    } else {
+      toast("清除失敗");
+    }
   }
 
   buildBudgetItemMenu();
@@ -1305,13 +1606,22 @@
   let _wipeConfirming = false;
 
 
+  // 從裝置刪除 = 退出共享（不動主帳本）；主裝置刪除 = 全清並讓所有從裝置登出。
+  const _WIPE_LABEL = _IS_OWNER ? '↓ 匯出備份並刪除所有資料' : '↓ 退出共享並清除此裝置';
+  const _WIPE_CONFIRM = _IS_OWNER ? '確認刪除所有資料？再按一次確認' : '確認退出共享？再按一次確認';
+  // HTML 預設是主裝置文案；從裝置載入時改寫按鈕與說明。
+  try {
+    const _wipeBtn = document.getElementById('btn-wipe');
+    if (_wipeBtn && !_IS_OWNER) _wipeBtn.textContent = _WIPE_LABEL;
+  } catch (e) { }
+
   async function wipeData() {
     const btn = document.getElementById('btn-wipe');
     if (!_wipeConfirming) {
       _wipeConfirming = true;
-      btn.textContent = '確認刪除所有資料？再按一次確認';
+      btn.textContent = _WIPE_CONFIRM;
       setTimeout(() => {
-        if (_wipeConfirming) { _wipeConfirming = false; btn.textContent = '↓ 匯出備份並刪除所有資料'; }
+        if (_wipeConfirming) { _wipeConfirming = false; btn.textContent = _WIPE_LABEL; }
       }, 5000);
       return;
     }
@@ -1322,7 +1632,8 @@
       // wiping). Blob download stays inside the app — unlike window.open / navigating
       // to the URL, which on an iOS home-screen PWA backgrounds the app, freezes its
       // timers, and leaves this button stuck on 處理中.
-      await downloadBlob('/api/export/zip', backupFilename());
+      // 主裝置刪除會銷毀整份帳本，先匯出備份；從裝置只是退出共享，帳本仍在主裝置上，無需備份。
+      if (_IS_OWNER) await downloadBlob('/api/export/zip', backupFilename());
       await fetch('/api/data/wipe', { method: 'POST' });
       notifyDataChanged();
       try { localStorage.removeItem('sync_code'); } catch (e) { }
@@ -1330,7 +1641,7 @@
       (window.top || window).location.replace('/onboarding');
     } catch (e) {
       toast('處理失敗，請重試');
-      btn.textContent = '↓ 匯出備份並刪除所有資料'; btn.disabled = false;
+      btn.textContent = _WIPE_LABEL; btn.disabled = false;
     }
   }
 
@@ -1381,6 +1692,28 @@
     }
   }
 
+  // Mint the 識別碼 on demand. Kept out of page render (see category_routes) so the
+  // folder-move it may trigger never races the shell's sibling iframes.
+  async function revealSyncCode() {
+    const btn = document.getElementById('btn-sync-reveal');
+    btn.textContent = '產生中...'; btn.disabled = true;
+    try {
+      const res = await fetch('/api/sync-code/ensure', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        const disp = document.getElementById('sync-code-display');
+        disp.textContent = data.code; disp.style.display = '';
+        document.getElementById('btn-sync-regen').style.display = '';
+        try { localStorage.setItem('sync_code', data.code); } catch (e) { }
+        btn.style.display = 'none';
+      } else {
+        toast('產生失敗，請重試'); btn.textContent = '顯示識別碼'; btn.disabled = false;
+      }
+    } catch (e) {
+      toast('產生失敗，請重試'); btn.textContent = '顯示識別碼'; btn.disabled = false;
+    }
+  }
+
   let _syncRegenConfirming = false;
 
   async function regenSyncCode() {
@@ -1408,6 +1741,96 @@
     } finally {
       btn.textContent = '重新產生'; btn.disabled = false;
     }
+  }
+
+  // ── 共享裝置名單（主裝置專用）──
+  let _kickConfirming = null; // 目前處於「再按一次確認」狀態的 device_id
+
+  function shortId(id) { return (id || '').slice(0, 8); }
+
+  async function openMembers() {
+    const overlay = document.getElementById('members-overlay');
+    const list = document.getElementById('members-list');
+    list.innerHTML = '<p style="color:var(--muted);font-size:.85rem;">載入中…</p>';
+    overlay.classList.add('open');
+    _kickConfirming = null;
+    try {
+      const res = await fetch('/api/sync-code/members');
+      const data = await res.json();
+      renderMembers(data.members || []);
+    } catch (e) {
+      list.innerHTML = '<p style="color:var(--danger);font-size:.85rem;">載入失敗，請重試</p>';
+    }
+  }
+
+  function renderMembers(members) {
+    const list = document.getElementById('members-list');
+    list.innerHTML = '';
+    members.forEach(m => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:.5rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.6rem .8rem;';
+      const roleLabel = m.role === 'owner' ? '主裝置' : '從裝置';
+      const selfTag = m.is_self ? '（本裝置）' : '';
+      const left = document.createElement('div');
+      left.innerHTML =
+        '<div style="font-family:\'DM Mono\',monospace;font-size:.95rem;">' + shortId(m.device_id) + '</div>' +
+        '<div style="font-size:.72rem;color:var(--muted);margin-top:.15rem;">' + roleLabel + selfTag + '</div>';
+      row.appendChild(left);
+      // 主裝置可踢除非自己的裝置；自己那列不給按鈕。
+      if (_IS_OWNER && !m.is_self) {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-outline';
+        btn.style.cssText = 'width:auto;padding:.3rem .8rem;font-size:.75rem;color:var(--danger);border-color:var(--danger);';
+        btn.textContent = '移除';
+        btn.onclick = () => kickDevice(m.device_id, btn);
+        row.appendChild(btn);
+      }
+      list.appendChild(row);
+    });
+  }
+
+  async function kickDevice(deviceId, btn) {
+    // 沿用連按兩次確認模式（禁用原生 confirm）。
+    if (_kickConfirming !== deviceId) {
+      _kickConfirming = deviceId;
+      btn.textContent = '再按一次移除';
+      setTimeout(() => {
+        if (_kickConfirming === deviceId) { _kickConfirming = null; btn.textContent = '移除'; }
+      }, 5000);
+      return;
+    }
+    _kickConfirming = null;
+    btn.textContent = '處理中…'; btn.disabled = true;
+    try {
+      const res = await fetch('/api/sync-code/kick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: deviceId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast('已移除該裝置');
+        await openMembers(); // 重新載入名單，並可能收合工具區
+        refreshSyncCountAfterKick();
+      } else {
+        toast(data.error || '移除失敗，請重試');
+        btn.textContent = '移除'; btn.disabled = false;
+      }
+    } catch (e) {
+      toast('移除失敗，請重試');
+      btn.textContent = '移除'; btn.disabled = false;
+    }
+  }
+
+  // 踢除後群組可能只剩主裝置一台，收合「共享裝置名單」按鈕以與初始渲染邏輯一致。
+  function refreshSyncCountAfterKick() {
+    const tools = document.getElementById('sync-owner-tools');
+    fetch('/api/sync-code/members').then(r => r.json()).then(d => {
+      const n = (d.members || []).length;
+      const p = document.getElementById('sync-device-count');
+      if (p) p.childNodes[0].nodeValue = '目前有 ' + n + ' 台裝置與此代碼同步';
+      if (tools) tools.style.display = n > 1 ? '' : 'none';
+    }).catch(() => { });
   }
 
   let _syncLeaveConfirming = false;

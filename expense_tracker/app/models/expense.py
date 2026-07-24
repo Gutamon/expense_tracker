@@ -63,7 +63,11 @@ class ExpenseModel:
             sort_by = "date"
         rows = read_csv("expenses.csv")
         reverse = (order == -1)
-        rows.sort(key=lambda r: (r.get(sort_by) or ""), reverse=reverse)
+        if sort_by == "date":
+            rows.sort(key=lambda r: (r.get("created_at") or "", int(r.get("id") or 0)), reverse=reverse)
+            rows.sort(key=lambda r: (r.get("date") or ""), reverse=reverse)
+        else:
+            rows.sort(key=lambda r: (r.get(sort_by) or ""), reverse=reverse)
         return rows
 
     def get_by_id(self, expense_id: str) -> dict | None:
